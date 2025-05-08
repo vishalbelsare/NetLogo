@@ -2,69 +2,61 @@
 
 package org.nlogo.app.tools
 
-import java.awt.{ BorderLayout, Color, FlowLayout, Frame }
-import java.io.File
+import java.awt.{ BorderLayout, FlowLayout, Frame }
 import java.nio.file.Path
-import javax.swing.{ Action, BorderFactory, JButton, JLabel, JOptionPane, JPanel }
+import javax.swing.{ JLabel, JPanel }
+import javax.swing.border.EmptyBorder
 
-import org.nlogo.api.{ FileIO, LibraryInfoDownloader, LibraryManager }
+import scala.concurrent.ExecutionContext
+
+import org.nlogo.api.{ LibraryInfoDownloader, LibraryManager }
 import org.nlogo.core.I18N
-import org.nlogo.swing.{ ProgressListener, SwingWorker }
+import org.nlogo.swing.{ CustomOptionPane, DialogButton, OptionPane, ProgressListener, ScrollPane, TextArea, Transparent }
+import org.nlogo.theme.{ InterfaceColors, ThemeSync }
 
-class LibrariesDialog( parent:             Frame
-                     , manager:            LibraryManager
-                     , recompile:          () => Unit
-                     , updateSource:       ((String) => String) => Unit
-                     , getExtPathMappings: () => Map[String, Path]
-                     ) extends ToolDialog(parent, "libraries") {
-
-  private lazy val bottomPanelBorder =
-    BorderFactory.createCompoundBorder(
-      BorderFactory.createEmptyBorder(5, 0, 0, 0),
-      BorderFactory.createCompoundBorder(
-        BorderFactory.createMatteBorder(2, 0, 0, 0, Color.LIGHT_GRAY),
-        BorderFactory.createEmptyBorder(10, 10, 10, 10)
-      )
-    )
+class LibrariesDialog( parent:          Frame
+                     , manager:         LibraryManager
+                     , recompile:       () => Unit
+                     , updateSource:    ((String) => String) => Unit
+                     , extPathMappings: Map[String, Path]
+                     ) extends ToolDialog(parent, "libraries") with ThemeSync {
 
   // `tabs` can be converted back to a `JTabbedPane` once other libraries are added, like code modules or models.
   // -JeremyB April 2019
   private lazy val tabs            = new JPanel(new BorderLayout)
+  private lazy val tab             = new LibrariesTab("extensions", manager, status.setText, recompile, updateSource, extPathMappings)
   private lazy val bottomPanel     = new JPanel(new BorderLayout)
   private lazy val status          = new JLabel
-  private lazy val buttonPanel     = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0))
-  private lazy val libPathsButton  = new JButton(I18N.gui("showLibPaths"))
-  private lazy val updateAllButton = new JButton
-  private lazy val tab             = new LibrariesTab("extensions", manager, status.setText, recompile, updateSource, getExtPathMappings)
+  private lazy val buttonPanel     = new JPanel(new FlowLayout(FlowLayout.CENTER, 6, 0)) with Transparent
+  private lazy val libPathsButton  = new DialogButton(false, I18N.gui("showLibPaths"), () => {
+    val mappingsStr = extPathMappings.map { case (k, v) => s"  * $k: $v" }.toSeq.sorted.mkString("\n")
+    val msg = s"""${I18N.gui("libPathsExplanation")}
+                  |
+                  |$mappingsStr""".stripMargin
+    val textArea = new TextArea(15, 60, msg) {
+      setLineWrap(true)
+      setWrapStyleWord(true)
+      setEditable(false)
+    }
+    val scrollPane = new ScrollPane(textArea) {
+      setBackground(InterfaceColors.textAreaBackground())
+    }
+    new CustomOptionPane(LibrariesDialog.this, I18N.gui("showLibPaths"), scrollPane, OptionPane.Options.Ok)
+  })
+  private lazy val updateAllButton = new DialogButton(true, tab.updateAllAction)
 
   protected override def initGUI(): Unit = {
-
     tabs.add(tab)
 
-    bottomPanel.setBorder(bottomPanelBorder)
+    bottomPanel.setBorder(new EmptyBorder(10, 10, 10, 10))
     bottomPanel.add(status, BorderLayout.CENTER)
     bottomPanel.add(buttonPanel, BorderLayout.EAST)
-
-    libPathsButton.addActionListener {
-      _ =>
-        val mappingsStr = getExtPathMappings().map { case (k, v) => s"  * $k: $v" }.toSeq.sorted.mkString("\n")
-        val msg = s"""${I18N.gui("libPathsExplanation")}
-                     |
-                     |$mappingsStr""".stripMargin
-        JOptionPane.showMessageDialog(this, msg, "", JOptionPane.PLAIN_MESSAGE)
-    }
-
-    updateAllButton.setAction(currentUpdateAllAction)
 
     setLayout(new BorderLayout)
     add(tabs, BorderLayout.CENTER)
     add(bottomPanel, BorderLayout.SOUTH)
     setSize(650, 400)
-
   }
-
-  private def currentUpdateAllAction(): Action =
-    tab.updateAllAction
 
   override def setVisible(isVisible: Boolean): Unit = {
     super.setVisible(isVisible)
@@ -78,31 +70,35 @@ class LibrariesDialog( parent:             Frame
 
       listener.start()
 
-      (new SwingWorker[Any, Any] {
-
-        private var changed = false
-
-        override def doInBackground(): Unit = {
-          LibraryInfoDownloader(manager.metadataURL, (_: File) => { changed = true })
-        }
-
-        override def onComplete(): Unit = {
-          if (changed) {
-            val hash = LibraryInfoDownloader.urlToHash(manager.metadataURL)
-            manager.updateLists(new File(FileIO.perUserFile(hash)))
+      import ExecutionContext.Implicits.global
+      LibraryInfoDownloader(manager.metadataURL).foreach {
+        pairOpt =>
+          pairOpt.foreach {
+            case (file, didRewrite) =>
+              if (didRewrite) {
+                manager.updateLists(file)
+              }
           }
           listener.finish()
-        }
-
-      }).execute()
+      }
 
       buttonPanel.getComponents.foreach(c => buttonPanel.remove(c))
 
-      if (!getExtPathMappings().isEmpty)
+      if (!extPathMappings.isEmpty)
         buttonPanel.add(libPathsButton)
       buttonPanel.add(updateAllButton)
 
     }
   }
 
+  override def syncTheme(): Unit = {
+    tab.syncTheme()
+
+    bottomPanel.setBackground(InterfaceColors.dialogBackground())
+
+    libPathsButton.syncTheme()
+    updateAllButton.syncTheme()
+
+    status.setForeground(InterfaceColors.dialogText())
+  }
 }

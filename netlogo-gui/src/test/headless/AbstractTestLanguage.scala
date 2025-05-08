@@ -4,8 +4,8 @@ package org.nlogo.headless
 
 import org.scalatest.Assertions
 import org.nlogo.agent.CompilationManagement
-import org.nlogo.api.{Equality, JobOwner, LogoException, NetLogoLegacyDialect, NetLogoThreeDDialect, Version, WorldDimensions3D }
-import org.nlogo.core.{ AgentKind, CompilerException, Model, Program, WorldDimensions }
+import org.nlogo.api.{ Equality, JobOwner, LogoException, NetLogoLegacyDialect, NetLogoThreeDDialect, Version }
+import org.nlogo.core.{ AgentKind, CompilerException, Model, Program, WorldDimensions, WorldDimensions3D }
 import org.nlogo.nvm.PresentationCompilerInterface
 import org.nlogo.core.Femto
 
@@ -32,7 +32,7 @@ trait AbstractTestLanguage extends Assertions {
 
   def owner: JobOwner = workspace.defaultOwner
 
-  def init() {
+  def init(): Unit = {
     workspace.initForTesting(
       if(Version.is3D)
         new WorldDimensions3D(-5, 5, -5, 5, -5, 5)
@@ -42,7 +42,7 @@ trait AbstractTestLanguage extends Assertions {
 
   def newProgram: Program = Program.fromDialect(dialect)
 
-  def defineProcedures(source: String) {
+  def defineProcedures(source: String): Unit = {
     val results = {
       compiler.compileProgram(
         HeadlessWorkspace.TestDeclarations + source, newProgram, workspace.getExtensionManager(),
@@ -58,7 +58,7 @@ trait AbstractTestLanguage extends Assertions {
     workspace.openModel(model.copy(version = Version.version))
   }
 
-  def testReporter(reporter: String, expectedResult: String, mode: TestMode = NormalMode) {
+  def testReporter(reporter: String, expectedResult: String, mode: TestMode = NormalMode): Unit = {
     workspace.lastLogoException = null
     val actualResult = workspace.evaluateReporter(owner,
       if (mode == NormalMode) reporter
@@ -70,46 +70,51 @@ trait AbstractTestLanguage extends Assertions {
     // as Logo values, and as printed representations.  Most of the time these checks will come out
     // the same, but it's good to have a both, partially as a way of giving both
     // Utils.recursivelyEqual() and Dump.logoObject() lots of testing! - ST 5/8/03
-    withClue(mode + ": not equals(): reporter \"" + reporter + "\"") {
+    withClue(s"$mode: not equals(): reporter \"$reporter\"") {
       assertResult(expectedResult)(
         org.nlogo.api.Dump.logoObject(actualResult, true, false))
     }
     assert(Equality.equals(actualResult,
                            compiler.readFromString(expectedResult)),
-           mode + ": not recursivelyEqual(): reporter \"" + reporter + "\"")
+           s"$mode: not recursivelyEqual(): reporter \"$reporter\"")
   }
   private def privateTestReporterError(reporter: String,
                                        expectedError: String,
                                        actualError: => Option[String],
-                                       mode: TestMode) {
+                                       mode: TestMode): Unit = {
     try {
       testReporter(reporter, expectedError, mode)
-      fail("failed to cause runtime error: \"" + reporter + "\"")
+      fail(s"failed to cause runtime error: `$reporter")
+
     } catch {
       // PureConstantOptimizer throws would-be runtime errors at compile-time, so we check those
       case ex: CompilerException
         if (ex.getMessage.startsWith(CompilerException.RuntimeErrorAtCompileTimePrefix)) =>
           assertResult(CompilerException.RuntimeErrorAtCompileTimePrefix + expectedError)(ex.getMessage)
+
       case ex: CompilerException =>
-        fail("expected runtime error, got compile error: " + ex.getMessage)
+        fail(s"expected runtime error, got compile error: ${ex.getMessage}")
+
       case ex: Throwable =>
-        withClue(mode + ": reporter: " + reporter) {
+        withClue(s"$mode: reporter: $reporter") {
           if (actualError.isEmpty)
-            fail("expected to find an error, but none found")
+            fail(s"expected to find an error, but none found for `$reporter`")
+
           else
             assertResult(expectedError)(actualError.get)
         }
+
     }
   }
-  def testReporterError(reporter: String, error: String, mode: TestMode) {
+  def testReporterError(reporter: String, error: String, mode: TestMode): Unit = {
     privateTestReporterError(reporter, error, Option(workspace.lastLogoException).map(_.getMessage), mode)
   }
-  def testReporterErrorStackTrace(reporter: String, stackTrace: String, mode: TestMode) {
+  def testReporterErrorStackTrace(reporter: String, stackTrace: String, mode: TestMode): Unit = {
     privateTestReporterError(reporter, stackTrace, Option(workspace.lastErrorReport).flatMap(_.stackTrace), mode)
   }
   def testCommand(command: String,
                   agentClass: AgentKind = AgentKind.Observer,
-                  mode: TestMode = NormalMode) {
+                  mode: TestMode = NormalMode): Unit = {
     workspace.lastLogoException = null
     workspace.evaluateCommands(owner,
       if(mode == NormalMode) command
@@ -120,39 +125,39 @@ trait AbstractTestLanguage extends Assertions {
   }
   def testCommandError(command: String, error: String,
                        agentClass: AgentKind = AgentKind.Observer,
-                       mode: TestMode = NormalMode) {
+                       mode: TestMode = NormalMode): Unit = {
     try {
       testCommand(command, agentClass, mode)
-      fail("failed to cause runtime error: \"" + command + "\"")
+      fail(s"failed to cause runtime error: `$command`")
     }
     catch {
       case ex: LogoException =>
-        withClue(mode + ": command: " + command) {
+        withClue(s"$mode: command: $command") {
           assertResult(error)(ex.getMessage)
         }
     }
   }
   def testCommandErrorStackTrace(command: String, stackTrace: String,
                        agentClass: AgentKind = AgentKind.Observer,
-                       mode: TestMode = NormalMode) {
+                       mode: TestMode = NormalMode): Unit = {
     try {
       testCommand(command, agentClass, mode)
-      fail("failed to cause runtime error: \"" + command + "\"")
+      fail(s"failed to cause runtime error: `$command`")
     }
     catch {
       case ex: LogoException =>
-        withClue(mode + ": command: " + command) {
+        withClue(s"$mode: command: $command") {
           // println(workspace.lastErrorReport.stackTrace.get)
           assertResult(stackTrace)(workspace.lastErrorReport.stackTrace.get)
         }
     }
   }
   def testCommandCompilerErrorMessage(command: String, errorMessage: String,
-                                      agentClass: AgentKind = AgentKind.Observer)
+                                      agentClass: AgentKind = AgentKind.Observer): Unit =
   {
     try {
       workspace.compileCommands(command, agentClass)
-      fail("no CompilerException occurred")
+      fail(s"no CompilerException occurred for `$command`")
     }
     catch {
       case ex: CompilerException =>

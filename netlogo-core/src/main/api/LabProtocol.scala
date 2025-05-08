@@ -2,19 +2,41 @@
 
 package org.nlogo.api
 
-case class LabProtocol(name: String,
-                    setupCommands: String,
-                    goCommands: String,
-                    finalCommands: String,
-                    repetitions: Int,
-                    sequentialRunOrder: Boolean,
-                    runMetricsEveryStep: Boolean,
-                    timeLimit: Int,
-                    exitCondition: String,
-                    metrics: List[String],
-                    valueSets: List[RefValueSet])
+case class LabProtocol(name: String = LabDefaultValues.getDefaultName,
+                    preExperimentCommands: String = LabDefaultValues.getDefaultPreExperimentCommands,
+                    setupCommands: String = LabDefaultValues.getDefaultSetupCommands,
+                    goCommands: String = LabDefaultValues.getDefaultGoCommands,
+                    postRunCommands: String = LabDefaultValues.getDefaultPostRunCommands,
+                    postExperimentCommands: String = LabDefaultValues.getDefaultPostExperimentCommands,
+                    repetitions: Int = LabDefaultValues.getDefaultRepetitions,
+                    sequentialRunOrder: Boolean = LabDefaultValues.getDefaultSequentialRunOrder,
+                    runMetricsEveryStep: Boolean = LabDefaultValues.getDefaultRunMetricsEveryStep,
+                    runMetricsCondition: String = LabDefaultValues.getDefaultRunMetricsCondition,
+                    timeLimit: Int = LabDefaultValues.getDefaultTimeLimit,
+                    exitCondition: String = LabDefaultValues.getDefaultExitCondition,
+                    metrics: List[String] = LabDefaultValues.getDefaultMetrics,
+                    constants: List[RefValueSet] = LabDefaultValues.getDefaultConstants,
+                    subExperiments: List[List[RefValueSet]] = LabDefaultValues.getDefaultSubExperiments,
+                    runsCompleted: Int = 0,
+                    runOptions: LabRunOptions = new LabRunOptions)
 {
-  def countRuns = repetitions * valueSets.map(_.length.toInt).product
+  val valueSets =
+    if (subExperiments.isEmpty)
+      List(constants)
+    else {
+      val variables = (constants.map(_.variableName) ::: subExperiments.flatten.map(_.variableName)).distinct
+      for (subExperiment <- subExperiments) yield {
+        var filled = List[RefValueSet]()
+        for (variable <- variables) {
+          filled = filled :+ subExperiment.find(_.variableName == variable)
+                                          .getOrElse(constants.find(_.variableName == variable)
+                                          .getOrElse(new RefEnumeratedValueSet(variable, List(null).asInstanceOf[List[AnyRef]])))
+        }
+        filled
+      }
+    }
+
+  def countRuns = repetitions * valueSets.map(_.map(_.length.toInt).product).sum
 
   // Generate all the possible combinations of values from the ValueSets, in order.  (I'm using
   // Iterator here so that each combination we generate can be garbage collected when we're done
@@ -35,14 +57,14 @@ case class LabProtocol(name: String,
         case set::sets =>
           set.iterator.flatMap(v =>
             combinations(sets).map(m =>
-              if(sequentialRunOrder) (set.variableName,v) :: m
+              if (sequentialRunOrder) (set.variableName,v) :: m
               else m :+ set.variableName -> v))
       }
-    if(sequentialRunOrder) combinations(valueSets)
-      .flatMap(Iterator.fill(repetitions)(_))
+    if (sequentialRunOrder) {
+      valueSets.map(combinations(_).flatMap(x => Iterator.fill(repetitions)(x))).flatten.iterator
+    }
     else {
-      val runners = combinations(valueSets.reverse).toList
-      (for(i <- 1 to repetitions) yield runners).flatten.toIterator
+      Iterator.fill(repetitions)(valueSets.map(x => combinations(x.reverse)).flatten).flatten
     }
   }
 }

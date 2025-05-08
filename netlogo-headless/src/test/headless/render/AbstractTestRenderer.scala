@@ -26,8 +26,8 @@ abstract class AbstractTestRenderer(worldType: WorldType = Torus) extends TestUs
     run()
     def command: String
     def expectedResults: List[Operation]
-    def setup(g:MockGraphics){}
-    def run(){
+    def setup(g:MockGraphics): Unit ={}
+    def run(): Unit ={
       mockTestUsingWorkspace(this.toString, radius = 16, worldType = AbstractTestRenderer.this.worldType) { workspace =>
         val g = new MockGraphics(AbstractTestRenderer.this)
         setup(g)
@@ -40,7 +40,7 @@ abstract class AbstractTestRenderer(worldType: WorldType = Torus) extends TestUs
     }
   }
 
-  def testOperations(g: MockGraphics, expecteds: List[Operation]) {
+  def testOperations(g: MockGraphics, expecteds: List[Operation]): Unit = {
 //    info("expected: " + expecteds.mkString("\n"))
 //    info("actual: " + g.operations.mkString("\n"))
     assert(expecteds.mkString("\n") === g.toString)

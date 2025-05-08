@@ -1,4 +1,4 @@
-#!/usr/bin/env sbt -Dsbt.version=1.1.4 -Dsbt.main.class=sbt.ScriptMain -error
+#!/usr/bin/env sbt -Dsbt.version=1.10.11 -Dsbt.main.class=sbt.ScriptMain -error
 
 // This generates Markdown suitable for pasting into
 // https://github.com/NetLogo/NetLogo/wiki/Release-notes
@@ -7,14 +7,14 @@
 // don't panic; it may take a few minutes to download dependencies
 
 /***
-scalaVersion := "2.12.15"
+scalaVersion := "2.13.16"
 onLoadMessage := ""
 scalacOptions ++= Seq(
   "-deprecation", "-unchecked", "-feature", "-Xfatal-warnings")
 libraryDependencies ++= Seq(
   "net.databinder.dispatch" %% "dispatch-core" % "0.12.0",
-  "net.databinder.dispatch" %% "dispatch-json4s-native" % "0.12.0",
-  "org.slf4j" % "slf4j-nop" % "1.7.32")
+  "net.databinder.dispatch" %% "dispatch-json4s-native" % "0.12.0"
+)
 */
 
 import dispatch._, Defaults._
@@ -47,7 +47,7 @@ def getIssues(state: String): List[Issue] = {
   yield Issue.fromJson(item)
 }
 
-def report(state: String) {
+def report(state: String): Unit = {
   val issues = getIssues(state)
   println(issues.size + " issues with state = " + state)
   for(Issue(n, title, labels) <- issues.sortBy(_.number).sortBy(_.labels.mkString)) {

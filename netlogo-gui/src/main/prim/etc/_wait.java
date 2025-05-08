@@ -9,11 +9,11 @@ import org.nlogo.nvm.Command;
 import org.nlogo.nvm.Context;
 import org.nlogo.nvm.MutableLong;
 
-public final strictfp class _wait
+public final class _wait
     extends Command
     implements org.nlogo.nvm.CustomAssembled {
 
-  private final Let let = new Let("~WAITCOUNTER");
+  private final Let let = new Let("~WAITCOUNTER", null);
 
   @Override
   public void perform(final Context context)

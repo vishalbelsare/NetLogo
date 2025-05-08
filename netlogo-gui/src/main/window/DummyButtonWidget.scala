@@ -2,41 +2,29 @@
 
 package org.nlogo.window
 
-import org.nlogo.api.{ Editable, Property }
-import org.nlogo.core.{ AgentKind, I18N, Button => CoreButton }
-import org.nlogo.awt.{ Fonts => NlogoFonts }
+import java.awt.{ Dimension, Graphics }
 
-import java.awt.{ Color, Dimension, Font, Graphics }
-import java.util.{ List => JList }
+import org.nlogo.awt.Fonts
+import org.nlogo.core.{ AgentKind, I18N, Button => CoreButton, Widget => CoreWidget }
+import org.nlogo.theme.InterfaceColors
 
 object DummyButtonWidget {
   private val MinimumWidth = 55
   private val MinimumHeight = 33
-  private val PreferredTextHorizontalPadding = 28
-  private val PreferredTextVertialPadding = 12
 }
 
-class DummyButtonWidget
-  extends SingleErrorWidget
-  with Editable {
-
-  type WidgetModel = CoreButton
-
+class DummyButtonWidget extends SingleErrorWidget with Editable {
   import DummyButtonWidget._
-
-  setBackground(InterfaceColors.BUTTON_BACKGROUND)
-  setBorder(widgetBorder)
-  org.nlogo.awt.Fonts.adjustDefaultFont(this)
 
   private var _actionKey: Char = '\u0000'
   private var _keyEnabled: Boolean = false
   private var _name: String = ""
 
-  def propertySet: JList[Property] = Properties.dummyButton
+  override def editPanel: EditPanel = new DummyButtonEditPanel(this)
 
   def actionKey: Char = _actionKey
 
-  def actionKey(actionKey: Char): Unit = {
+  def setActionKey(actionKey: Char): Unit = {
     _actionKey = actionKey
   }
 
@@ -62,7 +50,7 @@ class DummyButtonWidget
 
   def name: String = _name
 
-  def name(name: String): Unit = {
+  def setDisplayName(name: String): Unit = {
     _name = name
     displayName(name)
   }
@@ -72,34 +60,23 @@ class DummyButtonWidget
   override def getMinimumSize: Dimension =
     new Dimension(MinimumWidth, MinimumHeight)
 
-  override def getPreferredSize(font: Font): Dimension = {
-    val size = getMinimumSize
-    val fontMetrics = getFontMetrics(font)
-    size.width = StrictMath.max(size.width,
-      fontMetrics.stringWidth(displayName) +
-      PreferredTextHorizontalPadding)
-    size.height = StrictMath.max(size.height,
-      fontMetrics.getMaxDescent +
-      fontMetrics.getMaxAscent +
-      PreferredTextVertialPadding)
-    size
-  }
+  override def getPreferredSize: Dimension =
+    new Dimension(MinimumWidth.max(super.getPreferredSize.width), MinimumHeight.max(super.getPreferredSize.height))
 
   /// painting
 
   override def paintComponent(g: Graphics): Unit = {
-    g.setColor(getBackground)
-    g.fillRect(0, 0, getWidth, getHeight)
+    super.paintComponent(g)
     val size = getSize()
     val fontMetrics = g.getFontMetrics
     val labelHeight =
       fontMetrics.getMaxDescent + fontMetrics.getMaxAscent
     val availableWidth = size.width - 8
     val stringWidth = fontMetrics.stringWidth(displayName)
-    g.setColor(getForeground)
+    g.setColor(InterfaceColors.buttonText())
 
     val shortString =
-      NlogoFonts.shortenStringToFit(displayName, availableWidth, fontMetrics)
+      Fonts.shortenStringToFit(displayName, availableWidth, fontMetrics)
 
     val nx =
       if (stringWidth > availableWidth) 4
@@ -111,33 +88,44 @@ class DummyButtonWidget
     if (actionKeyString != "") {
       val ax = size.width - 4 - fontMetrics.stringWidth(actionKeyString)
       val ay = fontMetrics.getMaxAscent + 2
-      val keyColor =
-        if (keyEnabled) Color.BLACK else Color.GRAY
 
-      g.setColor(keyColor)
+      g.setColor(
+        if (keyEnabled)
+          InterfaceColors.buttonText()
+        else
+          InterfaceColors.buttonTextDisabled()
+      )
+
       g.drawString(actionKeyString, ax - 1, ay)
     }
   }
 
+  override def syncTheme(): Unit = {
+    setBackgroundColor(InterfaceColors.buttonBackground())
+  }
+
   ///
 
-  override def model: WidgetModel = {
-    val b = getBoundsTuple
+  override def model: CoreWidget = {
+    val b = getUnzoomedBounds
     val savedActionKey =
       if (actionKey == 0 || actionKey == ' ') None else Some(actionKey)
     CoreButton(
       display    = name.potentiallyEmptyStringToOption,
-      left = b._1, top = b._2, right = b._3, bottom = b._4,
+      x = b.x, y = b.y, width = b.width, height = b.height, oldSize = _oldSize,
       source     = None,               forever    = false,
       buttonKind = AgentKind.Observer, actionKey  = savedActionKey)
   }
 
-  override def load(button: WidgetModel): AnyRef = {
-    button.actionKey.foreach(k => actionKey(k))
-    name(button.display.optionToPotentiallyEmptyString)
-    setSize(button.right - button.left, button.top - button.bottom)
-    this
+  override def load(model: CoreWidget): Unit = {
+    model match {
+      case button: CoreButton =>
+        button.actionKey.foreach(setActionKey(_))
+        setDisplayName(button.display.optionToPotentiallyEmptyString)
+        oldSize(button.oldSize)
+        setSize(button.width, button.height)
+
+      case _ =>
+    }
   }
-
 }
-

@@ -78,22 +78,30 @@ class ExtensionPrimitiveHandler(extensionManager: ExtensionManager) extends Name
         new core.prim._extern(c.getSyntax)
       case r: PrimitiveReporter =>
         new core.prim._externreport(r.getSyntax)
+      case p =>
+        throw new IllegalStateException
     }
 }
 
 class AgentVariableReporterHandler(program: Program) extends NameHandler {
   import scala.collection.immutable.ListMap
   import PartialFunction.condOpt
+
   override def apply(token: Token) =
     getAgentVariableReporter(token.value.asInstanceOf[String])
       .map{(TokenType.Reporter, _)}
+
   def boolOpt[T](b: Boolean)(x: => T) =
     if (b) Some(x) else None
+
   def mapIndexOpt[T, S](map: ListMap[String, T], key: String)(f: (Int, T) => S): Option[S] =
     if (map.contains(key)) {
       val index = map.keys.toSeq.indexOf(key)
       Some(f(index, map(key)))
-    } else None
+    } else {
+      None
+    }
+
   def getAgentVariableReporter(varName: String): Option[core.Reporter] =
     boolOpt(program.breeds.values.exists(_.owns.contains(varName)))(
       new core.prim._breedvariable(varName)) orElse

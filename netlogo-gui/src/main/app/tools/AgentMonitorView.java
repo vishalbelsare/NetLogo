@@ -10,9 +10,10 @@ import org.nlogo.agent.Patch;
 import org.nlogo.agent.Turtle;
 import org.nlogo.api.Perspective;
 import org.nlogo.api.PerspectiveJ;
+import org.nlogo.swing.WrappingPopupMenu;
 import org.nlogo.window.GUIWorkspace;
 
-public strictfp class AgentMonitorView
+public class AgentMonitorView
     extends org.nlogo.window.View {
   public AgentMonitorView(GUIWorkspace workspace) {
     super(workspace);
@@ -163,9 +164,9 @@ public strictfp class AgentMonitorView
   }
 
   private void doPopup(java.awt.event.MouseEvent e) {
-    javax.swing.JPopupMenu menu = new org.nlogo.swing.WrappingPopupMenu();
+    WrappingPopupMenu menu = new WrappingPopupMenu();
     java.awt.Point p = e.getPoint();
-    p = populateContextMenu(menu, p, (java.awt.Component) e.getSource());
+    populateContextMenu(menu, p);
     if (menu.getSubElements().length > 0) {
       menu.show((java.awt.Component) e.getSource(), p.x, p.y);
     }

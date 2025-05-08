@@ -5,9 +5,10 @@ package org.nlogo.app.tools
 // This is a little piece of ModelsLibraryDialog I wanted to write in Scala without having to
 // convert the whole thing to Scala. - ST 2/27/11
 
+import java.io.{ File, StringReader }
 import java.nio.file.{ Files, Path }
-import java.io.File
 import java.util.{ ArrayList => JArrayList, List => JList }
+import javax.xml.stream.{ XMLInputFactory, XMLStreamConstants }
 
 import com.typesafe.config.{ Config, ConfigException, ConfigFactory, ConfigParseOptions, ConfigSyntax }
 
@@ -21,9 +22,28 @@ object ModelsLibraryIndexReader {
   // and the project itself, so it's copied.  Since extension sample models cannot pre-generate their blurbs,
   // we do it live.  -Jeremy B October 2020
   def getWhatIsIt(path: Path): Option[String] = {
-    import scala.collection.JavaConverters._
+    import scala.jdk.CollectionConverters.ListHasAsScala
     val info = try {
-      Files.readAllLines(path).asScala.mkString("\n").split("\\@\\#\\$\\#\\@\\#\\$\\#\\@\n")(2)
+      val sourceReader = new StringReader(Files.readAllLines(path).asScala.mkString("\n"))
+      val reader = {
+        val factory = XMLInputFactory.newFactory
+
+        factory.setProperty("javax.xml.stream.isCoalescing", true)
+
+        factory.createXMLStreamReader(sourceReader)
+      }
+
+      var text = ""
+
+      while (reader.hasNext && text.isEmpty) {
+        if (reader.next == XMLStreamConstants.START_ELEMENT && reader.getLocalName == "info")
+          text = reader.getElementText
+      }
+
+      reader.close()
+      sourceReader.close()
+
+      text
     } catch {
       case e: Exception => ""
     }
@@ -39,7 +59,7 @@ object ModelsLibraryIndexReader {
   }
 
   def readInfoMap: Map[String, String] = {
-    import scala.collection.JavaConverters._
+    import scala.jdk.CollectionConverters.ListHasAsScala
 
     val parsingConfiguration = ConfigParseOptions.defaults.setSyntax(ConfigSyntax.CONF)
     val index = ConfigFactory.parseFile(new File(ModelsLibrary.modelsRoot, "index.conf"), parsingConfiguration)

@@ -26,14 +26,14 @@ trait FrameCache {
    * Add a new frame in the cache, and make sure we keep only the
    * most valuable ones if we are busting maxSize. NP 2013-01-31
    */
-  def addFrameToCache(index: Int, frame: Frame) {
+  def addFrameToCache(index: Int, frame: Frame): Unit = {
     cache += index -> frame
     if (cache.size > maxFrameCacheSize) {
       // if we are busting cache size
       val keepers = cache.keys.toSeq
         .sortBy(-utility(_, index))
         .take(minFrameCacheSize)
-      cache = cache.filterKeys(keepers.contains)
+      cache = cache.view.filterKeys(keepers.contains).toMap
     }
   }
 

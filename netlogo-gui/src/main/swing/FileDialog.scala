@@ -2,7 +2,7 @@
 
 package org.nlogo.swing
 
-import java.awt.{ Component, Frame }
+import java.awt.{ Component, FileDialog => AWTFileDialog, Frame }
 import java.io.File
 import javax.swing.JFileChooser
 
@@ -27,19 +27,17 @@ object FileDialog {
     * the given file will be the default selection.
     */
   @throws[UserCancelException]
-  def showFiles(component: Component, title: String, mode: Int, file: String): String =
-    showFiles(Hierarchy.getFrame(component), title, mode, file)
+  def showFiles(component: Component, title: String, mode: Int, file: String, allowed: List[String] = Nil): String =
+    showFiles(Hierarchy.getFrame(component), title, mode, file, allowed)
 
   def confirmFileOverwrite(owner: Component, path: String) = {
     // The FileDialog checks for overwrite, but we munge extensions after
     // so we need to check with the user to see if they really meant to use
     // the extension so we don't overwrite anything we're not meant to.
     // -Jeremy B June 2021
-    val options = Array[Object](
-      I18N.gui.get("common.buttons.replace"),
-      I18N.gui.get("common.buttons.cancel"))
-    val message = I18N.gui.getN("file.save.warn.overwrite", path)
-    if (OptionDialog.showMessage(owner, "NetLogo", message, options) != 0) {
+    if (new OptionPane(owner, I18N.gui.get("common.netlogo"), I18N.gui.getN("file.save.warn.overwrite", path),
+                       Seq(I18N.gui.get("common.buttons.replace"), I18N.gui.get("common.buttons.cancel")),
+                       OptionPane.Icons.Question).getSelectedIndex != 0) {
       None
     } else {
       Some(path)
@@ -52,7 +50,7 @@ object FileDialog {
     */
   @throws[UserCancelException]
   def showFiles(parentFrame: Frame, title: String, mode: Int): String =
-    showFiles(parentFrame, title, mode, null)
+    showFiles(parentFrame, title, mode, null, Nil)
 
   @throws[UserCancelException]
   def showDirectories(parentFrame: Frame, title: String): String = {
@@ -68,21 +66,21 @@ object FileDialog {
   }
 
   @throws[UserCancelException]
-  private def showFiles(parentFrame: Frame, title: String, mode: Int, file: String): String = {
-    val dialog = new java.awt.FileDialog(parentFrame, title, mode)
-    dialog.setDirectory(currentDirectory)
+  private def showFiles(parentFrame: Frame, title: String, mode: Int, file: String, allowed: List[String]): String = {
+    val chooser = new AWTFileDialog(parentFrame, title, mode)
+    chooser.setDirectory(currentDirectory)
     if (file != null)
-      dialog.setFile(file)
-    dialog.setVisible(true)
-    if (dialog.getFile == null)
+      chooser.setFile(file)
+    chooser.setVisible(true)
+    if (chooser.getFile == null)
       throw new UserCancelException
-    currentDirectory = dialog.getDirectory
-    if (mode == java.awt.FileDialog.LOAD && !new File(currentDirectory + dialog.getFile).exists)
-      return showFiles(parentFrame, title, mode, dialog.getFile)
-    if (dialog.getDirectory == null)
-      dialog.getFile
+    currentDirectory = chooser.getDirectory
+    if (mode == AWTFileDialog.LOAD && !new File(currentDirectory + chooser.getFile).exists)
+      return showFiles(parentFrame, title, mode, chooser.getFile, allowed)
+    if (chooser.getDirectory == null)
+      chooser.getFile
     else
-      dialog.getDirectory + dialog.getFile
+      chooser.getDirectory + chooser.getFile
   }
 
   private def selectedDirectory(chooser: JFileChooser): String = {

@@ -47,7 +47,10 @@ trait AbstractOptimizerTest extends AnyFunSuite {
         .statements.stmts.head.toString
 
     def compile(source: String, optimizations: Optimizations): ProcedureDefinition = {
-      val procdef +: _ = Scaffold(SourceHeader + " " + source)
+      val procdef = Scaffold(SourceHeader + " " + source) match {
+        case p +: tail => p
+        case _ => throw new IllegalStateException
+      }
       procdef.accept(new Optimizer(optimizations))
       procdef
     }
@@ -294,6 +297,24 @@ class OptimizerTests extends AbstractOptimizerTest {
     withReporterOptimization("AnyOtherWith")
     assertResult("_anyotherwith[_turtles[], [_constboolean:true[]]]")(
       compileReporter("any? other turtles with [true]"))
+  } }
+  test("anyTurtlesOn1") { new OptTest {
+    withReporterOptimization("AnyTurtlesOn")
+    assertResult("_anyturtleson[_patches[]]")(
+      compileReporter("any? turtles-on patches"))
+  } }
+  test("anyTurtlesOn2") { new OptTest {
+    withReporterOptimization("AnyTurtlesOn")
+    assertResult("_anyturtleson[_turtles[]]")(compileReporter("any? turtles-on turtles"))
+  } }
+  test("anyBreedOn1") { new OptTest {
+    withReporterOptimization("AnyBreedOn")
+    assertResult("_anybreedon:FROGS[_patches[]]")(
+      compileReporter("any? frogs-on patches"))
+  } }
+  test("anyBreedOn2") { new OptTest {
+    withReporterOptimization("AnyBreedOn")
+    assertResult("_anybreedon:FROGS[_turtles[]]")(compileReporter("any? frogs-on turtles"))
   } }
   test("countOther") { new OptTest {
     withReporterOptimization("CountOther")

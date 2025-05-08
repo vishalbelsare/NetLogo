@@ -16,7 +16,7 @@ object NetLogoWebExport {
     val codeElement = parsedHtml.getElementById("nlogo-code")
     codeElement.appendText(ModelSigil)
     codeElement.attributes.put("data-filename", "<NetLogoModelName />")
-    Files.write(saveFile.toPath, parsedHtml.outerHtml.replaceAllLiterally(ModelSigil, "<NetLogoModel />").getBytes)
+    Files.write(saveFile.toPath, parsedHtml.outerHtml.replace(ModelSigil, "<NetLogoModel />").getBytes)
   }
 
   lazy val nlwExportFile =
@@ -26,7 +26,7 @@ object NetLogoWebExport {
     taskKey[Unit]("update netlogo web export file")
 
   lazy val settings = Seq(
-    nlwExportFile := (resourceDirectory in Compile).value / "system" / "net-logo-web.html",
+    nlwExportFile := (Compile / resourceDirectory).value / "system" / "net-logo-web.html",
     nlwUpdateExportFile := { apply(nlwExportFile.value) }
   )
 }

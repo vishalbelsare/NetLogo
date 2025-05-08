@@ -45,7 +45,7 @@ class JarLoader(workspace: ExtendableWorkspace) extends ExtensionManager.Extensi
 
   def extensionClassManager(classLoader: ClassLoader, data: ExtensionData): ClassManager =
     try {
-      classLoader.loadClass(data.classManagerName).newInstance match {
+      classLoader.loadClass(data.classManagerName).getDeclaredConstructor().newInstance() match {
         case cm: ClassManager => cm
         case _                =>
           throw new ExtensionManagerException(InvalidClassManager(data.extensionName))
@@ -86,7 +86,7 @@ class JarLoader(workspace: ExtendableWorkspace) extends ExtensionManager.Extensi
         .filter(file => file.isFile && file.getName.toUpperCase.endsWith(".JAR"))
         .map(f => Try(f.toURI.toURL).recover {
           case ex: MalformedURLException => throw new IllegalStateException(ex)
-        }.get)
+        }.get).toIndexedSeq
     else
       Seq[URL]()
 }

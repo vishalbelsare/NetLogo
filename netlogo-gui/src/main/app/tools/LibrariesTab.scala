@@ -2,31 +2,28 @@
 
 package org.nlogo.app.tools
 
-import java.awt.{ BorderLayout, Color, Component, Dimension, FlowLayout, GridLayout }
+import java.awt.{ BorderLayout, Component, Dimension, FlowLayout, Font, GridBagConstraints, GridBagLayout, GridLayout,
+                  Insets }
 import java.awt.font.TextAttribute
 import java.io.IOException
 import java.nio.file.Path
-import javax.swing.{ Action, BorderFactory, Box, DefaultListModel, JButton, JLabel, JList, JOptionPane,
-  JPanel, JScrollPane, JTextField, JTextArea, ListCellRenderer, ListModel }
+import javax.swing.{ Action, Box, DefaultListModel, Icon, JLabel, JList, JPanel, ListCellRenderer, ListModel }
+import javax.swing.border.LineBorder
 import javax.swing.event.{ AncestorEvent, AncestorListener, ListDataEvent, ListDataListener }
 
 import java.util.Collections
 
 import scala.collection.mutable.Buffer
 
-import org.nlogo.api.{ LibraryManager, Version }
+import org.nlogo.api.{ LibraryInfoDownloader, LibraryManager, Version }
 import org.nlogo.awt.EventQueue
 import org.nlogo.core.{ I18N, LibraryInfo, LibraryStatus }
-import org.nlogo.swing.{ BrowserLauncher, EmptyIcon, FilterableListModel, RichAction, SwingWorker }
-import org.nlogo.swing.Utils.icon
+import org.nlogo.swing.{ BrowserLauncher, Button, EmptyIcon, FilterableListModel, OptionPane, RichAction, ScalableIcon,
+                         ScrollPane, SwingWorker, TextArea, TextField, Transparent, Utils }
+import org.nlogo.theme.{ InterfaceColors, ThemeSync }
 import org.nlogo.workspace.ModelsLibrary
 
 object LibrariesTab {
-  val itemHTMLTemplate =
-    """<html>
-      |<h3 style="margin: -10px 0">%s
-      |<p color="#AAAAAA">%s""".stripMargin
-
   def addExtsToSource(source: String, requiredExts: Set[String]): String = {
 
     // We have to be careful here.  I'd love to do clever things, but the extensions
@@ -47,22 +44,22 @@ object LibrariesTab {
 
 }
 
-class LibrariesTab( category:           String
-                  , manager:            LibraryManager
-                  , updateStatus:       String => Unit
-                  , recompile:          () => Unit
-                  , updateSource:       ((String) => String) => Unit
-                  , getExtPathMappings: () => Map[String, Path]
-                  ) extends JPanel(new BorderLayout) {
+class LibrariesTab( category:        String
+                  , manager:         LibraryManager
+                  , updateStatus:    String => Unit
+                  , recompile:       () => Unit
+                  , updateSource:    ((String) => String) => Unit
+                  , extPathMappings: Map[String, Path]
+                  ) extends JPanel(new BorderLayout) with ThemeSync {
 
   import LibrariesTab._
 
-  private val libraries   = manager.getExtensionInfos
-  private val install     = manager.installExtension _
-  private val uninstall   = manager.uninstallExtension _
-  private val updateLists = () => manager.reloadMetadata()
+  private val libraries       = manager.getExtensionInfos
+  private val install         = manager.installExtension _
+  private val uninstall       = manager.uninstallExtension _
+  private val updateLists     = () => manager.reloadMetadata()
 
-  implicit val i18nPrefix = I18N.Prefix("tools.libraries")
+  implicit val i18nPrefix: org.nlogo.core.I18N.Prefix = I18N.Prefix("tools.libraries")
 
   private val baseListModel = new DefaultListModel[LibraryInfo]
 
@@ -100,23 +97,49 @@ class LibrariesTab( category:           String
 
     }
 
-  private val filterField = new JTextField
+  private val topPanel = new JPanel(new GridBagLayout)
+  private val magIcon = new JLabel
+  private val filterField = new TextField
+
+  private val libraryScroll = new ScrollPane(libraryList)
 
   private val sidebar             = Box.createVerticalBox()
-  private val libraryButtonsPanel = new JPanel(new GridLayout(3,1, 2,2))
-  private val installationPanel   = new JPanel(new GridLayout(1,2, 2,2))
+  private val libraryButtonsPanel = new JPanel(new GridLayout(3, 1, 2, 2)) with Transparent
+  private val installationPanel   = new JPanel(new GridLayout(1, 2, 2, 2)) with Transparent
 
-  private val installButton      = new JButton(I18N.gui("install"))
-  private val addToCodeTabButton = new JButton(I18N.gui("addToCodeTab"))
-  private val homepageButton     = new JButton(I18N.gui("homepage"))
-  private val uninstallButton    = new JButton(I18N.gui("uninstall"))
+  private val installButton = new Button(I18N.gui("install"), () => {
+    val installCheck = (lib: LibraryInfo) =>
+      lib.isVersionRequirementMet(Version.version) && lib.status != LibraryStatus.UpToDate
+    val uninstallCheck = (lib: LibraryInfo) => installCheck(lib) && lib.canUninstall
+    perform("uninstalling", uninstall, uninstallCheck)
+    perform("installing", wrappedInstall, installCheck)
+  })
 
-  private val info = new JTextArea(2, 28)
+  private val addToCodeTabButton = new Button(I18N.gui("addToCodeTab"), () => {
+    updateSource(addExtsToSource(_, selectedValues.map(_.codeName).toSet))
+    recompile()
+  })
 
-  private val  installedVersion = new JLabel
-  private val     latestVersion = new JLabel
+  private val homepageButton = new Button(I18N.gui("homepage"), () => {
+    BrowserLauncher.openURI(LibrariesTab.this, selectedValue.homepage.toURI)
+  })
+
+  private val uninstallButton = new Button(I18N.gui("uninstall"), () => {
+    perform("uninstalling", uninstall, _.canUninstall)
+  })
+
+  private val info = new TextArea(2, 28)
+  private val infoScroll = new ScrollPane(info)
+
+  private val installedVersionLabel  = new JLabel(s"${I18N.gui("installedVersion")}: ")
+  private val latestVersionLabel  = new JLabel(s"${I18N.gui("latestVersion")}: ")
+  private val minNetLogoVersionLabel = new JLabel(s"${I18N.gui("minimumVersion")}: ")
+
+  private val installedVersion = new JLabel
+  private val latestVersion = new JLabel
   private val minNetLogoVersion = new JLabel
-  private val nlvPanel          = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0))
+
+  private val nlvPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0)) with Transparent
 
   locally {
 
@@ -125,27 +148,26 @@ class LibrariesTab( category:           String
     def embolden(l: JLabel) =
       l.setFont(l.getFont.deriveFont(Collections.singletonMap(TextAttribute.WEIGHT, TextAttribute.WEIGHT_BOLD)))
 
-    libraryList.setCellRenderer(new CellRenderer(libraryList.getCellRenderer))
+    libraryList.setCellRenderer(new CellRenderer)
 
-    installationPanel  .add(installButton)
+    installationPanel.add(installButton)
+
     libraryButtonsPanel.add(installationPanel)
     libraryButtonsPanel.add(addToCodeTabButton)
     libraryButtonsPanel.add(homepageButton)
-
-    val installedVersionLabel  = new JLabel(s"${I18N.gui("installedVersion")}: ")
-    val    latestVersionLabel  = new JLabel(s"${I18N.gui("latestVersion")}: "   )
-    val minNetLogoVersionLabel = new JLabel(s"${I18N.gui("minimumVersion")}: "  )
 
     embolden(installedVersionLabel)
     embolden(latestVersionLabel)
     embolden(minNetLogoVersionLabel)
 
-    val ivPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0))
+    val ivPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0)) with Transparent
+
     ivPanel.add(installedVersionLabel)
     ivPanel.add(installedVersion)
     ivPanel.setMaximumSize(new Dimension(Short.MaxValue, 20))
 
-    val lvPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0))
+    val lvPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0)) with Transparent
+
     lvPanel.add(latestVersionLabel)
     lvPanel.add(latestVersion)
     lvPanel.setMaximumSize(new Dimension(Short.MaxValue, 20))
@@ -159,20 +181,13 @@ class LibrariesTab( category:           String
 
     info.setLineWrap(true)
     info.setWrapStyleWord(true)
-    info.setBackground(new Color(0,0,0,0))
-    info.setOpaque(false)
     info.setEditable(false)
 
-    val infoScroll = new JScrollPane(info)
-    infoScroll.getViewport.setOpaque(false)
-    infoScroll.setViewportBorder(null)
-    infoScroll.setBorder(BorderFactory.createEmptyBorder(0, 5, 0, 5))
-
     libraryButtonsPanel.setAlignmentX(Component.LEFT_ALIGNMENT)
-    ivPanel            .setAlignmentX(Component.LEFT_ALIGNMENT)
-    lvPanel            .setAlignmentX(Component.LEFT_ALIGNMENT)
-    nlvPanel           .setAlignmentX(Component.LEFT_ALIGNMENT)
-    infoScroll         .setAlignmentX(Component.LEFT_ALIGNMENT)
+    ivPanel.setAlignmentX(Component.LEFT_ALIGNMENT)
+    lvPanel.setAlignmentX(Component.LEFT_ALIGNMENT)
+    nlvPanel.setAlignmentX(Component.LEFT_ALIGNMENT)
+    infoScroll.setAlignmentX(Component.LEFT_ALIGNMENT)
 
     val d = new Dimension(5, 5)
     sidebar.add(libraryButtonsPanel)
@@ -183,29 +198,34 @@ class LibrariesTab( category:           String
     sidebar.add(new Box.Filler(d, d, d))
     sidebar.add(infoScroll)
 
-    val magIcon  = new JLabel(icon("/images/magnify.gif", 20, 32))
-    val topPanel = new JPanel(new BorderLayout)
-    topPanel.add(filterField, BorderLayout.CENTER)
-    topPanel.add(    magIcon, BorderLayout.WEST)
+    val c = new GridBagConstraints
 
-    add(new JScrollPane(libraryList), BorderLayout.CENTER)
-    add(                     sidebar, BorderLayout.EAST)
-    add(                    topPanel, BorderLayout.NORTH)
+    c.insets = new Insets(6, 6, 6, 6)
 
-    uninstallButton.addActionListener(_ => perform("uninstalling", uninstall, _.canUninstall))
+    topPanel.add(magIcon, c)
+
+    c.insets = new Insets(6, 0, 6, 6)
+    c.fill = GridBagConstraints.HORIZONTAL
+    c.weightx = 1
+
+    topPanel.add(filterField, c)
+
+    add(libraryScroll, BorderLayout.CENTER)
+    add(sidebar, BorderLayout.EAST)
+    add(topPanel, BorderLayout.NORTH)
 
     listModel.addListDataListener(
       new ListDataListener {
 
         override def intervalAdded(e: ListDataEvent): Unit =
           if (canUpdateInRange(listModel, e.getIndex0, e.getIndex1))
-            updateAllAction.setEnabled(LibraryManager.enabled && true)
+            updateAllAction.setEnabled(LibraryInfoDownloader.enabled && true)
 
         override def intervalRemoved(e: ListDataEvent): Unit =
-          updateAllAction.setEnabled(LibraryManager.enabled && canUpdate(listModel))
+          updateAllAction.setEnabled(LibraryInfoDownloader.enabled && canUpdate(listModel))
 
         override def contentsChanged(e: ListDataEvent): Unit =
-          updateAllAction.setEnabled(LibraryManager.enabled && canUpdate(listModel))
+          updateAllAction.setEnabled(LibraryInfoDownloader.enabled && canUpdate(listModel))
 
       }
     )
@@ -215,17 +235,7 @@ class LibrariesTab( category:           String
 
     filterField.getDocument.addDocumentListener(() => listModel.filter(filterField.getText))
 
-    installButton.addActionListener(_ => perform("installing", wrappedInstall,
-      lib => lib.isVersionRequirementMet(Version.version) && lib.status != LibraryStatus.UpToDate))
-
-    addToCodeTabButton.addActionListener(_ => {
-      updateSource(addExtsToSource(_, selectedValues.map(_.codeName).toSet))
-      recompile()
-    })
-
-    homepageButton.addActionListener(_ => BrowserLauncher.openURI(this, selectedValue.homepage.toURI))
-
-    updateAllAction.setEnabled(LibraryManager.enabled && canUpdate(listModel))
+    updateAllAction.setEnabled(LibraryInfoDownloader.enabled && canUpdate(listModel))
 
     updateSidebar()
 
@@ -273,9 +283,9 @@ class LibrariesTab( category:           String
       addToCodeTabButton.setEnabled(selectedValues.forall(_.status != LibraryStatus.CanInstall))
 
       installButton.setText(installButtonText)
-      installButton.setEnabled(LibraryManager.enabled && actionableLibraries.length > 0)
+      installButton.setEnabled(LibraryInfoDownloader.enabled && actionableLibraries.length > 0)
 
-      uninstallButton.setEnabled(LibraryManager.enabled && selectedValues.filter(_.status != LibraryStatus.CanInstall).exists(!_.bundled))
+      uninstallButton.setEnabled(LibraryInfoDownloader.enabled && selectedValues.filter(_.status != LibraryStatus.CanInstall).exists(!_.bundled))
       homepageButton.setEnabled(numSelected == 1)
 
       val installToolTip = if (numSelected == 1) selectedValue.downloadURL.toString else null
@@ -310,12 +320,13 @@ class LibrariesTab( category:           String
   }
 
   private def installButtonText: String =
-    if (actionableLibraries.forall(_.status == LibraryStatus.CanInstall))
+    if (actionableLibraries.forall(_.status == LibraryStatus.CanInstall)) {
       I18N.gui("install")
-    else if (actionableLibraries.forall(_.status == LibraryStatus.CanUpdate))
+    } else if (actionableLibraries.forall(_.status == LibraryStatus.CanUpdate)) {
       I18N.gui("update")
-    else
+    } else {
       I18N.gui("update") + " / " + I18N.gui("install")
+    }
 
   private def finishManagement(): Unit = {
     updateSidebar()
@@ -327,7 +338,7 @@ class LibrariesTab( category:           String
   private def selectedValue: LibraryInfo = libraryList.getSelectedValue
 
   private def selectedValues: Buffer[LibraryInfo] = {
-    import scala.collection.JavaConverters._
+    import scala.jdk.CollectionConverters.ListHasAsScala
     libraryList.getSelectedValuesList.asScala
   }
 
@@ -336,12 +347,8 @@ class LibrariesTab( category:           String
       install(lib)
     } catch {
       case ex: IOException =>
-        JOptionPane.showMessageDialog(
-          this
-        , I18N.gui("downloadFailed", lib.downloadURL)
-        , I18N.gui.get("common.messages.error")
-        , JOptionPane.ERROR_MESSAGE
-        )
+        new OptionPane(this, I18N.gui.get("common.messages.error"), I18N.gui("downloadFailed", lib.downloadURL),
+                       OptionPane.Options.Ok, OptionPane.Icons.Error)
     }
 
   private def containsLib(info: LibraryInfo, text: String): Boolean =
@@ -353,7 +360,7 @@ class LibrariesTab( category:           String
       actionIsInProgress = true
       new Worker(opName, fn, selectedValue, multiple = false, { () => actionIsInProgress = false; finishManagement() }).execute()
     } else {
-      val libs = selectedValues.filter(checkIsTarget)
+      val libs = selectedValues.filter(checkIsTarget).toSeq
       numOperatedLibs = libs.length
       updateMultipleOperationStatus(opName)
       runAllWorkersAndThen(opName, fn, libs, multiple = true)(() => finishManagement())
@@ -367,35 +374,76 @@ class LibrariesTab( category:           String
   private def updateSingleOperationStatus(operation: String, libName: String) =
     updateStatus(I18N.gui(operation, libName))
 
-  private class CellRenderer(originalRenderer: ListCellRenderer[_ >: LibraryInfo]) extends ListCellRenderer[LibraryInfo] {
+  private class CellRenderer extends JPanel(new GridBagLayout) with ListCellRenderer[LibraryInfo] {
+    private val noIcon        = new ScalableIcon(new EmptyIcon(24, 24), 24, 24)
+    private val upToDateIcon  = Utils.iconScaledWithColor("/images/check.png", 24, 24, InterfaceColors.checkFilled())
+    private val warningIcon   = Utils.iconScaledWithColor("/images/exclamation-triangle.png", 24, 24,
+                                                          InterfaceColors.warningIcon())
+    private val canUpdateIcon = Utils.iconScaledWithColor("/images/update.png", 24, 24, InterfaceColors.updateIcon())
 
-    private val noIcon        = new EmptyIcon(32, 32)
-    private val upToDateIcon  = icon("/images/nice-checkmark.png", 32, 32)
-    private val warningIcon   = icon("/images/exclamation.png", 32, 32)
-    private val canUpdateIcon = icon("/images/update.gif", 32, 32)
+    private val iconLabel = new JLabel
+    private val nameLabel = new JLabel
+    private val descLabel = new JLabel
 
-    override def getListCellRendererComponent(list: JList[_ <: LibraryInfo], value: LibraryInfo, index: Int, isSelected: Boolean, hasFocus: Boolean) = {
-      val originalComponent = originalRenderer.getListCellRendererComponent(list, value, index, isSelected, hasFocus)
-      originalComponent match {
-        case label: JLabel => {
-          label.setText(itemHTMLTemplate.format(value.name, value.shortDescription))
-          label.setIcon(statusIcon(value.status, value.codeName))
-          label.setIconTextGap(0)
-          label
-        }
-        case _ => originalComponent
-      }
+    locally {
+      val c = new GridBagConstraints
+
+      c.gridx = 0
+      c.gridy = 0
+      c.gridheight = 2
+      c.anchor = GridBagConstraints.WEST
+      c.insets = new Insets(6, 6, 6, 6)
+
+      add(iconLabel, c)
+
+      c.gridx = 1
+      c.gridy = 0
+      c.gridheight = 1
+      c.weightx = 1
+      c.insets = new Insets(6, 0, 3, 6)
+
+      add(nameLabel, c)
+
+      c.gridy = 1
+      c.insets = new Insets(0, 0, 6, 6)
+
+      add(descLabel, c)
+
+      nameLabel.setFont(nameLabel.getFont.deriveFont(14.0f).deriveFont(Font.BOLD))
     }
 
-    private def statusIcon(status: LibraryStatus, extName: String) =
-      if (!getExtPathMappings().contains(extName))
+    override def getListCellRendererComponent(list: JList[_ <: LibraryInfo], value: LibraryInfo, index: Int,
+                                              isSelected: Boolean, hasFocus: Boolean): Component = {
+
+      iconLabel.setIcon(statusIcon(value.status, value.codeName))
+      nameLabel.setText(value.name)
+      descLabel.setText(value.shortDescription)
+
+      if (isSelected) {
+        setBackground(InterfaceColors.dialogBackgroundSelected())
+
+        nameLabel.setForeground(InterfaceColors.dialogTextSelected())
+        descLabel.setForeground(InterfaceColors.dialogTextSelected())
+      } else {
+        setBackground(InterfaceColors.dialogBackground())
+
+        nameLabel.setForeground(InterfaceColors.dialogText())
+        descLabel.setForeground(InterfaceColors.dialogText())
+      }
+
+      this
+    }
+
+    private def statusIcon(status: LibraryStatus, extName: String): Icon =
+      if (!extPathMappings.contains(extName)) {
         status match {
           case LibraryStatus.UpToDate   => upToDateIcon
           case LibraryStatus.CanUpdate  => canUpdateIcon
           case LibraryStatus.CanInstall => noIcon
         }
-      else
+      } else {
         warningIcon
+      }
   }
 
   private class Worker( operation: String, fn: LibraryInfo => Unit
@@ -440,4 +488,34 @@ class LibrariesTab( category:           String
 
   }
 
+  override def syncTheme(): Unit = {
+    setBackground(InterfaceColors.dialogBackground())
+
+    topPanel.setBackground(InterfaceColors.dialogBackground())
+
+    magIcon.setIcon(Utils.iconScaledWithColor("/images/find.png", 15, 15, InterfaceColors.toolbarImage()))
+
+    filterField.syncTheme()
+
+    libraryScroll.setBackground(InterfaceColors.dialogBackground())
+    libraryList.setBackground(InterfaceColors.dialogBackground())
+
+    installButton.syncTheme()
+    addToCodeTabButton.syncTheme()
+    homepageButton.syncTheme()
+    uninstallButton.syncTheme()
+
+    installedVersionLabel.setForeground(InterfaceColors.dialogText())
+    latestVersionLabel.setForeground(InterfaceColors.dialogText())
+    minNetLogoVersionLabel.setForeground(InterfaceColors.dialogText())
+
+    installedVersion.setForeground(InterfaceColors.dialogText())
+    latestVersion.setForeground(InterfaceColors.dialogText())
+    minNetLogoVersion.setForeground(InterfaceColors.dialogText())
+
+    infoScroll.setBorder(new LineBorder(InterfaceColors.textAreaBorderNoneditable()))
+    infoScroll.setBackground(InterfaceColors.textAreaBackground())
+
+    info.syncTheme()
+  }
 }

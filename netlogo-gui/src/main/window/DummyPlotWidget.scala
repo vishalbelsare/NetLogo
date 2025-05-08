@@ -20,20 +20,20 @@ object DummyPlotWidget {
 class DummyPlotWidget(plot: Plot, plotManager: PlotManager) extends AbstractPlotWidget(plot, plotManager) {
   var nameOptions = createNameOptions()
 
-  override def load(model: WidgetModel): AnyRef = {
-    super.load(model)
+  override def editPanel: EditPanel = {
     nameOptions = createNameOptions()
-    if (nameOptions.names.contains(plot.name)) {
+
+    if (nameOptions.names.contains(plot.name))
       nameOptions.selectByName(plot.name)
-    }
-    this
+
+    new DummyPlotEditPanel(this)
   }
 
   override def handle(e: AfterLoadEvent): Unit = {}
 
-  def nameOptions(nameOptions: Options[Plot]): Unit = {
+  def setNameOptions(nameOptions: Options[Plot]): Unit = {
     this.nameOptions = nameOptions
-    plotName(nameOptions.chosenName)
+    setPlotName(nameOptions.chosenName)
   }
 
   def createNameOptions(): Options[Plot] = {
@@ -53,10 +53,5 @@ class DummyPlotWidget(plot: Plot, plotManager: PlotManager) extends AbstractPlot
                 pen.defaultInterval + " " + pen.defaultMode + " " + pen.defaultColor + " " + pen.inLegend + "\n")
       }
     }
-  }
-
-  override def propertySet = {
-    nameOptions = createNameOptions
-    Properties.dummyPlot
   }
 }

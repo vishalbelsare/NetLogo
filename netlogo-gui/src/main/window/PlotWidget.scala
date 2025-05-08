@@ -2,17 +2,20 @@
 
 package org.nlogo.window
 
-import javax.swing.{JMenuItem, JPopupMenu}
-import org.nlogo.awt.ImageSelection
-import org.nlogo.window.Events.PeriodicUpdateEvent
-import java.awt.{Component, Point}
+import java.awt.{ Point, Toolkit }
+import java.awt.event.ActionEvent
 import java.awt.image.BufferedImage
-import org.nlogo.swing.RichJMenuItem
-import org.nlogo.plot.{PlotManagerInterface, Plot}
+import javax.swing.{ AbstractAction, JMenuItem }
+
+import org.nlogo.awt.ImageSelection
 import org.nlogo.core.I18N
+import org.nlogo.editor.Colorizer
+import org.nlogo.plot.{PlotManagerInterface, Plot}
+import org.nlogo.swing.{ MenuItem, PopupMenu }
+import org.nlogo.window.Events.PeriodicUpdateEvent
 
 object PlotWidget{
-  def apply(name:String, plotManager:PlotManagerInterface): PlotWidget = {
+  def apply(name: String, plotManager: PlotManagerInterface, colorizer: Colorizer): PlotWidget = {
     val plot = plotManager.newPlot(name)
     // create a default pen.
     plot.createPlotPen("default", false, "", "plot count turtles")
@@ -21,16 +24,18 @@ object PlotWidget{
     // this would save trouble in other places too where might forget to recompile.
     // however, this would take a good deal of work. maybe someday. -JC 6/1/10
     plotManager.compilePlot(plot)
-    new PlotWidget(plot, plotManager)
+    new PlotWidget(plot, plotManager, colorizer)
   }
 
-  def apply(plotManager: PlotManagerInterface): PlotWidget = this(plotManager.nextName, plotManager)
+  def apply(plotManager: PlotManagerInterface, colorizer: Colorizer): PlotWidget = this(plotManager.nextName, plotManager, colorizer)
 }
 
-class PlotWidget(plot:Plot, plotManager: PlotManagerInterface) extends AbstractPlotWidget(plot, plotManager)
-        with PeriodicUpdateEvent.Handler {
+class PlotWidget(plot: Plot, plotManager: PlotManagerInterface, colorizer: Colorizer)
+  extends AbstractPlotWidget(plot, plotManager) with PeriodicUpdateEvent.Handler {
 
-  def handle(e: PeriodicUpdateEvent){ repaintIfNeeded() }
+  override def editPanel: EditPanel = new PlotEditPanel(this, colorizer)
+
+  def handle(e: PeriodicUpdateEvent): Unit ={ repaintIfNeeded() }
 
   override def hasContextMenu = true
   override def exportable = true
@@ -45,19 +50,23 @@ class PlotWidget(plot:Plot, plotManager: PlotManagerInterface) extends AbstractP
     image
   }
 
-  override def populateContextMenu(menu: JPopupMenu, p: Point, source: Component): Point = {
-    val copyItem = RichJMenuItem(I18N.gui.get("edit.plot.copyimage")){
-      java.awt.Toolkit.getDefaultToolkit.getSystemClipboard.setContents(new ImageSelection(exportGraphics), null)
-    }
-    menu.add(copyItem)
-    p
+  override def populateContextMenu(menu: PopupMenu, p: Point): Unit = {
+    menu.add(new MenuItem(new AbstractAction(I18N.gui.get("edit.plot.copyimage")) {
+      def actionPerformed(e: ActionEvent): Unit = {
+        Toolkit.getDefaultToolkit.getSystemClipboard.setContents(new ImageSelection(exportGraphics), null)
+      }
+    }))
   }
 
   override def extraMenuItems: List[JMenuItem] = List(
-    RichJMenuItem(I18N.gui.get("edit.plot.clearplot")){ clear() }
+    new MenuItem(new AbstractAction(I18N.gui.get("edit.plot.clearplot")) {
+      def actionPerformed(e: ActionEvent): Unit = {
+        clear()
+      }
+    })
   )
 
-  def repaintIfNeeded(){
+  def repaintIfNeeded(): Unit ={
     canvas.repaintIfNeeded()
     refreshGUI()
     recolor()

@@ -3,25 +3,33 @@
 package org.nlogo.headless
 
 import org.nlogo.core.WorldDimensions
-import org.nlogo.api.{ APIVersion, Version }
+import org.nlogo.api.{ APIVersion, ExportPlotWarningAction, LabDefaultValues, LabProtocol, Version }
 import org.nlogo.nvm.LabInterface.Settings
+import org.nlogo.api.PlotCompilationErrorAction
 
 object Main {
   class CancelException extends RuntimeException
 
-  def main(args: Array[String]) {
+  def main(args: Array[String]): Unit = {
     try {
       setHeadlessProperty()
-      parseArgs(args).foreach(runExperiment)
+      parseArgs(args).foreach(runExperiment(_))
     } catch {
       case e: CancelException => // ignore
     }
   }
 
-  def runExperiment(settings: Settings) {
+  def runExperiment(settings: Settings, finish: () => Unit = () => {}): Unit = {
+    var plotCompilationErrorAction: PlotCompilationErrorAction = PlotCompilationErrorAction.Output
+    var exportPlotWarningAction: ExportPlotWarningAction = ExportPlotWarningAction.Output
     def newWorkspace = {
       val w = HeadlessWorkspace.newInstance
+      w.setPlotCompilationErrorAction(plotCompilationErrorAction)
+      w.setExportPlotWarningAction(exportPlotWarningAction)
       w.open(settings.modelPath)
+      plotCompilationErrorAction = PlotCompilationErrorAction.Ignore
+      exportPlotWarningAction = ExportPlotWarningAction.Ignore
+      w.setShouldUpdatePlots(settings.updatePlots)
       w
     }
     val openWs = newWorkspace
@@ -32,13 +40,31 @@ object Main {
     }
     proto match {
       case Some(protocol) =>
-        val lab = HeadlessWorkspace.newLab
-        lab.run(settings, protocol, newWorkspace _)
+        runExperimentWithProtocol(settings, protocol, finish)
+
       case None =>
         throw new IllegalArgumentException("Invalid run, specify experiment name or setup file")
     }
   }
-  def setHeadlessProperty() {
+
+  def runExperimentWithProtocol(settings: Settings, protocol: LabProtocol, finish: () => Unit = () => {}): Unit = {
+    var plotCompilationErrorAction: PlotCompilationErrorAction = PlotCompilationErrorAction.Output
+    var exportPlotWarningAction: ExportPlotWarningAction = ExportPlotWarningAction.Output
+    def newWorkspace = {
+      val w = HeadlessWorkspace.newInstance
+      w.setPlotCompilationErrorAction(plotCompilationErrorAction)
+      w.setExportPlotWarningAction(exportPlotWarningAction)
+      w.open(settings.modelPath)
+      plotCompilationErrorAction = PlotCompilationErrorAction.Ignore
+      exportPlotWarningAction = ExportPlotWarningAction.Ignore
+      w.setShouldUpdatePlots(settings.updatePlots)
+      w
+    }
+    val lab = HeadlessWorkspace.newLab
+    lab.run(settings, protocol, () => newWorkspace, finish)
+  }
+
+  def setHeadlessProperty(): Unit = {
     // force headless mode if it is not set.  This is necessary for the headless workspace to run
     // on most platforms when a display is not available. --CLB
     // note that since our check is for null, so the user can still force the property to false and
@@ -57,20 +83,24 @@ object Main {
     var experiment: Option[String] = None
     var tableWriter: Option[java.io.PrintWriter] = None
     var spreadsheetWriter: Option[java.io.PrintWriter] = None
-    var threads = Runtime.getRuntime.availableProcessors
+    var statsWriter: Option[(java.io.PrintWriter, String)] = None
+    var listsWriter: Option[(java.io.PrintWriter, String)] = None
+    var threads = LabDefaultValues.getDefaultThreads
     var suppressErrors = false
+    var updatePlots = false
     val it = args.iterator
-    def die(msg: String) { Console.err.println(msg); throw new CancelException }
+    def die(msg: String): Unit = { Console.err.println(msg); throw new CancelException }
     def path2writer(path: String) =
       if(path == "-")
         new java.io.PrintWriter(Console.out) {
           // don't close Console.out - ST 6/9/09
-          override def close() { } }
+          override def close(): Unit = { } }
       else
         new java.io.PrintWriter(new java.io.FileWriter(path.trim))
+    var outputPath = ""
     while(it.hasNext) {
       val arg = it.next()
-      def requireHasNext() {
+      def requireHasNext(): Unit = {
         if (!it.hasNext)
           die("missing argument after " + arg)
       }
@@ -96,14 +126,28 @@ object Main {
         { requireHasNext(); setupFile = Some(new java.io.File(it.next())) }
       else if(arg == "--experiment")
         { requireHasNext(); experiment = Some(it.next()) }
-      else if(arg == "--table")
-        { requireHasNext(); tableWriter = Some(path2writer(it.next())) }
-      else if(arg == "--spreadsheet")
-        { requireHasNext(); spreadsheetWriter = Some(path2writer(it.next())) }
+      else if(arg == "--table") {
+        requireHasNext()
+        outputPath = it.next()
+        tableWriter = Some(path2writer(outputPath))
+      }
+      else if(arg == "--spreadsheet") {
+        requireHasNext()
+        val localOut = it.next()
+        if (outputPath.isEmpty)
+          outputPath = localOut
+        spreadsheetWriter = Some(path2writer(localOut))
+      }
+      else if(arg == "--stats")
+        { requireHasNext(); statsWriter = Some((path2writer(it.next()), outputPath)) }
+      else if(arg == "--lists")
+        { requireHasNext(); listsWriter = Some((path2writer(it.next()), outputPath)) }
       else if(arg == "--threads")
         { requireHasNext(); threads = it.next().toInt }
       else if(arg == "--suppress-errors")
         { suppressErrors = true }
+      else if (arg == "--update-plots")
+        { updatePlots = true }
       else
         die("unknown argument: " + arg)
     }
@@ -111,9 +155,14 @@ object Main {
       die("you must specify --model")
     if(setupFile == None && experiment == None)
       die("you must specify either --setup-file or --experiment (or both)")
+    if(listsWriter != None && tableWriter == None && spreadsheetWriter == None)
+      die("you cannot specify --lists without also specifying --table or --spreadsheet")
     val dimStrings = List(minPxcor, maxPxcor, minPycor, maxPycor)
     if(dimStrings.exists(_.isDefined) && dimStrings.exists(!_.isDefined))
       die("if any of min/max-px/ycor are specified, all four must be specified")
+    if (statsWriter != None && (tableWriter == None && spreadsheetWriter == None)) {
+      die("You cannot specify --stats without also specifying --table or --spreadsheet. Try --help for more information.")
+    }
     val dims =
       if(dimStrings.forall(!_.isDefined))
         None
@@ -121,6 +170,6 @@ object Main {
         Some(new WorldDimensions(minPxcor.get.toInt, maxPxcor.get.toInt,
                                  minPycor.get.toInt, maxPycor.get.toInt))
     Some(new Settings(model.get, experiment, setupFile, tableWriter,
-                      spreadsheetWriter, dims, threads, suppressErrors))
+                      spreadsheetWriter, statsWriter, listsWriter, dims, threads, suppressErrors, updatePlots))
   }
 }

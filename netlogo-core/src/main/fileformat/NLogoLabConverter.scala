@@ -14,20 +14,23 @@ object NLogoLabConverter extends AutoConvertable {
 
   def needingConversion(needsConversion: String => Boolean, protocol: LabProtocol): Boolean = {
     import protocol._
-    needsConversion(setupCommands) || needsConversion(goCommands) || needsConversion(finalCommands) ||
+    needsConversion(preExperimentCommands) || needsConversion(setupCommands) || needsConversion(goCommands) ||
+      needsConversion(postRunCommands) || needsConversion(postExperimentCommands) ||
       metrics.exists(needsConversion) || needsConversion(exitCondition)
   }
 
   def autoConvertProtocol(converter: AutoConverter)(protocol:LabProtocol): LabProtocol = {
     import protocol._
     new LabProtocol(name,
+      converter.convertStatement(preExperimentCommands),
       converter.convertStatement(setupCommands),
       converter.convertStatement(goCommands),
-      converter.convertStatement(finalCommands),
-      repetitions, sequentialRunOrder, runMetricsEveryStep, timeLimit,
+      converter.convertStatement(postRunCommands),
+      converter.convertStatement(postExperimentCommands),
+      repetitions, sequentialRunOrder, runMetricsEveryStep, converter.convertStatement(runMetricsCondition), timeLimit,
       if (exitCondition == "") "" else converter.convertReporterExpression(exitCondition),
       metrics.map(converter.convertReporterExpression),
-      valueSets)
+      constants, subExperiments)
   }
 
   override def requiresAutoConversion(model: Model, needsConversion: String => Boolean): Boolean =

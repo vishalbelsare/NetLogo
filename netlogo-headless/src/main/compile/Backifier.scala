@@ -32,18 +32,34 @@ class Backifier(
         new nvmprim._extern(
           extensionManager.replaceIdentifier(c.token.text.toUpperCase)
             .asInstanceOf[nlogoApi.Command])
+
       case core.prim._call(proc) =>
         new nvmprim._call(procedures(proc.name))
+
       case core.prim._let(Some(let), _) =>
         new nvmprim._let(let)
+
+      case core.prim._multilet(lets) =>
+        new nvmprim._multiassign("LET", lets.size)
+
+      case core.prim._multiassignnest(prim, totalNeeded) =>
+        new nvmprim._multiassignnest(prim, totalNeeded)
+
+      case core.prim._multiset(sets) =>
+        new nvmprim._multiassign("SET", sets.size)
+
       case cc: core.prim._carefully =>
         new nvmprim._carefully(cc.let)
+
       case bk: core.prim._bk =>
         new nvmprim._bk(c.token)
+
       case fd: core.prim._fd =>
         new nvmprim._fd(c.token)
+
       case rep: core.prim._repeat =>
         new nvmprim._repeat(c.token)
+
       case _ =>
         fallback[core.Command, nvm.Command](c)
     }

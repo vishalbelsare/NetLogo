@@ -72,9 +72,9 @@ trait Finder extends AnyFunSuite  {
 
   case class TxtsInResources(path: String) extends Iterable[(String, String)] {
     import org.reflections._
-    import collection.JavaConverters._
+    import scala.jdk.CollectionConverters.SetHasAsScala
     override def iterator =
-      new Reflections(path, new scanners.ResourcesScanner())
+      new Reflections(path, scanners.Scanners.Resources)
         .getResources(java.util.regex.Pattern.compile(".*\\.txt"))
         .asScala.toSeq.sorted.iterator
         .map(s =>
@@ -100,7 +100,7 @@ trait Finder extends AnyFunSuite  {
 
   def withFixture[T](name: String)(body: AbstractFixture => T): T
 
-  def runTest(t: LanguageTest, mode: TestMode) {
+  def runTest(t: LanguageTest, mode: TestMode): Unit = {
     withFixture(s"${t.fullName} ($mode)") {
       fixture =>
         val nonDecls = t.entries.filterNot(_.isInstanceOf[Declaration])

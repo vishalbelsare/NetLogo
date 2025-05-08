@@ -2,26 +2,29 @@
 
 package org.nlogo.app
 
-import java.awt.{ Component, Container, FileDialog => AWTFileDialog }
+import java.awt.{ Component, Container, FileDialog => AWTFileDialog, KeyboardFocusManager }
 import java.io.{ File, IOException }
 import java.net.{ URI, URISyntaxException }
 import java.nio.file.Paths
-import javax.swing.{ Action, JOptionPane }
+import javax.swing.Action
 
 import scala.util.{ Failure, Try }
 
 import org.nlogo.core.{ I18N, Model }
-import org.nlogo.api.{ Exceptions, FileIO, ModelLoader, ModelReader, ModelType, Version },
+import org.nlogo.api.{ AbstractModelLoader, Exceptions, FileIO, ModelReader, ModelType, Version },
   ModelReader.{ emptyModelPath, modelSuffix }
 import org.nlogo.app.common.{ Actions, Dialogs, ExceptionCatchingAction }, Actions.Ellipsis
 import org.nlogo.app.codetab.TemporaryCodeTab
 import org.nlogo.app.tools.{ ModelsLibraryDialog, NetLogoWebSaver }
 import org.nlogo.awt.{ Hierarchy, UserCancelException }
-import org.nlogo.fileformat.{ FailedConversionResult, ModelConversion, SuccessfulConversion }
-import org.nlogo.swing.{ FileDialog, ModalProgressTask, OptionDialog, UserAction }, UserAction.MenuAction
-import org.nlogo.window.{ BackgroundFileController, Events, FileController, ReconfigureWorkspaceUI },
-  Events.{AboutToCloseFilesEvent, AboutToQuitEvent, LoadModelEvent, ModelSavedEvent, OpenModelEvent }
-import org.nlogo.workspace.{ AbstractWorkspaceScala, OpenModel, OpenModelFromURI, OpenModelFromSource, SaveModel, SaveModelAs }
+import org.nlogo.fileformat.{ FailedConversionResult, SuccessfulConversion }
+import org.nlogo.fileformat.FileFormat.ModelConversion
+import org.nlogo.swing.{ FileDialog, ModalProgressTask, OptionPane, UserAction }, UserAction.MenuAction
+import org.nlogo.window.{ BackgroundFileController, Events, FileController, GUIWorkspace, ReconfigureWorkspaceUI },
+  Events.{ AboutToCloseFilesEvent, AboutToQuitEvent, AboutToSaveModelEvent, LoadModelEvent, LoadErrorEvent,
+           ModelSavedEvent, OpenModelEvent }
+import org.nlogo.workspace.{ AbstractWorkspaceScala, OpenModel, OpenModelFromURI, OpenModelFromSource, SaveModel,
+                             SaveModelAs }
 
 object FileManager {
   class NewAction(manager: FileManager, parent: Container)
@@ -115,13 +118,11 @@ object FileManager {
       val importPath = org.nlogo.swing.FileDialog.showFiles(
           parent, I18N.gui.get("menu.file.import.hubNetClientInterface"), java.awt.FileDialog.LOAD, null);
       val choice =
-          OptionDialog.showMessage(frame,
-                  I18N.gui.get("menu.file.import.hubNetClientInterface.message"),
-                  I18N.gui.get("menu.file.import.hubNetClientInterface.prompt"),
-                  Array[Object](
-    I18N.gui.get("menu.file.import.hubNetClientInterface.fromInterface"),
-    I18N.gui.get("menu.file.import.hubNetClientInterface.fromClient"),
-    I18N.gui.get("common.buttons.cancel")))
+          new OptionPane(frame, I18N.gui.get("menu.file.import.hubNetClientInterface.message"),
+                         I18N.gui.get("menu.file.import.hubNetClientInterface.prompt"),
+                         Seq(I18N.gui.get("menu.file.import.hubNetClientInterface.fromInterface"),
+                             I18N.gui.get("menu.file.import.hubNetClientInterface.fromClient")),
+                         OptionPane.Icons.Question).getSelectedIndex
 
       if (choice != 2) {
         ModalProgressTask.onUIThread(
@@ -140,7 +141,8 @@ object FileManager {
     group    = UserAction.FileShareGroup
 
     // disabled for 3-D since you can't do that in NetLogo Web - RG 9/10/15
-    setEnabled(! Version.is3D)
+    setEnabled(false) // Disabled until NLW supports '.nlogox' -- Jason B. (3/13/25)
+    //setEnabled(! Version.is3D)
 
     @throws(classOf[UserCancelException])
     @throws(classOf[IOException])
@@ -151,14 +153,28 @@ object FileManager {
 
       val exportFile = new File(exportPath)
       val saver = NetLogoWebSaver(exportPath)
-      saver.save(modelToSave, exportFile.getName)
+
+      val modelString = modelToSave
+      val includes = collectIncludes(modelString)
+
+      if (includes.nonEmpty &&
+        new OptionPane(parent, I18N.gui.get("common.messages.warning"),
+                       I18N.gui.get("menu.file.nlw.prompt.includesWarning"), OptionPane.Options.OkCancel,
+                       OptionPane.Icons.Warning).getSelectedIndex != 0)
+        throw new UserCancelException()
+
+      saver.save(modelString, exportFile.getName, includes)
     }
 
     @throws(classOf[UserCancelException])
     def suggestedFileName: String = {
       if (workspace.getModelType == ModelType.New) {
         manager.saveModel(false)
-        workspace.getModelFileName.stripSuffix(".nlogo") + ".html"
+        val index = workspace.getModelFileName.lastIndexOf(".nlogo")
+        if (index == -1)
+          workspace.getModelFileName
+        else
+          workspace.getModelFileName.substring(0, index) + ".html"
       } else
         workspace.modelNameForDisplay + ".html"
     }
@@ -167,23 +183,20 @@ object FileManager {
     @throws(classOf[IOException])
     def modelToSave: String = {
       if (doesNotMatchWorkingCopy && userWantsLastSaveExported())
-        modelSaver.modelAsString(modelSaver.priorModel, "nlogo")
+        modelSaver.modelAsString(modelSaver.priorModel, "nlogox")
       else
-        modelSaver.modelAsString(modelSaver.currentModel, "nlogo")
+        modelSaver.modelAsString(modelSaver.currentModel, "nlogox")
     }
 
     @throws(classOf[UserCancelException])
     private def userWantsLastSaveExported(): Boolean = {
-      val modelType = workspace.getModelType
       val typeKey =
-        if (modelType == ModelType.Normal) "fromSave" else "fromLibrary"
-      val options = Array[Object](
-        I18N.gui.get("menu.file.nlw.prompt." + typeKey),
-        I18N.gui.get("menu.file.nlw.prompt.fromCurrentCopy"),
-        I18N.gui.get("common.buttons.cancel"))
-      val title   = I18N.gui.get("menu.file.nlw.prompt.title")
-      val message = I18N.gui.get("menu.file.nlw.prompt.message." + typeKey)
-      val choice = OptionDialog.showMessage(parent, title, message, options)
+        if (workspace.getModelType == ModelType.Normal) "fromSave" else "fromLibrary"
+      val choice = new OptionPane(parent, I18N.gui.get("menu.file.nlw.prompt.title"),
+                                  I18N.gui.get("menu.file.nlw.prompt.message." + typeKey),
+                                  Seq(I18N.gui.get("menu.file.nlw.prompt." + typeKey),
+                                      I18N.gui.get("menu.file.nlw.prompt.fromCurrentCopy")),
+                                  OptionPane.Icons.Question).getSelectedIndex
       if (choice == 0)
         true
       else if (choice == 1)
@@ -196,6 +209,23 @@ object FileManager {
     // report if UI values (sliders, etc.) have been changed - RG 9/10/15
     private def doesNotMatchWorkingCopy: Boolean = {
       modelSaver.priorModel != modelSaver.currentModel
+    }
+
+    @throws(classOf[IOException])
+    private def collectIncludes(str: String): List[(String, String)] = {
+      val includes = workspace.compiler.findIncludes(workspace.getModelPath, str, workspace.getCompilationEnvironment)
+
+      if (includes.isEmpty)
+        return Nil
+
+      includes.get.flatMap({ case (name, path) =>
+        val file = scala.io.Source.fromFile(path)
+        val source = file.mkString
+
+        file.close()
+
+        (name, source) :: collectIncludes(source)
+      }).toList
     }
   }
 
@@ -212,7 +242,7 @@ object FileManager {
 
     override def action(): Unit = {
       for {
-        name <- tab.filename.right.toOption
+        name <- tab.filename.toOption
         path <- FileIO.resolvePath(name, Paths.get(workspace.getModelPath))
       } {
         convertIncludeFile.apply(path, modelSaver.currentModel, tab.innerSource) match {
@@ -226,6 +256,18 @@ object FileManager {
     }
   }
 
+  class ManageResourcesAction(manager: FileManager, workspace: AbstractWorkspaceScala, parent: Component)
+    extends ExceptionCatchingAction(I18N.gui.get("menu.file.manageResources"), parent) with MenuAction {
+
+    category = UserAction.FileCategory
+    group = UserAction.FileResourcesGroup
+    rank = 1
+
+    override def action(): Unit = {
+      new ResourceManagerDialog(workspace.asInstanceOf[GUIWorkspace].getFrame, workspace).setVisible(true)
+    }
+  }
+
 }
 
 import FileManager._
@@ -234,12 +276,13 @@ import FileManager._
  *  fileMenu, but it's obviously undesirable to couple the behavior in this class too closely to
  *  its presentation (the menu) */
 class FileManager(workspace: AbstractWorkspaceScala,
-  modelLoader: ModelLoader,
+  modelLoader: AbstractModelLoader,
   modelConverter: ModelConversion,
   dirtyMonitor: DirtyMonitor,
   modelSaver: ModelSaver,
   eventRaiser: AnyRef,
-  parent: Container)
+  parent: Container,
+  tabManager: TabManager)
     extends OpenModelEvent.Handler
     with LoadModelEvent.Handler {
   private var firstLoad: Boolean = true
@@ -304,16 +347,31 @@ class FileManager(workspace: AbstractWorkspaceScala,
   }
 
   private def loadModel(uri: URI, openModel: (OpenModel.Controller) => Option[Model]): Option[Model] = {
-    ModalProgressTask.runForResultOnBackgroundThread(
-      Hierarchy.getFrame(parent), I18N.gui.get("dialog.interface.loading.task"),
-      (dialog) => new BackgroundFileController(dialog, controller),
-      (fileController: BackgroundFileController) =>
-        try {
-          openModel(fileController)
-        } catch {
-          case e: Exception => println("Exception in FileMenu.loadModel: " + e)
+    // if NetLogo isn't currently focused, don't open the progress dialog or it will refocus NetLogo (Isaac B 4/22/25)
+    if (KeyboardFocusManager.getCurrentKeyboardFocusManager.getActiveWindow == null) {
+      try {
+        openModel(controller)
+      } catch {
+        case e: Exception =>
+          println("Exception in FileMenu.loadModel: " + e)
           None
-        })
+      }
+    } else {
+      val result = ModalProgressTask.runForResultOnBackgroundThread(
+        Hierarchy.getFrame(parent), I18N.gui.get("dialog.interface.loading.task"),
+        (dialog) => new BackgroundFileController(dialog, controller),
+        (fileController: BackgroundFileController) =>
+          try {
+            openModel(fileController)
+          } catch {
+            case e: Exception => println("Exception in FileMenu.loadModel: " + e)
+            None
+          })
+      if (result.isEmpty) {
+        new LoadErrorEvent().raise(eventRaiser)
+      }
+      result
+    }
   }
 
   @throws(classOf[UserCancelException])
@@ -330,14 +388,17 @@ class FileManager(workspace: AbstractWorkspaceScala,
   @throws(classOf[UserCancelException])
   private[app] def saveModel(saveAs: Boolean): Unit = {
     val saveThunk = {
-      val saveModel = if (saveAs) SaveModelAs else SaveModel
+      val newFormat =
+        workspace.getModelFileName != null && (workspace.getModelFileName.endsWith(".nlogox") ||
+                                               workspace.getModelFileName.endsWith(".nlogox3d"))
+      val saveModel = if (saveAs || !newFormat) SaveModelAs else SaveModel
       saveModel(currentModel, modelLoader, controller, workspace, Version)
     }
 
     // if there's no thunk, the user canceled the save
     saveThunk.foreach { thunk =>
       val saver = new Saver(thunk)
-      val focusOwner = java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner()
+      val focusOwner = KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner()
       val tempParent = if (focusOwner == null) parent else focusOwner
 
       ModalProgressTask.onUIThread(Hierarchy.getFrame(tempParent),
@@ -348,10 +409,10 @@ class FileManager(workspace: AbstractWorkspaceScala,
 
       saver.result match {
         case Some(Failure(e: Throwable)) =>
-          JOptionPane.showMessageDialog(parent,
-            I18N.gui.getN("menu.file.save.error", e.getMessage),
-            "NetLogo", JOptionPane.ERROR_MESSAGE)
+          new OptionPane(parent, I18N.gui.get("common.netlogo"), I18N.gui.getN("menu.file.save.error", e.getMessage),
+                         OptionPane.Options.Ok, OptionPane.Icons.Error)
         case _ =>
+          ModelConfig.setLastModified(workspace.getModelPath)
       }
     }
   }
@@ -367,8 +428,14 @@ class FileManager(workspace: AbstractWorkspaceScala,
           runLoad(parent, uri, model, modelType, shouldAutoInstallLibs)
         }
       }
-      ModalProgressTask.onUIThread(
-        Hierarchy.getFrame(parent), I18N.gui.get("dialog.interface.loading.task"), loader)
+
+      // if NetLogo isn't currently focused, don't open the progress dialog or it will refocus NetLogo (Isaac B 4/22/25)
+      if (KeyboardFocusManager.getCurrentKeyboardFocusManager.getActiveWindow == null) {
+        loader.run()
+      } else {
+        ModalProgressTask.onUIThread(
+          Hierarchy.getFrame(parent), I18N.gui.get("dialog.interface.loading.task"), loader)
+      }
     }
   }
 
@@ -381,6 +448,7 @@ class FileManager(workspace: AbstractWorkspaceScala,
     var result = Option.empty[Try[URI]]
 
     def run(): Unit = {
+      new AboutToSaveModelEvent().raise(eventRaiser)
       val r = thunk()
       r.foreach { uri =>
         val path = Paths.get(uri).toString
@@ -399,7 +467,8 @@ class FileManager(workspace: AbstractWorkspaceScala,
     new QuitAction(this, parent),
     new ModelsLibraryAction(this, parent),
     new SaveAsNetLogoWebAction(this, workspace, modelSaver, parent),
-    new ImportClientAction(this, workspace, parent))
+    new ImportClientAction(this, workspace, parent),
+    new ManageResourcesAction(this, workspace, parent))
 
   def saveModelActions(parent: Component) = {
     def saveAction(saveAs: Boolean) =
@@ -413,7 +482,14 @@ class FileManager(workspace: AbstractWorkspaceScala,
         rank = 0
 
         @throws(classOf[UserCancelException])
-        override def action(): Unit = saveModel(saveAs)
+        override def action(): Unit = {
+          tabManager.getSelectedTab match {
+            case tempTab: TemporaryCodeTab => tempTab.save(saveAs)
+            case _ => saveModel(saveAs)
+          }
+
+          tabManager.saveOpenTabs()
+        }
       }
 
     Seq(saveAction(false), saveAction(true))

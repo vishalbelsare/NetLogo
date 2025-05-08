@@ -317,6 +317,7 @@
       <a href="#turtles-here">turtles-here</a>
       <a href="#turtles-on">turtles-on</a>
       <a href="#up-to-n-of">up-to-n-of</a>
+      <a href="#who-are-not">who-are-not</a>
       <a href="#with">with</a>
       <a href="#with-max">with-max</a>
       <a href="#with-min">with-min</a>
@@ -529,6 +530,7 @@
       <a href="#file-show">file-show</a>
       <a href="#file-type">file-type</a>
       <a href="#file-write">file-write</a>
+      <a href="#home-directory">home-directory</a>
       <a href="#user-directory">user-directory</a>
       <a href="#user-file">user-file</a>
       <a href="#user-new-file">user-new-file</a>
@@ -753,16 +755,6 @@
         <a href="#thickness">thickness</a>
         <a href="#tie-mode">tie-mode</a>
       </p>
-      <!-- ======================================== -->
-      <h3 id="other-variables">
-        <a>Other</a>
-      </h3>
-      <p>
-        <a href="#arrow">-&gt;</a>
-      </p>
-      <!-- ======================================== -->
-      <!-- ======================================== -->
-      <!-- ======================================== -->
     </div>
     <h2 id="Keywords">
       <a>Keywords</a>
@@ -925,8 +917,9 @@ if all? turtles [color = red]
           true.  Otherwise reports false.
         </p>
         <p>
-          Note that if <i>boolean1</i> is false, then <i>boolean2</i>
-          will not be run (since it can't affect the result).
+          Note that if <i>boolean1</i> is false, then <i>boolean2</i> will not be run (since it can't affect the
+          result).  See <a href="programming.html#commands-and-reporters">the programming guide for more information on
+          logical operator precedence</a>.
         </p>
         <pre>
 if (pxcor &gt; 0) and (pycor &gt; 0)
@@ -3570,6 +3563,17 @@ histogram [color] of turtles
             0</code>.
         </p>
       </div>
+     <div class="dict_entry" id="home-directory">
+        <h3>
+          <a>home-directory<span class="since">6.4.1</span></a>
+        </h3>
+        <h4>
+          <span class="prim_example">home-directory</span>
+        </h4>
+        <p>
+          Reports the user's home directory.
+        </p>
+      </div>
       <div class="dict_entry" id="hsb">
         <h3>
           <a>hsb<span class="since">1.0</span></a>
@@ -4918,10 +4922,21 @@ end
       <p>
         Example:
       </p>
-      <pre>
+<pre>
 let prey one-of sheep-here
 if prey != nobody
   [ ask prey [ die ] ]
+</pre>
+      <p>
+        You can also create multiple local variables if you put the variable names in a list format.  The values for the new variables will be taken from the list given as the second argument.  This can be particular useful when you want to calculate multiple values in a reporter procedure, as you can easily create multiple variables with the results.  A runtime error will occur if you do not give a list of values or the list you provide doesn't have enough values for all the variables.
+      </p>
+<pre>
+let [x y z] [10 15 20]
+show x ; prints 10
+show y ; prints 15
+show z ; prints 20
+
+let [a b c] [10] ; causes a runtime error as we need at least 3 values in the list
 </pre>
     </div>
     <div class="dict_entry" id="link">
@@ -5584,8 +5599,11 @@ show modes [pxcor] of turtles
           <span class="prim_example">mouse-inside?</span>
         </h4>
         <p>
-          Reports true if the mouse pointer is inside the current view,
-          false otherwise.
+          Reports true if the mouse pointer is inside the world boundaries
+          inside the current view, false otherwise.  In the case of an
+          unwrapped world and using <code>follow</code> on an agent, It's possible
+          for the mouse pointer to be inside the view but not inside the
+          world boundaries.
         </p>
       </div>
       <div class="dict_entry" id="mouse-cor">
@@ -6175,8 +6193,9 @@ show one-of mylist
           are true.  Otherwise returns false if both <i>boolean</i>s are false.
         </p>
         <p>
-          Note that if <i>boolean1</i> is true, then <i>boolean2</i> will
-          not be run (since it can't affect the result).
+          Note that if <i>boolean1</i> is true, then <i>boolean2</i> will not be run (since it can't affect the result).
+          See <a href="programming.html#commands-and-reporters">the programming guide for more information on logical
+          operator precedence</a>.
         </p>
         <pre>
 if (pxcor &gt; 0) or (pycor &gt; 0) [ set pcolor red ]
@@ -6605,7 +6624,8 @@ patch-set [neighbors] of turtles
           on the patch. Color can be represented either as a NetLogo color (a
           single number) or an RGB color (a list of 3 numbers). See details
           in the <a href="programming.html#colors">Colors section</a> of the
-          Programming Guide.
+          Programming Guide.  If you give an RGBA color with 4 numbers the
+          transparency value will be ignored (except in NetLogo 3D).
         </p>
         <p>
           See also <a href="#color">color</a>.
@@ -7856,6 +7876,27 @@ show (sentence [1 2] 3 [4 5] (3 + 3) 7)
           <li>A local variable created by the <a href="#let">let</a> command.</li>
           <li>An input to the current procedure.</li>
         </ul>
+        <p>Example:</p>
+<pre>
+ask turtles [
+  set color red
+  set size 2
+  set shape "arrow"
+]
+</pre>
+        <p>
+          You can also give a list of variable names as the first argument for <code>set</code> and they will be assigned the values from a list given as the second argument.  This can be particular useful when you want to calculate multiple values in a reporter procedure, as you can easily set multiple variables with the results.  A runtime error will occur if the second argument is not a list value or if there are not enough values in the list for all the variables specified.
+        </p>
+<pre>
+ask turtles [
+  set [color size shape] [red 2 "arrow"]
+  show color ; prints 15
+  show size ; prints 2
+  show shape ; prints "arrow"
+]
+ask turtles [
+  set [color size shape] [red] ; causes a runtime error as we need at least 3 values in the list
+]
       </div>
       <div class="dict_entry" id="set-current-directory">
         <h3>
@@ -8157,6 +8198,33 @@ ask cats [ set breed dogs ]
         <p>
           These commands will produce a runtime error if the current plot has not been set.
         </p>
+      </div>
+      <div class="dict_entry" id="set-topology">
+        <h3>
+          <a>set-topology<span class="since">7.0</span></a>
+        </h3>
+        <h4>
+          <span class="prim_example">set-topology <i>wraps-in-x? wraps-in-y?</i></span>
+        </h4>
+        <p>
+          Sets the wrapping behavior of the world, such that X coordinates wrap
+          if the first argument was <i>true</i> and Y coordinates wrap if the
+          second argument was <i>true</i>.
+        </p>
+        <p>
+          Equivalent to adjusting the "World wraps horizontally" and "World wraps
+          vertically" checkboxes in the "Model Settings" window.
+        </p>
+        <pre>
+set-topology true true
+;; wrapping in both directions (torus)
+set-topology true false
+;; wrapping only in the X direction (vertical cylinder)
+set-topology false true
+;; wrapping only in the Y direction (horizontal cylinder)
+set-topology false false
+;; no wrapping (box)
+</pre>
       </div>
       <div class="dict_entry" id="setxy">
         <h3>
@@ -9220,10 +9288,10 @@ ask dogs [ show count cats-here ]
           <a>turtles-on<span class="since">2.0</span></a>
         </h3>
         <h4>
-          <span class="prim_example">turtles-on <i>agent</i></span>
-          <span class="prim_example">turtles-on <i>agentset</i></span>
-          <span class="prim_example"><i>&lt;breeds&gt;</i>-on <i>agent</i></span>
-          <span class="prim_example"><i>&lt;breeds&gt;</i>-on <i>agentset</i></span>
+          <span class="prim_example">turtles-on <i>turtle or patch</i></span>
+          <span class="prim_example">turtles-on <i>turtleset or agentset</i></span>
+          <span class="prim_example"><i>&lt;breeds&gt;</i>-on <i>turtle or patch</i></span>
+          <span class="prim_example"><i>&lt;breeds&gt;</i>-on <i>turtleset or patchset</i></span>
           <img alt="Turtle Command" src="images/turtle.gif"/> <img alt="Patch Command" src="images/patch.gif"/>
         </h4>
         <p>
@@ -9850,6 +9918,41 @@ ask turtles [ print who ]
           frog.
         </p>
       </div>
+      <div class="dict_entry" id="who-are-not">
+        <h3>
+          <a>who-are-not<span class="since">6.3.1</span></a>
+        </h3>
+        <h4>
+          <span class="prim_example"><i>agentset</i> who-are-not <i>agentset</i></span>
+          <span class="prim_example"><i>agentset</i> who-are-not <i>agent</i></span>
+        </h4>
+        <p>
+          Takes an agentset on the left and an agentset or an agent on the right.  Reports
+          a new agentset containing all agents from the left-hand agentset that are not in
+          the right-hand agentset (or are not the right-hand agent).
+        </p>
+        <pre>
+breed [frogs frog]
+breed [mice mouse]
+
+create-frogs 10
+create-mice 10
+create-turtles 10
+
+; contains all the turtles who are not frogs
+ask turtles who-are-not frogs [
+  forward 1
+]</pre>
+        <p>Another example:<p>
+        <pre>
+ask turtles [
+  ; contains all the turtles this turtle is not linked to
+  let targets (other turtles who-are-not link-neighbors)
+  if count targets > 0 [
+    create-link-with one-of targets
+  ]
+]</pre>
+      </div>
       <div class="dict_entry" id="with">
         <h3>
           <a>with<span class="since">1.0</span></a>
@@ -10147,8 +10250,9 @@ write &quot;hello world&quot;
           <span class="prim_example"><i>boolean1</i> xor <i>boolean2</i></span>
         </h4>
         <p>
-          Reports true if either <i>boolean1</i> or <i>boolean2</i> is true,
-          but not when both are true.  Otherwise returns false.
+          Reports true if either <i>boolean1</i> or <i>boolean2</i> is true, but not when both are true.  Otherwise
+          returns false.  See <a href="programming.html#commands-and-reporters">the programming guide for more
+          information on logical operator precedence</a>.
         </p>
         <pre>
 if (pxcor &gt; 0) xor (pycor &gt; 0)

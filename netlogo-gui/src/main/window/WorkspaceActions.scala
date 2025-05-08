@@ -6,12 +6,12 @@ import java.awt.event.ActionEvent
 
 import javax.swing.{ AbstractAction, Action }
 
+import org.nlogo.api.{ Refreshable, Version }
 import org.nlogo.core.{ I18N, AgentKind }
-import org.nlogo.api.Refreshable
 import org.nlogo.swing.UserAction._
 
 object WorkspaceActions {
-  implicit val i18nName = I18N.Prefix("menu.tools")
+  implicit val i18nName: org.nlogo.core.I18N.Prefix = I18N.Prefix("menu.tools")
 
   val HaltGroup     = "org.nlogo.window.WorkspaceActions.Halt"
 
@@ -23,11 +23,11 @@ object WorkspaceActions {
       new SimpleGUIWorkspaceAction(I18N.gui("patchMonitor"), ToolsMonitorGroup, workspace, _.inspectAgent(AgentKind.Patch)),
       new SimpleGUIWorkspaceAction(I18N.gui("linkMonitor"), ToolsMonitorGroup, workspace, _.inspectAgent(AgentKind.Link)),
       new SimpleGUIWorkspaceAction(I18N.gui("closeAllAgentMonitors"), ToolsMonitorGroup, workspace, _.closeAgentMonitors),
-      new SimpleGUIWorkspaceAction(I18N.gui("closeDeadAgentMonitors"), ToolsMonitorGroup, workspace, _.stopInspectingDeadAgents),
-      new Open3DViewAction(workspace))
+      new SimpleGUIWorkspaceAction(I18N.gui("closeDeadAgentMonitors"), ToolsMonitorGroup, workspace, _.stopInspectingDeadAgents()),
+    ) ++ (if (Version.is3D) Seq() else Seq(new Open3DViewAction(workspace)))
 
-  def interfaceActions(workspace: GUIWorkspace): Seq[Action] =
-    Seq(new SnapToGridAction(workspace))
+  def interfaceActions(workspace: GUIWorkspace, widgetPanel: AbstractWidgetPanel): Seq[Action] =
+    Seq(new SnapToGridAction(workspace, widgetPanel))
 
   class GUIWorkspaceAction(name: String, workspace: GUIWorkspace) extends AbstractAction(name) with MenuAction {
     def performAction(workspace: GUIWorkspace): Unit = {}
@@ -76,11 +76,11 @@ class HubNetControlCenterAction(workspace: GUIWorkspace)
     accelerator = KeyBindings.keystroke('H', withMenu = true, withShift = true)
 
     override def actionPerformed(e: ActionEvent): Unit = {
-      workspace.hubNetManager.get.showControlCenter
+      workspace.hubNetManager.get.showControlCenter()
     }
 }
 
-class SnapToGridAction(workspace: GUIWorkspace)
+class SnapToGridAction(workspace: GUIWorkspace, widgetPanel: AbstractWidgetPanel)
   extends AbstractAction(I18N.gui.get("menu.edit.snapToGrid"))
   with CheckBoxAction
   with MenuAction

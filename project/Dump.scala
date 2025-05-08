@@ -4,7 +4,7 @@ import Keys._
 
 object Dump {
 
-  // e.g. dump "models/Sample\ Models/Earth\ Science/Fire.nlogo"
+  // e.g. dump "models/Sample\ Models/Earth\ Science/Fire.nlogox"
   // e.g. dump Fire   (to dump a benchmark model)
   // e.g. dump bench  (to replace all of the benchmark model dumps in test/bench)
   // e.g. dump all    (to dump all models to tmp/dumps)
@@ -18,7 +18,7 @@ object Dump {
     dumpClassName := "org.nlogo.headless.Dump",
     dump := {
       val args   = spaceDelimited("").parsed
-      val loader = (testLoader in Test).value
+      val loader = (Test / testLoader).value
       // oh god, I hope this doesn't break something. it doesn't work without it, the bytecode
       // generator can't load classes - ST 6/29/12
       Thread.currentThread.setContextClassLoader(loader)

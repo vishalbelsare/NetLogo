@@ -2,9 +2,7 @@
 
 package org.nlogo.fileformat
 
-import org.nlogo.core.{ Femto, LiteralParser, UpdateMode, View }
-
-import org.nlogo.api.WorldDimensions3D
+import org.nlogo.core.{ Femto, LiteralParser, UpdateMode, View, WorldDimensions3D }
 
 import org.scalacheck.{ Arbitrary, Gen }
 
@@ -42,7 +40,7 @@ class ThreeDViewReaderTest extends AnyFunSuite with ScalaCheckDrivenPropertyChec
 
   test("round-tripping works") {
     forAll(threeDViewWidgets) { (view: View) =>
-      val serialized = ThreeDViewReader.format(view).lines.toList
+      val serialized = ThreeDViewReader.format(view).linesIterator.toList
       assert(ThreeDViewReader.validate(serialized), "serialized widget should be valid")
       val deserialized = ThreeDViewReader.parse(serialized, litParser)
       assert(view == deserialized, "round-trip must not change widget, written as: " + serialized)

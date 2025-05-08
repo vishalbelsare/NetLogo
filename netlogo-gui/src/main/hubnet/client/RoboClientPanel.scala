@@ -10,30 +10,29 @@ private class RoboClientPanel(editorFactory:org.nlogo.window.EditorFactory,
         extends ClientPanel(editorFactory, errorHandler, workspace) {
   private lazy val roboClient:RoboWidgetControl = new RoboWidgetControl()
 
-  override def completeLogin(handshake:HandshakeFromServer){
+  override def completeLogin(handshake:HandshakeFromServer): Unit ={
     super.completeLogin(handshake)
     roboClient.start()
   }
 
-  override def disconnect(reason:String){
+  override def disconnect(reason:String): Unit ={
     roboClient.running = false
     super.disconnect(reason)
   }
 
-  override def logout(){
+  override def logout(): Unit ={
     roboClient.running = false
     super.logout()
   }
 
   private class RoboWidgetControl extends Thread("RoboWidgetControl Thread") {
     import org.nlogo.awt.EventQueue.invokeAndWait
-    import org.nlogo.window.{ButtonWidget, SliderWidget, Widget}
-    import org.nlogo.widget.SwitchWidget
+    import org.nlogo.window.{ ButtonWidget, SliderWidget, SwitchWidget, Widget }
 
     private val r = new org.nlogo.api.MersenneTwisterFast()
     var running = true
 
-    override def run() {
+    override def run(): Unit = {
       val components = clientGUI.getInterfaceComponents
       while (running) {
         val comp = components(r.nextInt(components.length))
@@ -50,7 +49,7 @@ private class RoboClientPanel(editorFactory:org.nlogo.window.EditorFactory,
     }
 
     @throws(classOf[InterruptedException])
-    private def sendRoboViewMessage(){
+    private def sendRoboViewMessage(): Unit ={
       def randomCor(min:Double, max:Double) = min + r.nextDouble() * (max - min) - 0.5
       invokeAndWait(() =>
         sendMouseMessage(randomCor(viewWidget.world.minPxcor, viewWidget.world.maxPxcor),
@@ -63,26 +62,31 @@ private class RoboClientPanel(editorFactory:org.nlogo.window.EditorFactory,
      * --mag 08/04/03, 08/07/03
      */
     @throws(classOf[InterruptedException])
-    private def getAndSendRoboWidgetMessage(widget:Widget) {
+    private def getAndSendRoboWidgetMessage(widget: Widget): Unit = {
       // use invokeAndWait() here instead of invokeLater() since
       // then if the event thread gets backed up, we don't send
       // over a whole slew of widget events all at once.  they
       // will always be at least waitTime apart.
       invokeAndWait(() => {
         val (name, value) = widget match {
-          case s:SliderWidget =>
-            if(s.value == s.maximum) s.value = s.minimum else s.value = s.value + s.increment
-            (s.nameWrapper, Some(s.value))
-          case b: ButtonWidget => (widget.displayName, Some(if(b.foreverOn) true else false))
+          case s: SliderWidget =>
+            if (s.value == s.maximum) {
+              s.setValue(s.minimum)
+            } else {
+              s.setValue(s.value + s.increment)
+            }
+            (s.name, Some(s.value))
+          case b: ButtonWidget =>
+            (widget.displayName, Some(b.foreverOn))
           case s: SwitchWidget =>
             s.isOn = !s.isOn
-            (widget.displayName, Some(s.isOn))
-          case _ => ("", None)
+            (widget.displayName, s.isOn)
+          case _ => ("", null)
         }
         // need to check if we are still connected since we could
         // have shutdown while we were waiting to be called.
         // --mag 8/26/03
-        if (connected.get && value.isDefined) sendDataAndWait(new ActivityCommand(name, value.get.asInstanceOf[AnyRef]))
+        if (connected.get && value != null) sendDataAndWait(new ActivityCommand(name, value.asInstanceOf[AnyRef]))
       })
     }
   }

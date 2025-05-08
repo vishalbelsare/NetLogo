@@ -7,7 +7,7 @@ import org.scalatest.funsuite.AnyFunSuite
 
 trait SimplePlotTest extends AnyFunSuite {
 
-  def testPlot(name: String)(f: Plot => Unit) {
+  def testPlot(name: String)(f: Plot => Unit): Unit = {
     test(name) {
       f(new Plot(name))
     }
@@ -20,8 +20,10 @@ class PlotTests extends SimplePlotTest {
     val plot = new Plot("test")
     assertResult("test")(plot.name)
     assertResult(0)(plot.pens.size) // no pens
-    assert(plot.defaultState.autoPlotOn)
-    assert(plot.state.autoPlotOn)
+    assert(plot.defaultState.autoPlotX)
+    assert(plot.state.autoPlotX)
+    assert(plot.defaultState.autoPlotY)
+    assert(plot.state.autoPlotY)
   }
 
   testPlot("ClearRemovesTemporaryPens") { plot =>
@@ -49,7 +51,7 @@ class PlotTests extends SimplePlotTest {
   testPlot("AutoPlotGrowMin") { plot =>
     val pen = plot.createPlotPen("test", false)
     plot.plot(pen, -0.0001, -0.0001)
-    assertResult(-2.5)(plot.state.xMin)
+    assertResult(-1.0)(plot.state.xMin)
     assertResult(-1.0)(plot.state.yMin)
     assertResult(10.0)(plot.state.xMax)
     assertResult(10.0)(plot.state.yMax)
@@ -61,8 +63,8 @@ class PlotTests extends SimplePlotTest {
     assertResult(10.0)(plot.state.xMax)
     assertResult(10.0)(plot.state.yMax)
     plot.plot(pen, 10.0001, 10.0001)
-    assertResult(12.5)(plot.state.xMax)
-    assertResult(11.0)(plot.state.yMax)
+    assertResult(12.0)(plot.state.xMax)
+    assertResult(12.0)(plot.state.yMax)
   }
   testPlot("AutoPlotGrowExtraRoomForBar") { plot =>
     val pen = plot.createPlotPen("test", false)
@@ -70,8 +72,8 @@ class PlotTests extends SimplePlotTest {
       mode = PlotPenInterface.BarMode,
       interval = 5.0)
     plot.plot(pen, 10.0001, 10.0001)
-    assertResult(18.8)(plot.state.xMax)
-    assertResult(11.0)(plot.state.yMax)
+    assertResult(16.0)(plot.state.xMax)
+    assertResult(12.0)(plot.state.yMax)
   }
 
   /// histogram tests
@@ -105,7 +107,7 @@ class PlotTests extends SimplePlotTest {
     plot.state = plot.state.copy(yMax = 5)
     val pen = plot.createPlotPen("test", false)
     val runner = new BasicPlotActionRunner(Seq(plot))
-    def zeros = Stream.continually(0.0)
+    def zeros = LazyList.continually(0.0)
     plot
       .histogramActions(pen, zeros.take(5))
       .foreach(runner.run)
@@ -117,7 +119,7 @@ class PlotTests extends SimplePlotTest {
     plot.clear()
     plot.state = plot.state.copy(yMax = 5)
     plot.plot(pen, 0, 10)
-    assertResult(11.0)(plot.state.yMax)
+    assertResult(10.0)(plot.state.yMax)
   }
 
   testPlot("Iterator") { plot =>

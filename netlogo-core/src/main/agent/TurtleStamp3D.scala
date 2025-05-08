@@ -5,7 +5,6 @@ package org.nlogo.agent
 import org.nlogo.core.AgentKind
 import org.nlogo.api.Color
 
-@annotation.strictfp
 case class TurtleStamp3D(shape: String, xcor: Double, ycor: Double, zcor: Double, size: Double,
                          heading: Double, pitch: Double, roll: Double, color: AnyRef, lineThickness: Double)
 extends org.nlogo.api.TurtleStamp3D {
@@ -23,8 +22,8 @@ extends org.nlogo.api.TurtleStamp3D {
   override def getBreedIndex = 0
   override def world = null
   override def getPatchHere = null
-  override def jump(d: Double) {}
-  override def heading(d: Double) {}
+  override def jump(d: Double): Unit = {}
+  override def heading(d: Double): Unit = {}
   override def classDisplayName = ""
   override def dx = 0
   override def dy = 0

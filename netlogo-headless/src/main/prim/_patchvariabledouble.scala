@@ -18,7 +18,7 @@ class _patchvariabledouble(private[this] var _vn: Int) extends Reporter {
   // MethodRipper won't let us call a public method from report_1()
   // so we must keep vn and _vn separate - ST 9/22/12
   def vn = _vn
-  def vn_=(vn: Int) { _vn = vn }
+  def vn_=(vn: Int): Unit = { _vn = vn }
 
   override def report(context: Context): java.lang.Double =
     report_1(context)
@@ -32,6 +32,7 @@ class _patchvariabledouble(private[this] var _vn: Int) extends Reporter {
     val patch = context.agent match {
       case t: Turtle => t.getPatchHere
       case p: Patch => p
+      case a => throw new IllegalStateException
     }
     patch.getPatchVariableDouble(_vn)
   }

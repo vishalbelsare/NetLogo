@@ -4,16 +4,17 @@ package org.nlogo.app
 
 import java.awt.Component
 import java.awt.event.ActionEvent
+import java.io.File
 import java.util.prefs.Preferences
-import javax.swing.{AbstractAction, Action, JOptionPane}
+import javax.swing.{ AbstractAction, Action }
 
-import org.nlogo.api.ModelType
+import org.nlogo.api.{ ModelType, Version }
 import org.nlogo.core.I18N
-import org.nlogo.swing.UserAction, UserAction.{ Menu => ActionMenu, MenuAction }
+import org.nlogo.swing.{ OptionPane, UserAction }, UserAction.{ Menu => ActionMenu, MenuAction }
 import org.nlogo.window.Events._
 
 case class ModelEntry(path: String, modelType: ModelType) {
-  def this(line: String) {
+  def this(line: String) = {
     this(line.drop(1), (line(0) match {
                           case 'N' => ModelType.Normal
                           case 'L' => ModelType.Library
@@ -69,11 +70,8 @@ class OpenRecentFileAction(modelEntry: ModelEntry, fileManager: FileManager, ind
       case ex: org.nlogo.awt.UserCancelException =>
         org.nlogo.api.Exceptions.ignore(ex)
       case ex: java.io.IOException => {
-        JOptionPane.showMessageDialog(
-          source,
-          ex.getMessage,
-          I18N.gui.get("common.messages.error"),
-          JOptionPane.ERROR_MESSAGE)
+        new OptionPane(source, I18N.gui.get("common.messages.error"), ex.getMessage, OptionPane.Options.YesNo,
+                       OptionPane.Icons.Error)
       }
     }
   }
@@ -81,17 +79,18 @@ class OpenRecentFileAction(modelEntry: ModelEntry, fileManager: FileManager, ind
 
 class RecentFiles {
   val prefs = Preferences.userNodeForPackage(getClass)
-  val key = "recent_files"
+  val key = if (Version.is3D) "recent_files_3d" else "recent_files"
   val maxEntries = 8
 
-  loadFromPrefs()
+  loadFromPrefs(true)
 
   private var _models: List[ModelEntry] = _
   def models = _models
-  def models_=(newModels: List[ModelEntry]) {
+  def models_=(newModels: List[ModelEntry]): Unit = {
     _models = newModels
       .flatMap(ensureCanonicalPath)
       .distinct
+      .filter(x => Version.is3D == (x.path.endsWith(".nlogo3d") || x.path.endsWith(".nlogox3d")))
       .take(maxEntries)
     prefs.put(key, _models.mkString("\n"))
   }
@@ -102,18 +101,19 @@ class RecentFiles {
    * e.g., paths that are too long. NP 2014-01-29.
    */
   private def ensureCanonicalPath(modelEntry: ModelEntry): Option[ModelEntry] =
-    try Some(ModelEntry(new java.io.File(modelEntry.path).getCanonicalPath(), modelEntry.modelType))
+    try Some(ModelEntry(new File(modelEntry.path).getCanonicalPath(), modelEntry.modelType))
     catch { case _: java.io.IOException => None }
 
-  def loadFromPrefs() {
-    models = prefs.get(key, "").lines.toList.map(new ModelEntry(_))
+  def loadFromPrefs(filter: Boolean = false): Unit = {
+    models = prefs.get(key, "").linesIterator.toList.map(new ModelEntry(_))
+                                                    .filter(entry => !filter || new File(entry.path).exists)
   }
 
-  def add(modelEntry: ModelEntry) {
+  def add(modelEntry: ModelEntry): Unit = {
     models = (modelEntry :: _models)
   }
 
-  def clear() {
+  def clear(): Unit = {
     models = Nil
   }
 }
@@ -133,7 +133,7 @@ class RecentFilesMenu(frame: AppFrame, fileManager: FileManager)
   }
 
   // Add models to list when the current model is saved
-  def handle(e: ModelSavedEvent) {
+  def handle(e: ModelSavedEvent): Unit = {
     for (p <- Option(e.modelPath)) {
       recentFiles.add(ModelEntry(p, ModelType.Normal))
       refreshMenu()
@@ -141,7 +141,7 @@ class RecentFilesMenu(frame: AppFrame, fileManager: FileManager)
   }
 
   // Add models to list when new models are opened
-  def handle(e: BeforeLoadEvent) {
+  def handle(e: BeforeLoadEvent): Unit = {
     if (e.modelType != ModelType.New) {
       for (p <- e.modelPath) {
         recentFiles.add(ModelEntry(p, e.modelType))
@@ -152,13 +152,13 @@ class RecentFilesMenu(frame: AppFrame, fileManager: FileManager)
 
   def computeActions: Seq[Action] = {
     val fileActions =
-    if (recentFiles.models.isEmpty) Seq(EmptyAction)
+    if (recentFiles.models.isEmpty) Seq(new EmptyAction)
     else (for ((modelEntry, i) <- recentFiles.models.zipWithIndex)
       yield new OpenRecentFileAction(modelEntry, fileManager, i))
     fileActions :+ new ClearItems()
   }
 
-  def refreshMenu() {
+  def refreshMenu(): Unit = {
     val oldActions = currentActions
     currentActions = computeActions
     menu.foreach { m =>
@@ -167,7 +167,7 @@ class RecentFilesMenu(frame: AppFrame, fileManager: FileManager)
     }
   }
 
-  object EmptyAction extends AbstractAction(I18N.gui.get("common.menus.empty"))
+  class EmptyAction extends AbstractAction(I18N.gui.get("common.menus.empty"))
   with MenuAction {
     category    = UserAction.FileCategory
     subcategory = UserAction.FileRecentSubcategory

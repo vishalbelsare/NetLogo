@@ -16,9 +16,6 @@ class NetworkUtilsTest extends AnyFunSuite {
   test("findViableInterfaces does not return disabled interfaces") {
     assert(NetworkUtils.findViableInterfaces.forall(i => i._1.isUp))
   }
-  test("findViableInterfaces does not return interfaces which are not multicastable") {
-    assert(NetworkUtils.findViableInterfaces.forall(i => i._1.supportsMulticast))
-  }
   test("findViableInterfaces does not return interfaces with only IP6 addresses") {
     assert(NetworkUtils.findViableInterfaces.forall(i => i._2.isInstanceOf[Inet4Address]))
   }
@@ -29,7 +26,7 @@ class NetworkUtilsTest extends AnyFunSuite {
   }
 
   test("an interface can be recalled after it has been remembered") {
-    import scala.collection.JavaConverters._
+    import scala.jdk.CollectionConverters.EnumerationHasAsScala
 
     NetworkUtils.forgetNetworkInterface()
     val ni = NetworkInterface.getNetworkInterfaces.asScala.next()

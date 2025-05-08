@@ -106,11 +106,17 @@ class TokenizerTests extends AnyFunSuite {
     assertResult(expected)(tokens.mkString)
   }
 
+  test("ArrayOfStringsWithCurlyBraces") {
+    val tokens = tokenize("{{array: 0: \"}}\" \"{{\"}}")
+    assertResult(1)(tokens.size)
+    assertResult("Token({{array: 0: \"}}\" \"{{\"}},Extension,{{array: 0: \"}}\" \"{{\"}})")(tokens.mkString)
+  }
+
   testLexFailure("\"",           0, 1,  "Closing double quote is missing")
   testLexFailure("\"\\b\"",      0, 4,  "Illegal character after backslash")
   testLexFailure("\"\\\"",       0, 3,  "Closing double quote is missing")
   testLexFailure(""""abc""",     0, 4,  "Closing double quote is missing")
-   // check that parser errors when string contains newline
+  // check that parser errors when string contains newline
   testLexFailure("\"abc\n\"",    0, 4,  "Closing double quote is missing")
   testLexFailure("1.2.3",        0, 5,  "Illegal number format")
   testLexFailure("{{array: 1: ", 0, 12, "End of file reached unexpectedly")
@@ -160,7 +166,7 @@ class TokenizerTests extends AnyFunSuite {
   testWhitespace("skips beginning and end whitespace", "  123   ", Seq("123"), Seq(5))
   testWhitespace("skips whitespace on multiple tokens", "  123  456 ", Seq("123", "456"), Seq(4, 1))
 
-  def testWhitespace(condition: String, text: String, expectedTexts: Seq[String], expectedSkips: Seq[Int]) {
+  def testWhitespace(condition: String, text: String, expectedTexts: Seq[String], expectedSkips: Seq[Int]): Unit = {
     test(s"Tokenize with skip whitespace $condition") {
         val tokens = tokenizeSkippingWhitespace(text)
         assert(tokens.map(_._1.text) == expectedTexts)

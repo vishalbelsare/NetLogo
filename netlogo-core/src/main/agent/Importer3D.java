@@ -2,15 +2,15 @@
 
 package org.nlogo.agent;
 
-import org.nlogo.core.AgentKind;
-import org.nlogo.core.AgentKindJ;
 import org.nlogo.api.AgentVariables;
 import org.nlogo.api.ImporterUser;
-import org.nlogo.api.WorldDimensions3D;
+import org.nlogo.core.AgentKind;
+import org.nlogo.core.AgentKindJ;
+import org.nlogo.core.WorldDimensions3D;
 
 import java.util.Map;
 
-public strictfp class Importer3D
+public class Importer3D
     extends Importer {
   static final String MIN_PZCOR_HEADER = "MIN-PZCOR";
   static final String MAX_PZCOR_HEADER = "MAX-PZCOR";

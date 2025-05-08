@@ -48,8 +48,8 @@ class PlotManager(factory: LogoThunkFactory, random: MersenneTwisterFast) extend
   def getPlot(name: String): Plot = _plots.find(_.name.equalsIgnoreCase(name)).orNull
 
   // used for letting the user choose which plot to export
-  def getPlotNames: Seq[String] = _plots.map(_.name)
-  def nextName = Stream.from(1).map("plot " + _).find(maybeGetPlot(_) == None).get
+  def getPlotNames: Seq[String] = _plots.map(_.name).toSeq
+  def nextName = LazyList.from(1).map("plot " + _).find(maybeGetPlot(_) == None).get
 
   // these are for api compatibility - Jeremy B Octover 2020
   def hasPlot(name: String): Boolean = _plots.exists(_.name == name)
@@ -57,17 +57,17 @@ class PlotManager(factory: LogoThunkFactory, random: MersenneTwisterFast) extend
   def publish(action: PlotAction): Unit = ???
   def setCurrentPlot(name: String): Unit = currentPlot = maybeGetPlot(name)
 
-  def forgetPlot(goner: Plot) {
+  def forgetPlot(goner: Plot): Unit = {
     if (currentPlot == Some(goner)) currentPlot = None
     _plots -= goner
   }
-  def forgetAll() {
+  def forgetAll(): Unit = {
     _plots.clear()
     plotThunks.clear()
     penThunks.clear()
     currentPlot = None
   }
-  def clearAll() {
+  def clearAll(): Unit = {
     _plots.foreach(_.clear())
     if (listener != null) listener.clearAll()
   }
@@ -124,10 +124,10 @@ class PlotManager(factory: LogoThunkFactory, random: MersenneTwisterFast) extend
   // code to run code in plots
   //
 
-  def setupPlots() { runCode(Setup) }
-  def updatePlots() { runCode(Update) }
+  def setupPlots(): Unit = { runCode(Setup) }
+  def updatePlots(): Unit = { runCode(Update) }
 
-  private def runCode(codeType: CodeType) {
+  private def runCode(codeType: CodeType): Unit = {
     // save the currently selected plot
     val oldCurrentPlot = currentPlot
     for (plot <- _plots) {
@@ -140,14 +140,16 @@ class PlotManager(factory: LogoThunkFactory, random: MersenneTwisterFast) extend
       // this line below runs the code if there is any to run, and it tells
       // us if stop was called from the code. if so, we dont run the pens code.
       val stopped =
-        codeType.call(plotThunks(plot)) match {
-          case Success(stop) => stop
-          case Failure(e: HaltSignal) => throw e
-          case Failure(e: Exception) =>
-            plot.runtimeError = Some(e)
-            false
-          case Failure(t: Throwable) => throw t
-        }
+        plotThunks.get(plot).map(
+          codeType.call(_) match {
+            case Success(stop) => stop
+            case Failure(e: HaltSignal) => throw e
+            case Failure(e: Exception) =>
+              plot.runtimeError = Some(e)
+              false
+            case Failure(t: Throwable) => throw t
+          }
+        ).getOrElse(false)
       if (! stopped) {
         // save the currently selected pen
         val oldCurrentPen = plot.currentPen
@@ -209,8 +211,8 @@ class PlotManager(factory: LogoThunkFactory, random: MersenneTwisterFast) extend
     plot.runtimeError.isDefined ||
     plot.pens.filterNot(_.temporary).exists(hasErrors)
   }
-  def getPlotSetupError(plot:Plot) = plotThunks(plot).setup.left.toOption
-  def getPlotUpdateError(plot:Plot) = plotThunks(plot).update.left.toOption
+  def getPlotSetupError(plot:Plot) = plotThunks.get(plot).flatMap(_.setup.left.toOption)
+  def getPlotUpdateError(plot:Plot) = plotThunks.get(plot).flatMap(_.update.left.toOption)
   def hasErrors(pen:PlotPen): Boolean = {
     pen.runtimeError.isDefined ||
     getPenSetupError(pen).isDefined ||

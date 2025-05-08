@@ -31,12 +31,12 @@ class JarLoaderTests extends AnyFunSuite with BeforeAndAfter {
   val emptyJarFile        = new File("tmp/empty/empty.jar")
 
   val dummyExtensionData =
-    new ExtensionData("dummy", dummyJarURL, "dummy", "org.nlogo.workspace.DummyClassManager", Some("6.1"), 0)
+    new ExtensionData("dummy", dummyJarURL, "dummy", "org.nlogo.workspace.DummyClassManager", Some("7.0"), 0)
 
   val dummyManifest = {
     val m = new JarManifest
     val attrs = m.getMainAttributes
-    attrs.putValue("NetLogo-Extension-API-Version", "6.1")
+    attrs.putValue("NetLogo-Extension-API-Version", "7.0")
     attrs.putValue("Extension-Name", dummyExtensionData.prefix)
     attrs.putValue("Class-Manager", dummyExtensionData.classManagerName)
     m
@@ -98,13 +98,13 @@ class JarLoaderTests extends AnyFunSuite with BeforeAndAfter {
   test("extensionData returns ExtensionData when it succeeds in connecting to a jar") {
     val extensionData = jarLoader.extensionData("array", arrayJarURL)
     val origMod       = new File(arrayJarURL.toURI).lastModified()
-    val modified      = 1000 * Math.round(origMod / 1000)
+    val modified      = 1000 * Math.round(origMod.toFloat / 1000)
     assert(extensionData.extensionName == "array")
     assert(extensionData.fileURL == arrayJarURL)
     assert(extensionData.prefix == "array")
     assert(extensionData.classManagerName == "org.nlogo.extensions.array.ArrayExtension")
-    assert(extensionData.version == Some("6.1"))
-    assert(extensionData.modified == modified)
+    assert(extensionData.version == Some("7.0"))
+    assert(extensionData.modified / 1000 == modified / 1000)
   }
 
   test("extensionData raises an error when the jar manifest doesn't have the required fields") {
@@ -142,8 +142,8 @@ class JarLoaderTests extends AnyFunSuite with BeforeAndAfter {
     intercept[ExtensionManagerException] { getClassManager("NotAClass") }
   }
 
-  test("extensionClassManager raises an IllegalStateException if the class cannot be instantiated") {
-    intercept[IllegalStateException] { getClassManager("UninstantiableClassManager") }
+  test("extensionClassManager raises an NoSuchMethodException if the class cannot be instantiated") {
+    intercept[NoSuchMethodException] { getClassManager("UninstantiableClassManager") }
   }
 
   test("extensionClassManager raises an ExtensionManagerException if the class isn't a ClassManager") {
@@ -162,7 +162,8 @@ class JarLoaderTests extends AnyFunSuite with BeforeAndAfter {
 
   test("resolvePathAsURL resolves extensions relative to the working directory") {
     val expectedURL = new java.io.File("extensions" + java.io.File.separator + "array").toURI.toURL
-    assert(jarLoader.resolvePathAsURL("array").get == expectedURL)
+    val actualURL   = jarLoader.resolvePathAsURL("array").get
+    assert(actualURL == expectedURL)
   }
 
   test("resolvePathAsURL returns None if the file cannot be found") {

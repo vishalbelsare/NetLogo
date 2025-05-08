@@ -2,20 +2,19 @@
 
 package org.nlogo.workspace
 
-import java.io.ByteArrayInputStream
-import java.io.IOException
+import java.io.{ ByteArrayInputStream, File, IOException }
 import java.nio.file.{ Path, Paths }
 import java.util.Base64
 
 import scala.collection.mutable.WeakHashMap
 import scala.util.Try
-
 import org.nlogo.agent.{ World, Agent, OutputObject }
-import org.nlogo.api.{ Dump, ExtensionManager => APIEM, FileIO, HubNetInterface, LibraryManager,
-  LogoException, OutputDestination, PreviewCommands, Workspace => APIWorkspace, WorldDimensions3D }
-import org.nlogo.core.{ CompilerException, Model, View, Widget => CoreWidget, WorldDimensions }
+import org.nlogo.api.{ Dump, ExtensionManager => APIEM, FileIO, HubNetInterface, LabProtocol, LibraryManager,
+  LogoException, OutputDestination, PreviewCommands, Workspace => APIWorkspace }
+import org.nlogo.core.{ CompilerException, Model, View, Widget => CoreWidget, WorldDimensions, WorldDimensions3D }
 import org.nlogo.nvm.{ Activation, Instruction, Command, Context, Job, MutableLong, Procedure, Tracer }
 import org.nlogo.nvm.RuntimePrimitiveException
+import org.nlogo.api.PlotCompilationErrorAction
 
 import AbstractWorkspaceTraits._
 
@@ -55,27 +54,27 @@ abstract class AbstractWorkspaceScala(val world: World, val hubNetManagerFactory
   // otherwise we don't get accurate runtime error locations
   // we pass in the Instruction so that we dont have to duplicate the exception logic in both locations.
   // JC 5/19/10
-  def tick(context: Context, originalInstruction: Instruction) {
+  def tick(context: Context, originalInstruction: Instruction): Unit = {
     if(world.tickCounter.ticks == -1)
       throw new RuntimePrimitiveException(context, originalInstruction,
         "The tick counter has not been started yet. Use RESET-TICKS.")
     world.tickCounter.tick()
-    updatePlots(context)
+    if (shouldUpdatePlots) updatePlots(context)
     requestDisplayUpdate(true)
   }
 
-  def resetTicks(context:Context) {
+  def resetTicks(context:Context): Unit = {
     world.tickCounter.reset()
     setupPlots(context)
     updatePlots(context)
     requestDisplayUpdate(true)
   }
 
-  def clearTicks {
+  def clearTicks(): Unit = {
     world.tickCounter.clear()
   }
 
-  def clearAll {
+  def clearAll: Unit = {
     world.clearAll()
     clearOutput()
     clearDrawing()
@@ -103,6 +102,23 @@ abstract class AbstractWorkspaceScala(val world: World, val hubNetManagerFactory
   @throws(classOf[LogoException])
   def open(path: String, shouldAutoInstallLibs: Boolean): Unit
 
+/**
+ * getPlotCompilationErrorAction and setPlotCompilationErrorAction should
+ * be inherited from org.nlogo.api.Controllable, but are not because of a
+ * scala bug that involves inheritance when java classes such as AbstractWorkspace
+ * are in a hierarchy.
+ * If the bug is fixed or AbstractWorkspace is converted to scala remove
+ * these 3 lines of code involving PlotCompilationErrorAction and the import of
+ * org.nlogo.api.Controllable
+ * The bug: https://github.com/scala/bug/issues/12224
+ *   AbstractMethodError when overriding java method with default implementation
+ *   implementation is "muted" in inherited interface Issue Issue #12224 scala/bug
+ */
+  private[this] var _plotCompilationErrorAction: PlotCompilationErrorAction = PlotCompilationErrorAction.Throw
+
+  override def getPlotCompilationErrorAction() = _plotCompilationErrorAction
+  override def setPlotCompilationErrorAction(plotCompilationErrorAction: PlotCompilationErrorAction): Unit = { _plotCompilationErrorAction = plotCompilationErrorAction }
+
   @throws(classOf[IOException])
   def getSource(filename: String): String = {
     // this `filename ==` feels very hacky. We should look for a way to pass
@@ -129,7 +145,10 @@ abstract class AbstractWorkspaceScala(val world: World, val hubNetManagerFactory
   @throws(classOf[java.io.IOException])
   def importDrawingBase64(base64: String): Unit = {
     val MimeRegex = "data:(.*);base64".r
-    val Array(MimeRegex(contentType), byteString) = base64.split(",")
+    val (contentType, byteString) = base64.split(",") match {
+      case Array(MimeRegex(tpe), str) => (tpe, str)
+      case _ => throw new IllegalStateException
+    }
     val bytes = Base64.getDecoder.decode(byteString)
     importDrawing(new ByteArrayInputStream(bytes), Option(contentType))
   }
@@ -164,9 +183,9 @@ abstract class AbstractWorkspaceScala(val world: World, val hubNetManagerFactory
 
 object AbstractWorkspaceTraits {
   trait Benchmarking { this: AbstractWorkspace =>
-    def benchmark(minTime: Int, maxTime: Int) {
+    def benchmark(minTime: Int, maxTime: Int): Unit = {
       new Thread("__bench") {
-        override def run() {
+        override def run(): Unit = {
           Benchmarker.benchmark(
             Benchmarking.this, minTime, maxTime)
         }}.start()
@@ -185,7 +204,7 @@ object AbstractWorkspaceTraits {
     def drawSpotlight: Boolean = true
     private var _fontSize = 13
     def fontSize = _fontSize
-    def fontSize(i: Int) { _fontSize = i }
+    def fontSize(i: Int): Unit = { _fontSize = i }
     def perspective: org.nlogo.api.Perspective = world.observer.perspective
     def renderPerspective: Boolean = true
     def viewHeight: Double = world.patchSize * world.worldHeight
@@ -262,11 +281,16 @@ object AbstractWorkspaceTraits {
 
     var _behaviorSpaceExperimentName = ""
 
+    var _behaviorSpaceExperiments = List[LabProtocol]()
+
     def behaviorSpaceRunNumber: Int =
       _behaviorSpaceRunNumber
 
     def behaviorSpaceExperimentName: String =
       _behaviorSpaceExperimentName
+
+    def getBehaviorSpaceExperiments: List[LabProtocol] =
+      _behaviorSpaceExperiments
 
     def behaviorSpaceRunNumber(n: Int): Unit = {
       _behaviorSpaceRunNumber = n
@@ -274,6 +298,10 @@ object AbstractWorkspaceTraits {
 
     def behaviorSpaceExperimentName(name: String): Unit = {
       _behaviorSpaceExperimentName = name
+    }
+
+    def setBehaviorSpaceExperiments(experiments: List[LabProtocol]): Unit = {
+      _behaviorSpaceExperiments = experiments
     }
   }
 
@@ -322,12 +350,24 @@ object AbstractWorkspaceTraits {
   }
 
   trait Extensions { self: AbstractWorkspaceScala =>
-    def getExtensionPathMappings(): Map[String, Path] =
-      (for (path <- Option(getModelPath).toSeq.map(mp => Paths.get(mp).getParent) ++ Seq(APIEM.extensionsPath);
-            dir  <- path.toFile.listFiles.filter(_.isDirectory);
-            jar  <- dir.listFiles.find(_.getName == s"${dir.getName}.jar").toSeq)
-       yield (dir.getName, Paths.get(jar.getCanonicalFile.toURI))
-      ).toMap
+    def getExtensionPathMappings(): Map[String, Path] = {
+      val searchPaths = Option(getModelPath).toSeq.map(mp => Paths.get(mp).getParent) ++ Seq(APIEM.extensionsPath)
+      val subDirs = searchPaths.flatMap( (path) => path.toFile.listFiles().filter(_.isDirectory) )
+      subDirs.flatMap( (subDir) => {
+        try {
+          val maybeFiles = subDir.listFiles()
+          val files      = if (maybeFiles == null) { new Array[File](0) } else { maybeFiles }
+          val jars       = files.find(_.getName == s"${subDir.getName}.jar").toSeq
+          jars.map( (jar) => (subDir.getName, Paths.get(jar.getCanonicalFile.toURI)))
+        } catch {
+          case ex: Exception =>
+            System.err.println(s"Error loading subfolder contents of ${subDir} while looking for extensions.")
+            System.err.println(ex.getMessage)
+            System.err.println(ex.getStackTrace.mkString("\n"))
+            Seq()
+        }
+      }).toMap
+    }
   }
 
 }

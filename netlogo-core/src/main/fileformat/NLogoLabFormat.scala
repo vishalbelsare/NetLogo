@@ -10,6 +10,8 @@ import scala.util.Try
 trait LabFormat[A <: ModelFormat[Array[String], A]]
   extends ComponentSerialization[Array[String], A] {
 
+  val editNames: Boolean
+
   def literalParser: LiteralParser
 
   def componentName = "org.nlogo.modelsection.behaviorspace"
@@ -21,7 +23,7 @@ trait LabFormat[A <: ModelFormat[Array[String], A]]
 
   def serialize(m: Model): Array[String] = {
     m.optionalSectionValue[Seq[LabProtocol]](componentName)
-      .map(ps => if (ps.isEmpty) Array[String]() else LabSaver.save(ps).lines.toArray)
+      .map(ps => if (ps.isEmpty) Array[String]() else LabSaver.save(ps).linesIterator.toArray)
       .getOrElse(Array[String]())
   }
 
@@ -34,12 +36,11 @@ trait LabFormat[A <: ModelFormat[Array[String], A]]
 
   def load(s: Array[String], version: Option[String]): Option[Seq[LabProtocol]] =
     if (s.isEmpty || s.forall(_.isEmpty)) None
-    else Some(loader(s.mkString("\n")))
+    else Some(loader(s.mkString("\n"), editNames, scala.collection.mutable.Set[String]()))
 }
 
-class NLogoLabFormat(val literalParser: LiteralParser)
+class NLogoLabFormat(val literalParser: LiteralParser, val editNames: Boolean = false)
   extends LabFormat[NLogoFormat]
 
-class NLogoThreeDLabFormat(val literalParser: LiteralParser)
+class NLogoThreeDLabFormat(val literalParser: LiteralParser, val editNames: Boolean = false)
   extends LabFormat[NLogoThreeDFormat]
-

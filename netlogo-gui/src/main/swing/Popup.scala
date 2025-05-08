@@ -2,8 +2,10 @@
 
 package org.nlogo.swing
 
-import javax.swing.{JDialog, JPanel}
 import java.awt.{ BorderLayout, Frame }
+import javax.swing.{ JDialog, JPanel }
+
+import org.nlogo.theme.InterfaceColors
 
 /**
  * Pops up the given panel as a modal window above the parent frame.
@@ -15,21 +17,22 @@ class Popup(parentFrame: Frame, title:String, panel: JPanel, cancel: => Unit, ok
   dialog.setTitle(title)
   dialog.add(panel, BorderLayout.CENTER)
   dialog.setAutoRequestFocus(true)
+  dialog.getContentPane.setBackground(InterfaceColors.dialogBackground())
 
-  dialog.add(ButtonPanel(
-    RichJButton(i18n("common.buttons.ok")){ if(ok) die() },
-    RichJButton(i18n("common.buttons.cancel")){ cancel; die() }),
+  dialog.add(new ButtonPanel(Seq(
+    new DialogButton(true, i18n("common.buttons.ok"), () => { if (ok) die() }),
+    new DialogButton(false, i18n("common.buttons.cancel"), () => { cancel; die() }))),
     BorderLayout.SOUTH)
 
   DialogForegrounder(dialog)
 
-  def show() {
+  def show(): Unit = {
     dialog.pack()
     org.nlogo.awt.Positioning.center(dialog, parentFrame)
     dialog.setVisible(true)
   }
 
-  def die() {
+  def die(): Unit = {
     dialog.setVisible(false)
     dialog.dispose()
   }

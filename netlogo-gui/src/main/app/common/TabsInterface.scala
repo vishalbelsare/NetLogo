@@ -19,13 +19,20 @@ trait TabsInterface {
   val infoTab: Component
   val mainCodeTab: Component
 
+  def smartTabbingEnabled: Boolean
+  def smartTabbingEnabled_=(enabled: Boolean): Unit
+
   def lineNumbersVisible: Boolean
   def lineNumbersVisible_=(b: Boolean): Unit
 
+  def watchingFiles: Boolean
+  def watchingFiles_=(b: Boolean): Unit
+
   def newExternalFile(): Unit
-  def openExternalFile(filename: String): Unit
+  def openExternalFile(filename: String, focus: Boolean = true): Unit
   def closeExternalFile(filename: Filename): Unit
 
-  def setDirtyMonitorCodeWindow(): Unit
-  def switchToSpecifiedCodeWindowState(state: Boolean): Unit
+  def switchWindow(separate: Boolean, preserveSelected: Boolean): Unit
+
+  def showCodeTabPreferences(): Unit
 }

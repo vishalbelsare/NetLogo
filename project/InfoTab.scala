@@ -10,7 +10,7 @@ object InfoTab {
   val infoTabTask =
     infoTab := {
       val streamsValue = streams.value
-      val testCpValue = (fullClasspath in Test).value
+      val testCpValue = (Test / fullClasspath).value
       val baseDirectoryValue = baseDirectory.value
       val runnerValue = runner.value
       val cache =
@@ -22,7 +22,7 @@ object InfoTab {
                 testCpValue.map(_.data), Seq(), streamsValue.log)(runnerValue)
               Set(baseDirectoryValue / "docs" / "infotab.html")
           }
-          cache(Set(baseDirectory.value / "models" / "Code Examples" / "Info Tab Example.nlogo")).toSeq
+          cache(Set(baseDirectory.value / "models" / "Code Examples" / "Info Tab Example.nlogox")).toSeq
     }
 
 }

@@ -2,57 +2,55 @@
 
 package org.nlogo.window
 
-import org.nlogo.plot.{ Plot, PlotPen }
+import java.awt.{ Color, Dimension, FlowLayout, Font, Graphics }
+import javax.swing.{ JLabel, JPanel }
 
-// we use fontSource in order to keep the font sizes of the PlotPen objects
-// in sync with the current zoom level even when the PlotLegend is
-// closed.  a bit kludgy perhaps, but oh well - ST 9/2/04
-class PlotLegend(plot: Plot, fontSource: java.awt.Component)
-extends javax.swing.JPanel {
+import org.nlogo.plot.PlotPen
+import org.nlogo.swing.Transparent
+import org.nlogo.theme.InterfaceColors
 
-  setLayout(new org.nlogo.awt.ColumnLayout(2)) // 2 pixel gap
-  setOpaque(false)
+class PlotLegend(widget: AbstractPlotWidget, boldName: Boolean)
+  extends JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0)) with Transparent {
 
   var open = false
 
-  def addPen(pen: PlotPen) {
+  def addPen(pen: PlotPen): Unit = {
     if (open) {
-      if (pen.inLegend) {
-        add(new LegendItem(pen) { setFont(fontSource.getFont) })
-      }
+      if (pen.inLegend)
+        add(new LegendItem(pen))
+
       revalidate()
     }
   }
 
-  def toggle() { open = !open; refresh() }
-  def refresh() { clearGUI(); if (open) fillGUI() }
-  def clearGUI() { removeAll(); revalidate() }
+  def toggle(): Unit = { open = !open; refresh() }
+  def refresh(): Unit = { clearGUI(); if (open) fillGUI() }
+  def clearGUI(): Unit = { removeAll(); revalidate() }
 
-  private def fillGUI() {
-    for (pen <- plot.pens; if (pen.inLegend)) {
-      add(new LegendItem(pen) { setFont(fontSource.getFont) })
-    }
+  private def fillGUI(): Unit = {
+    for (pen <- widget.plot.pens; if (pen.inLegend))
+      add(new LegendItem(pen))
+
     revalidate()
   }
 
-  private class LegendItem(pen: PlotPen) extends javax.swing.JComponent {
-    org.nlogo.awt.Fonts.adjustDefaultFont(this)
+  private class LegendItem(pen: PlotPen) extends JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0)) with Transparent {
+    add(new JPanel {
+      setBackground(new Color(pen.color))
 
-    override def paintComponent(g: java.awt.Graphics) {
-      val ascent = g.getFontMetrics.getMaxAscent
-      g.setColor(new java.awt.Color(pen.color))
-      g.fillRect(0, 0, ascent, ascent)
-      g.setColor(getForeground)
-      g.drawRect(0, 0, ascent, ascent)
-      g.drawString(pen.name, ascent + 4, ascent)
-    }
+      override def getPreferredSize: Dimension =
+        new Dimension(widget.zoom(15), widget.zoom(2))
+    })
 
-    override def getPreferredSize = getMinimumSize
-    override def getMinimumSize = {
-      val metrics = getFontMetrics(getFont())
-      new java.awt.Dimension(metrics.stringWidth(pen.name) + metrics.getMaxAscent + 4,
-        StrictMath.max(8, metrics.getMaxDescent + metrics.getMaxAscent))
-    }
+    add(new JLabel(pen.name) {
+      if (boldName)
+        setFont(getFont.deriveFont(Font.BOLD))
+
+      override def paintComponent(g: Graphics): Unit = {
+        setForeground(InterfaceColors.widgetText())
+
+        super.paintComponent(g)
+      }
+    })
   }
-
 }

@@ -16,24 +16,23 @@ object JumpToDeclaration {
   }
 
   def jumpToDeclaration(cursorPosition: Int, editorArea: JTextComponent): Unit = {
-    val tokenOption = findTokenContainingPosition(editorArea.getText(), cursorPosition)
-    for(token <- tokenOption) {
-      if(token.tpe != TokenType.Ident || DefaultTokenMapper.allCommandNames.contains(token.text)
-        || DefaultTokenMapper.allReporterNames.contains(token.text))
-        return
-      val t = getDeclaration(token, editorArea.getText)
-      t.foreach(token => {
-        editorArea.select(token.start, token.end)
-      })
+    findTokenContainingPosition(editorArea.getText(), cursorPosition).foreach { token =>
+      if (token.tpe == TokenType.Ident && !DefaultTokenMapper.allCommandNames.contains(token.text) &&
+          !DefaultTokenMapper.allReporterNames.contains(token.text)) {
+        val t = getDeclaration(token, editorArea.getText)
+        t.foreach(token => {
+          editorArea.select(token.start, token.end)
+        })
+      }
     }
   }
 
   def getDeclaration(token: Token, source: String): Option[Token] = {
     val tokens = Femto.scalaSingleton[TokenizerInterface]("org.nlogo.lex.Tokenizer").tokenizeString(source).filter(t => t.tpe != TokenType.Comment).toSeq
     val (globals, owns, functions) = parseOuterScope(tokens)
-    val indexOfToken = tokens.indexWhere(t => t.start == token.start)
+    var i = tokens.indexWhere(t => t.start == token.start)
     var stack = 0
-    for(i <- indexOfToken to 0 by -1) {
+    while (i >= 0) {
       val tok = tokens(i)
       if (tok.tpe == TokenType.CloseBracket) {
         stack -= 1
@@ -58,6 +57,7 @@ object JumpToDeclaration {
         }
         return globals.get(token.text.toUpperCase) orElse owns.get(token.text.toUpperCase) orElse functions.get(token.text.toUpperCase)
       }
+      i -= 1
     }
     globals.get(token.text.toUpperCase) orElse owns.get(token.text.toUpperCase) orElse functions.get(token.text.toUpperCase)
   }

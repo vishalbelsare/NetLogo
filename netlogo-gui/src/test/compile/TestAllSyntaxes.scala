@@ -19,7 +19,7 @@ class TestAllSyntaxes extends AnyFunSuite {
     shorten(i) + " " + i.syntax.dump
   def instruction(name: String) =
     (mapper.getCommand(name) orElse mapper.getReporter(name)).get
-  def doTest(names: Set[String], expected: String) {
+  def doTest(names: Set[String], expected: String): Unit = {
     val actual = names.map(instruction).map(entry).toSeq.sorted.mkString("\n")
     assertResult(expected)(actual)
   }
@@ -38,8 +38,10 @@ class TestAllSyntaxes extends AnyFunSuite {
                      |_approximatergb number/number/number,number,OTPL,None,10,3,3
                      |_asin number,number,OTPL,None,10,1,1
                      |_atan number/number,number,OTPL,None,10,2,2
-                     |_atpoints turtle agentset or patch agentset,list,agentset,OTPL,None,12,1,1
+                     |_atpoints turtle agentset or patch agentset,list,agentset,OTPL,None,13,1,1
                      |_autoplot ,TRUE/FALSE,OTPL,None,10,0,0
+                     |_autoplotx ,TRUE/FALSE,OTPL,None,10,0,0
+                     |_autoploty ,TRUE/FALSE,OTPL,None,10,0,0
                      |_basecolors ,list,OTPL,None,10,0,0
                      |_behaviorspaceexperimentname ,string,OTPL,None,10,0,0
                      |_behaviorspacerunnumber ,number,OTPL,None,10,0,0
@@ -84,6 +86,7 @@ class TestAllSyntaxes extends AnyFunSuite {
                      |_fput anything/list,list,OTPL,None,10,2,2
                      |_greaterorequal agent or number or string,agent or number or string,TRUE/FALSE,OTPL,None,6,1,1
                      |_greaterthan agent or number or string,agent or number or string,TRUE/FALSE,OTPL,None,6,1,1
+                     |_homedirectory ,string,OTPL,None,10,0,0
                      |_hsb number/number/number,list,OTPL,None,10,3,3
                      |_hsbold number/number/number,list,OTPL,None,10,3,3
                      |_hubnetclientslist ,list,OTPL,None,10,0,0
@@ -96,12 +99,12 @@ class TestAllSyntaxes extends AnyFunSuite {
                      |_hubnetmessagewaiting ,TRUE/FALSE,OTPL,None,10,0,0
                      |_hubnetoutqsize ,number,OTPL,None,10,0,0
                      |_ifelsevalue TRUE/FALSE/reporter block/TRUE/FALSE or reporter block,anything,OTPL,None,3,3,3
-                     |_incone turtle agentset or patch agentset,number/number,turtle agentset or patch agentset,-T--,None,12,2,2
+                     |_incone turtle agentset or patch agentset,number/number,turtle agentset or patch agentset,-T--,None,13,2,2
                      |_inconenowrap agentset,number/number,agentset,-T--,None,12,2,2
                      |_inlinkfrom agent,agent,-T--,None,10,1,1
                      |_inlinkneighbor agent,TRUE/FALSE,-T--,None,10,1,1
                      |_inlinkneighbors ,agentset,-T--,None,10,0,0
-                     |_inradius turtle agentset or patch agentset,number,turtle agentset or patch agentset,-TP-,None,12,1,1
+                     |_inradius turtle agentset or patch agentset,number,turtle agentset or patch agentset,-TP-,None,13,1,1
                      |_inradiusnowrap agentset,number,agentset,-TP-,None,12,1,1
                      |_insertitem number/string or list/anything,string or list,OTPL,None,10,3,3
                      |_int number,number,OTPL,None,10,1,1
@@ -269,18 +272,19 @@ class TestAllSyntaxes extends AnyFunSuite {
                      |_turtlesat number/number,turtle agentset,-TP-,None,10,2,2
                      |_turtleset list or turtle agentset or turtle,turtle agentset,OTPL,None,10,1,0
                      |_turtleshere ,turtle agentset,-TP-,None,10,0,0
-                     |_turtleson agent or agentset,turtle agentset,OTPL,None,10,1,1
+                     |_turtleson turtle agentset or patch agentset or turtle or patch,turtle agentset,OTPL,None,10,1,1
                      |_uptonof number/list or agentset,list or agentset,OTPL,None,10,2,2
                      |_userdirectory ,TRUE/FALSE or string,OTPL,None,10,0,0
                      |_userfile ,TRUE/FALSE or string,OTPL,None,10,0,0
-                     |_userinput anything,string,OTPL,None,10,1,1
+                     |_userinput anything/string,string,OTPL,None,10,1,1
                      |_usernewfile ,TRUE/FALSE or string,OTPL,None,10,0,0
                      |_useroneof anything/list,anything,OTPL,None,10,2,2
                      |_useryesorno anything,TRUE/FALSE,OTPL,None,10,1,1
                      |_variance list,number,OTPL,None,10,1,1
-                     |_with agentset,TRUE/FALSE block,agentset,OTPL,Some(?),12,1,1
-                     |_withmax agentset,number block,agentset,OTPL,Some(?),12,1,1
-                     |_withmin agentset,number block,agentset,OTPL,Some(?),12,1,1
+                     |_whoarenot agentset,agent or agentset,agentset,OTPL,None,12,1,1
+                     |_with agentset,TRUE/FALSE block,agentset,OTPL,Some(?),13,1,1
+                     |_withmax agentset,number block,agentset,OTPL,Some(?),13,1,1
+                     |_withmin agentset,number block,agentset,OTPL,Some(?),13,1,1
                      |_word anything,string,OTPL,None,10,2,0
                      |_worldheight ,number,OTPL,None,10,0,0
                      |_worldwidth ,number,OTPL,None,10,0,0
@@ -291,11 +295,14 @@ class TestAllSyntaxes extends AnyFunSuite {
                     |_askconcurrent agentset/command block,OTPL,Some(?),0,2,2
                     |_autoplotoff ,OTPL,None,0,0,0
                     |_autoploton ,OTPL,None,0,0,0
+                    |_autoplotxoff ,OTPL,None,0,0,0
+                    |_autoplotxon ,OTPL,None,0,0,0
+                    |_autoplotyoff ,OTPL,None,0,0,0
+                    |_autoplotyon ,OTPL,None,0,0,0
                     |_beep ,OTPL,None,0,0,0
                     |_bench number/number,O---,None,0,2,2
                     |_bk number,-T--,None,0,1,1
                     |_carefully command block/command block,OTPL,None,0,2,2
-                    |_changetopology TRUE/FALSE/TRUE/FALSE,OTPL,None,0,2,2
                     |_clearall ,O---,None,0,0,0
                     |_clearallandresetticks ,O---,None,0,0,0
                     |_clearallplots ,OTPL,None,0,0,0
@@ -470,6 +477,7 @@ class TestAllSyntaxes extends AnyFunSuite {
                     |_setplotpenmode number,OTPL,None,0,1,1
                     |_setplotxrange number/number,OTPL,None,0,2,2
                     |_setplotyrange number/number,OTPL,None,0,2,2
+                    |_settopology TRUE/FALSE/TRUE/FALSE,OTPL,None,0,2,2
                     |_setupplots ,OTPL,None,0,0,0
                     |_setxy number/number,-T--,None,0,2,2
                     |_show anything,OTPL,None,0,1,1

@@ -57,7 +57,7 @@ class Evaluator(workspace: AbstractWorkspace) {
 
   ///
 
-  private[workspace] def withContext(context: Context)(f: => Unit) {
+  private[workspace] def withContext(context: Context)(f: => Unit): Unit = {
     val oldContext = ProcedureRunner.context
     ProcedureRunner.context = context
     try f
@@ -66,15 +66,16 @@ class Evaluator(workspace: AbstractWorkspace) {
 
   private object ProcedureRunner {
     var context: Context = null
-    def run(p: Procedure, ownerOption: Option[JobOwner] = None): Try[Boolean] = {
+
+    def run(p: Procedure, owner: JobOwner): Try[Boolean] = {
       val oldActivation = context.activation
       val newActivation = new Activation(p, context.activation, 1)
       val oldRandom = context.job.random
       context.activation = newActivation
-      context.job.random = ownerOption.map(_.random).getOrElse(workspace.world.mainRNG.clone)
+      context.job.random = owner.random
       val procedureResult = Try {
         context.runExclusiveJob(workspace.world.observers, 0)
-        ! workspace.completedActivations.get(newActivation).contains(true)
+        !workspace.completedActivations.getOrElse(newActivation, false)
       }
       context.activation = oldActivation
       context.job.random = oldRandom
@@ -110,11 +111,10 @@ class Evaluator(workspace: AbstractWorkspace) {
       val proc = invokeCompiler(fullSource, Some(owner.displayName), true, agent.kind)
       new MyLogoThunk(fullSource, agent, owner, true, proc) with CommandLogoThunk {
         @throws(classOf[LogoException])
-        def call(): Try[Boolean] = ProcedureRunner.run(procedure, Some(owner))
+        def call(): Try[Boolean] = ProcedureRunner.run(procedure, owner)
       }
     }
 
-  @throws(classOf[CompilerException])
   private class MyLogoThunk(source: String, agent: Agent, owner: JobOwner, command: Boolean, val procedure: Procedure) {
     val agentset = AgentSet.fromAgent(agent)
     procedure.topLevel = false

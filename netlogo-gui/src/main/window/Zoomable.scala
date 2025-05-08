@@ -11,9 +11,8 @@ with Events.ZoomedEvent.Handler {
   def zoomSteps = _zoomSteps
   def zoomMin: Int = -9
   def zoomFactor = 1.0 + 0.1 * zoomSteps
-  def zoomSubcomponents = true
   def zoomTarget: java.awt.Component = this
-  def handle(e: org.nlogo.window.Events.ZoomedEvent) {
+  def handle(e: org.nlogo.window.Events.ZoomedEvent): Unit = {
     val isFocused = SwingUtilities.isDescendingFrom(this, KeyboardFocusManager.getCurrentKeyboardFocusManager.getFocusedWindow)
     if (isShowing && isFocused) { // ignore unless we're the front tab
       val oldFactor = zoomFactor

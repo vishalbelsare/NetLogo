@@ -3,8 +3,8 @@
 package org.nlogo.agent
 
 import org.nlogo.api.{ AgentException, Color, ImporterUser,
-  NetLogoThreeDDialect, WorldDimensionException, WorldDimensions3D }
-import org.nlogo.core.{ AgentKind, Program, WorldDimensions }
+  NetLogoThreeDDialect, WorldDimensionException }
+import org.nlogo.core.{ AgentKind, Program, WorldDimensions, WorldDimensions3D }
 import org.nlogo.log.LogManager
 
 import java.lang.{ Double => JDouble }
@@ -352,7 +352,7 @@ class World3D extends World
   private[nlogo] def drawLine(
     x0: Double, y0: Double,
     x1: Double, y1: Double,
-    color: AnyRef, size: Double, mode: String) {
+    color: AnyRef, size: Double, mode: String): Unit = {
     drawing.drawLine(x0, y0, 0, x1, y1, 0, size, color)
   }
 

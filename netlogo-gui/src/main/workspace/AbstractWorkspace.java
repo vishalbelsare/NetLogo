@@ -30,7 +30,7 @@ import org.nlogo.nvm.PresentationCompilerInterface;
 import org.nlogo.nvm.Procedure;
 import org.nlogo.nvm.Workspace;
 
-public abstract strictfp class AbstractWorkspace
+public abstract class AbstractWorkspace
     implements Workspace,
     EditorWorkspace,
     ExtendableWorkspace,
@@ -43,11 +43,36 @@ public abstract strictfp class AbstractWorkspace
   public final org.nlogo.agent.World _world;
 
   public final org.nlogo.nvm.JobManagerInterface jobManager;
-  protected final Evaluator evaluator;
-  protected final ExtensionManager extensionManager;
+  public final Evaluator evaluator;
+  public final ExtensionManager extensionManager;
+
+  protected final ExternalResourceManager resourceManager;
 
   public abstract WeakHashMap<Job, WeakHashMap<Agent, WeakHashMap<Command, MutableLong>>> lastRunTimes();
 
+  private boolean _shouldUpdatePlots = true;
+  public boolean shouldUpdatePlots() {
+    return this._shouldUpdatePlots;
+  }
+  public void setShouldUpdatePlots(boolean update) {
+    this._shouldUpdatePlots = update;
+  }
+
+  private boolean _triedToExportPlot = false;
+  public boolean triedToExportPlot() {
+    return this._triedToExportPlot;
+  }
+  public void setTriedToExportPlot(boolean triedToExport) {
+    this._triedToExportPlot = triedToExport;
+  }
+
+  private ExportPlotWarningAction _exportPlotWarningAction = ExportPlotWarningActionJ$.MODULE$.WARN();
+  public ExportPlotWarningAction exportPlotWarningAction() {
+    return this._exportPlotWarningAction;
+  }
+  public void setExportPlotWarningAction(ExportPlotWarningAction action) {
+    this._exportPlotWarningAction = action;
+  }
   //public final WorldLoader worldLoader ;
 
   // We're moving `previewCommands` here from `AbstractWorkspaceScala` so that
@@ -70,6 +95,7 @@ public abstract strictfp class AbstractWorkspace
     jobManager = Femto.getJ(JobManagerInterface.class, "org.nlogo.job.JobManager",
         new Object[]{this, world, world});
     extensionManager = new ExtensionManager(this, new JarLoader(this));
+    resourceManager = new ExternalResourceManager();
   }
 
   public org.nlogo.workspace.ExtensionManager getExtensionManager() {
@@ -83,6 +109,10 @@ public abstract strictfp class AbstractWorkspace
   public void importExtensionData(String name, List<String[]> data, org.nlogo.api.ImportErrorHandler handler)
       throws org.nlogo.api.ExtensionException {
     extensionManager.importExtensionData(name, data, handler);
+  }
+
+  public ExternalResourceManager getResourceManager() {
+    return resourceManager;
   }
 
   /**
@@ -175,7 +205,7 @@ public abstract strictfp class AbstractWorkspace
                                  boolean reporter)
       throws CompilerException {
     String key = source + "@" + context.activation.procedure().args().size() +
-        "@" + context.agentBit;
+        "@" + context.agentBit + (reporter ? "-reporter" : "-command");
     scala.Option<Procedure> storedProc = codeBits.get(key);
     if (storedProc.isEmpty()) {
       Procedure proc = evaluator.compileForRun(source, context, reporter);
@@ -220,7 +250,7 @@ public abstract strictfp class AbstractWorkspace
   /// output
 
   // called from job thread - ST 10/1/03
-  protected abstract void sendOutput(org.nlogo.agent.OutputObject oo,
+  public abstract void sendOutput(org.nlogo.agent.OutputObject oo,
                                      boolean toOutputArea)
       throws LogoException;
 

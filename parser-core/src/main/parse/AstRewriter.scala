@@ -66,7 +66,7 @@ class AstRewriter(val tokenizer: TokenizerInterface, op: CompilationOperand) ext
     import TokenType.{OpenBracket, CloseBracket, Ident}
     val extValue = extension.toUpperCase
     val source = op.sources("")
-    val tokens = tokenizer.tokenizeString(source).toStream
+    val tokens = tokenizer.tokenizeString(source).to(LazyList)
     val buf = new StringBuilder(source)
 
     val (beforeExtensions, rest) = tokens.span(t => t.value != "EXTENSIONS" && t.tpe == Ident)
@@ -167,7 +167,7 @@ class AstRewriter(val tokenizer: TokenizerInterface, op: CompilationOperand) ext
     val rewrittenProcedures = format(edit, procsToRewrite)
     val rewritten =
       wholeFile(structureResults, headers, rewrittenProcedures, footer)
-    rewritten.lines.map(eolWhitespace.replaceAllIn(_, "")).mkString("\n")
+    rewritten.linesIterator.map(eolWhitespace.replaceAllIn(_, "")).mkString("\n")
   }
 
   def trackWhitespace(

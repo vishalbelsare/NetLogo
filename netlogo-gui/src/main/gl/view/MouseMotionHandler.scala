@@ -11,7 +11,7 @@ object MouseMotionHandler {
   case object OrbitMode extends Mode
   case object ZoomMode extends Mode
   case object TranslateMode extends Mode
-  case object InteractMode extends Mode
+  case object InterfaceMode extends Mode
 }
 
 class MouseMotionHandler(view: View)
@@ -25,32 +25,32 @@ with java.awt.event.MouseWheelListener {
   private var prevMouseX, prevMouseY = 0
   val world = view.viewManager.world
 
-  def setMovementMode(mode: Mode) {
-    if (mode == InteractMode) {
+  def setMovementMode(mode: Mode): Unit = {
+    if (mode == InterfaceMode) {
       view.renderer.setMouseMode(true)
-      view.signalViewUpdate()
+      view.display()
     }
-    else if (movementMode == InteractMode)
+    else if (movementMode == InterfaceMode)
       view.renderer.setMouseMode(false)
     movementMode = mode
   }
 
   // MouseListener
 
-  def mouseEntered(evt: MouseEvent) {
-    if (movementMode == InteractMode)
+  def mouseEntered(evt: MouseEvent): Unit = {
+    if (movementMode == InterfaceMode)
       view.renderer.mouseInside(evt.getX, evt.getY)
   }
 
-  def mouseExited(evt: MouseEvent) {
-    if (movementMode == InteractMode)
+  def mouseExited(evt: MouseEvent): Unit = {
+    if (movementMode == InterfaceMode)
       view.renderer.mouseInside(evt.getX, evt.getY)
   }
 
-  def mousePressed(evt: MouseEvent) {
+  def mousePressed(evt: MouseEvent): Unit = {
     prevMouseX = evt.getX
     prevMouseY = evt.getY
-    if (!evt.isPopupTrigger && movementMode == InteractMode && hasButton1(evt))
+    if (!evt.isPopupTrigger && movementMode == InterfaceMode && hasButton1(evt))
       view.renderer.mouseDown(true)
     else {
       if (evt.isPopupTrigger)
@@ -59,16 +59,16 @@ with java.awt.event.MouseWheelListener {
     }
   }
 
-  def mouseReleased(evt: MouseEvent) {
+  def mouseReleased(evt: MouseEvent): Unit = {
     view.renderer.showCrossHairs(false)
-    if (!evt.isPopupTrigger && (movementMode == InteractMode) && hasButton1(evt))
+    if (!evt.isPopupTrigger && (movementMode == InterfaceMode) && hasButton1(evt))
       view.renderer.mouseDown(false)
     else if (evt.isPopupTrigger)
       view.doPopup(evt)
-    view.signalViewUpdate()
+    view.display()
   }
 
-  def mouseWheelMoved(e: MouseWheelEvent) {
+  def mouseWheelMoved(e: MouseWheelEvent): Unit = {
     val observer = world.observer
     var zoomDist = -e.getUnitsToScroll.toDouble
     observer.perspective match {
@@ -87,13 +87,13 @@ with java.awt.event.MouseWheelListener {
           observer.oycor + (zoomDist * orientation.dy),
           observer.ozcor - (zoomDist * orientation.dz))
     }
-    view.signalViewUpdate()
+    view.display()
   }
 
   /// Implementation of java.awt.event.MouseMotionListener
 
-  def mouseDragged(evt: MouseEvent) {
-    if (movementMode == InteractMode) {
+  def mouseDragged(evt: MouseEvent): Unit = {
+    if (movementMode == InterfaceMode) {
       // we skip all the unnecessary computations below because it drastically slows down the
       // mouse updates jrn 5/20/05
       view.renderer.mouseDown(true)
@@ -103,7 +103,7 @@ with java.awt.event.MouseWheelListener {
     else handleDrag(evt)
   }
 
-  private def handleDrag(evt: MouseEvent) {
+  private def handleDrag(evt: MouseEvent): Unit = {
     val mode =
       if (evt.isAltDown) TranslateMode
       else if (evt.isShiftDown) ZoomMode
@@ -139,20 +139,20 @@ with java.awt.event.MouseWheelListener {
                                   ozcor - (thetaY * orientation.dz))
           case TranslateMode =>
             observer.translate(thetaX, thetaY)
-          case InteractMode =>
+          case InterfaceMode =>
             // do nothing
         }
     }
-    view.signalViewUpdate()
+    view.display()
   }
 
-  def mouseMoved(evt: MouseEvent) {
-    if (movementMode == InteractMode) {
+  def mouseMoved(evt: MouseEvent): Unit = {
+    if (movementMode == InterfaceMode) {
       view.renderer.setMouseCors(evt.getPoint)
       view.renderer.mouseInside(evt.getX, evt.getY)
     }
   }
 
-  def mouseClicked(evt: MouseEvent) {}
+  def mouseClicked(evt: MouseEvent): Unit = {}
 
 }

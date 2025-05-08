@@ -92,7 +92,7 @@ class ScalaConversionsTests extends AnyFunSuite {
   }
 
   test("HeterogenousSeq") {
-    testConversion(List(1, "test", 'c') -> LogoList(Double.box(1.0), "test", "c"))
+    testConversion(List[Any](1, "test", 'c') -> LogoList(Double.box(1.0), "test", "c"))
   }
 
   test("NonConvertableObject") {
@@ -102,11 +102,11 @@ class ScalaConversionsTests extends AnyFunSuite {
     }
   }
 
-  private def testConversion(vals: Tuple2[Any, Any]) {
+  private def testConversion(vals: Tuple2[Any, Any]): Unit = {
     testConversion(vals._1, vals._2)
   }
 
-  private def testConversion(input: Any, expected: Any) {
+  private def testConversion(input: Any, expected: Any): Unit = {
     val actual = input.toLogoObject
     assertResult(expected)(actual)
   }

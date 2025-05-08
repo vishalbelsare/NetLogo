@@ -18,6 +18,11 @@ object ModelsLibrary {
   val modelIndex = TaskKey[Seq[File]](
     "modelIndex", "builds models/index.txt for use in Models Library dialog")
 
+  val exportResizedModels = TaskKey[Unit](
+    "exportResizedModels", "resize all models to the new widget sizes and export the interface")
+
+  val convertWidgetSizes = TaskKey[Unit]("convertWidgetSizes", "run widget resize tool on all models in the library")
+
   val modelParser: Initialize[Parser[Option[Path]]] = {
     import Parser._
     Def.setting {
@@ -36,7 +41,7 @@ object ModelsLibrary {
   def modelFiles(directory: File): Seq[Path] = {
     val dirPath = directory.toPath
     FileActions.enumeratePaths(dirPath)
-      .filter(p => p.getFileName.toString.endsWith(".nlogo") || p.getFileName.toString.endsWith(".nlogo3d"))
+      .filter(p => p.getFileName.toString.endsWith(".nlogox") || p.getFileName.toString.endsWith(".nlogox3d"))
   }
 
   lazy val settings = Seq(
@@ -49,27 +54,37 @@ object ModelsLibrary {
     javaOptions += "-Dnetlogo.models.dir=" + modelsDirectory.value.getAbsolutePath.toString,
     resaveModels := {
       makeMainTask("org.nlogo.tools.ModelResaver",
-        classpath = (fullClasspath in Test),
+        classpath = (Test / fullClasspath),
         workingDirectory = baseDirectory(_.getParentFile)).toTask("").value
     },
     resaveModel := {
       makeMainTask("org.nlogo.tools.ModelResaver",
-        classpath = (fullClasspath in Test),
+        classpath = (Test / fullClasspath),
         workingDirectory = baseDirectory(_.getParentFile))
+    },
+    exportResizedModels := {
+      makeMainTask("org.nlogo.tools.ExportResizedModels",
+        classpath = (Test / fullClasspath),
+        workingDirectory = baseDirectory(_.getParentFile)).toTask("").value
+    },
+    convertWidgetSizes := {
+      makeMainTask("org.nlogo.tools.ConvertWidgetSizes",
+        classpath = (Test / fullClasspath),
+        workingDirectory = baseDirectory(_.getParentFile)).toTask("").value
     }
   )
 
   private def generateIndex(modelsPath: File, logger: Logger): String = {
     import scala.collection.JavaConverters._
     val buf = new StringBuilder
-    def println(s: String) { buf ++= s + "\n" }
+    def println(s: String): Unit = { buf ++= s + "\n" }
     val paths = FileActions
       .enumeratePaths(modelsPath.toPath)
       .filterNot(p => p.toString.contains("test"))
       .filterNot(p => Files.isDirectory(p))
-      .filter(p => p.getFileName.toString.endsWith("nlogo") || p.getFileName.toString.endsWith("nlogo3d"))
+      .filter(p => p.getFileName.toString.endsWith("nlogox") || p.getFileName.toString.endsWith("nlogox3d"))
     def infoTab(path: Path) = try {
-      Files.readAllLines(path).asScala.mkString("\n").split("\\@\\#\\$\\#\\@\\#\\$\\#\\@\n")(2)
+      InfoExtractor(Files.readAllLines(path).asScala.mkString("\n"))
     } catch {
       case e: Exception =>
         logger.error(s"while generating index, encountered error on file $path : ${e.getMessage}")

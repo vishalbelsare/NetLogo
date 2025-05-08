@@ -76,6 +76,8 @@ trait ProgramGenerator extends ScalaCheckDrivenPropertyChecks {
       otherElems = (program.elems.toSet - elem).map(Right(_)).toSeq
     } yield MangledProgram(corruptedElem +: otherElems)
 
+  // this is marked nowarn because ScalaCheck's interface uses Stream, but Scala 2.13 deprecated it in favor of LazyList (Isaac B 4/25/25)
+  @annotation.nowarn
   implicit def shrinkProgramElements(implicit shrinkSeq: Shrink[Seq[String]]): Shrink[ProgramElement] =
     Shrink.apply((e: ProgramElement) =>
         e match {
@@ -118,7 +120,8 @@ trait ProgramGenerator extends ScalaCheckDrivenPropertyChecks {
         case Breed(tpe, plural, singular, owns) if owns.nonEmpty => s"[ $plural $singular ] $plural-own " + owns.mkString("[ ", " ", " ]")
         case Breed(tpe, plural, singular, _) => s"[ $plural $singular ]"
         case BracketedElement(keyword, elems) => elems.mkString("[ ", " ", " ]")
-        case p@Procedure(procType, _, _, _) => p.programText.replaceAllLiterally(procType, "")
+        case p@Procedure(procType, _, _, _) => p.programText.replace(procType, "")
+        case _ => throw new IllegalStateException
       }
     }
   }
@@ -133,10 +136,10 @@ trait ProgramGenerator extends ScalaCheckDrivenPropertyChecks {
 
     case class DeleteLastSyntax(originalElement: ProgramElement) extends MangledProgramElement {
       def mangledText = originalElement match {
-        case p: Procedure => originalText.replaceAllLiterally("end", "")
+        case p: Procedure => originalText.replace("end", "")
         case Breed(tpe, plural, singular, owns) if owns.nonEmpty => s"$tpe [ $plural $singular ] $plural-own " + owns.mkString("[ ", " ", "")
         case Breed(tpe, plural, singular, _) => s"$tpe [ $plural $singular"
-        case o            => originalText.replaceAllLiterally("]", "")
+        case o            => originalText.replace("]", "")
       }
     }
   }

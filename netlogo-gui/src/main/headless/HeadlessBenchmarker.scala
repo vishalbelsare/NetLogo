@@ -4,7 +4,7 @@ package org.nlogo.headless
 import org.nlogo.api.Version
 import org.nlogo.workspace.Benchmarker
 object HeadlessBenchmarker {
-  def main(argv:Array[String]) {
+  def main(argv:Array[String]): Unit = {
     Main.setHeadlessProperty()
     val (name,minTime,maxTime) = argv match {
       case Array(name)         => (name,60,300)
@@ -16,7 +16,7 @@ object HeadlessBenchmarker {
     println("@@@@@@ warmup " + minTime + " seconds, min " + minTime + " seconds, max " + maxTime + " seconds")
     val workspace = HeadlessWorkspace.newInstance
     try {
-      workspace.open("../models/test/benchmarks/" + name + " Benchmark.nlogo")
+      workspace.open("../models/test/benchmarks/" + name + " Benchmark.nlogox")
       Benchmarker.benchmark(workspace,minTime,maxTime)
     }
     finally { workspace.dispose() }

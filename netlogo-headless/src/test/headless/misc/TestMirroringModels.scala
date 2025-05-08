@@ -5,7 +5,7 @@ package misc
 
 import org.scalatest.funsuite.AnyFunSuite
 import org.nlogo.{ api, mirror }
-import org.nlogo.util.SlowTestTag
+import org.nlogo.util.SlowTest
 import mirror._, Mirroring._, Mirrorables._
 import org.nlogo.drawing.DrawingActionRunner
 import org.nlogo.workspace.Checksummer
@@ -23,7 +23,7 @@ class TestMirroringModels extends AnyFunSuite  {
   // (old.nabble.com/get-rid-of-%22Could-not-find-mediaLib-accelerator-wrapper-classes%22-td11025745.html)
   System.setProperty("com.sun.media.jai.disableMediaLib", "true")
 
-  def modelRenderingTest(path: String) {
+  def modelRenderingTest(path: String): Unit = {
     withWorkspace { (ws, mirrorables) =>
       val drawingActionBuffer = new api.ActionBuffer(ws.drawingActionBroker)
       drawingActionBuffer.activate()
@@ -80,9 +80,9 @@ class TestMirroringModels extends AnyFunSuite  {
 
   for {
     path <- checksums.values.map(_.path).toSet
-    if !exclusions.exists(name => path.endsWith(name + ".nlogo"))
+    if !exclusions.exists(name => path.endsWith(name + ".nlogox"))
     if !moreExclusions.exists(name => path.containsSlice(name))
-  } test("Mirroring: " + path, SlowTestTag) {
+  } test("Mirroring: " + path, SlowTest.Tag) {
     modelRenderingTest(path)
   }
 

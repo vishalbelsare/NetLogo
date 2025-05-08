@@ -23,17 +23,17 @@ object LinkManager {
 
 trait LinkManager {
 
-  def reset()
+  def reset(): Unit
 
-  def cleanupTurtle(turtle: Turtle)
-  def cleanupLink(link: Link)
+  def cleanupTurtle(turtle: Turtle): Unit
+  def cleanupLink(link: Link): Unit
 
   def checkBreededCompatibility(unbreeded: Boolean): Boolean
 
   def createLink(src: Turtle, dest: Turtle, linkBreed: AgentSet): Link
 
-  def addLink(link: Link)
-  def removeLink(link: Link)
+  def addLink(link: Link): Unit
+  def removeLink(link: Link): Unit
 
   /**
     * Gets a specific link for the given turtles and link breed.
@@ -63,6 +63,11 @@ trait LinkManager {
     */
   def linksTo(src: Turtle, dest: Turtle, linkBreed: AgentSet): Array[Link]
 
+  // These exist as "optimizations" for the `link-neighbor?`, `in-link-neighbor?`, and `out-link-neighbor?` and
+  // associated breed-specific prims.  -Jeremy B May 2023
+  def isLinkedWith(src: Turtle, dest: Turtle, linkBreed: AgentSet): Boolean
+  def isLinkedTo(src: Turtle, dest: Turtle, linkBreed: AgentSet): Boolean
+
   def outNeighbors(src: Turtle, linkBreed: AgentSet): Array[Turtle]
   def inNeighbors(target: Turtle, linkBreed: AgentSet): Array[Turtle]
   def neighbors(target: Turtle, linkSet: AgentSet): Array[Turtle]
@@ -70,8 +75,9 @@ trait LinkManager {
   def outLinks(src: Turtle, linkBreed: AgentSet): Array[Link]
   def inLinks(target: Turtle, linkBreed: AgentSet): Array[Link]
   def links(target: Turtle, linkSet: AgentSet): Array[Link]
-
-  def dummyLink(end1: Turtle, end2: Turtle, breed: AgentSet): DummyLink
+  // The ends of the dummyLink are AnyRef because they can be a Turtle or null.
+  // null is used when only one end of a link has been specified in a Link Inspector (Monitor)
+  def dummyLink(end1: AnyRef, end2: AnyRef, breed: AgentSet): DummyLink
 }
 
 //
@@ -98,10 +104,13 @@ class LinkManagerImpl[W <: World](world: W, linkFactory: LinkFactory[W]) extends
 
   private var unbreededLinkCount = 0
 
-  def reset() {
-    world.links.agents.forEach { case l: Link =>
-      l.end1.removeLink(l)
-      l.end2.removeLink(l)
+  def reset(): Unit = {
+    world.links.agents.forEach {
+      case l: Link =>
+        l.end1.removeLink(l)
+        l.end2.removeLink(l)
+
+      case _ =>
     }
     world.tieManager.reset()
     unbreededLinkCount = 0
@@ -167,8 +176,15 @@ class LinkManagerImpl[W <: World](world: W, linkFactory: LinkFactory[W]) extends
     Option(link).asInstanceOf[Option[Link]]
   }
 
+  def isLinkedWith(src: Turtle, dest: Turtle, linkBreed: AgentSet): Boolean =
+    src.isLinkedWith(dest, linkBreed)
+
+  def isLinkedTo(src: Turtle, dest: Turtle, linkBreed: AgentSet): Boolean =
+    src.isLinkedTo(dest, linkBreed)
+
   def linksWith(src: Turtle, dest: Turtle, linkBreed: AgentSet): Array[Link] =
     links(src, linkBreed).filter(_.otherEnd(src) == dest)
+
   def linksTo(src: Turtle, dest: Turtle, linkBreed: AgentSet): Array[Link] =
     outLinks(src, linkBreed).filter(_.otherEnd(src) == dest)
 
@@ -194,7 +210,7 @@ class LinkManagerImpl[W <: World](world: W, linkFactory: LinkFactory[W]) extends
     if ((linkBreed eq world.links) && (world.linkBreeds.size > 1)) result.distinct else result
   }
 
-  def dummyLink(end1: Turtle, end2: Turtle, breed: AgentSet): DummyLink = {
+  def dummyLink(end1: AnyRef, end2: AnyRef, breed: AgentSet): DummyLink = {
     new DummyLink(world, end1, end2, breed)
   }
 }

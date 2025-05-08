@@ -8,9 +8,11 @@ import java.util.Arrays
 
 import org.scalatest.funsuite.AnyFunSuite
 
-import org.nlogo.api.{ ComponentSerialization, ConfigurableModelLoader, ModelLoader, ModelSettings, Version }
+import org.nlogo.api.{ AbstractModelLoader, ComponentSerialization, ConfigurableModelLoader, ModelSettings, Version }
 import org.nlogo.core.{ DummyCompilationEnvironment, DummyExtensionManager, Model, Shape, Widget },
   Shape.{ LinkShape, VectorShape }
+
+import scala.jdk.CollectionConverters.ListHasAsScala
 
 abstract class NLogoFormatTest[A] extends ModelSectionTest[Array[String], NLogoFormat, A] {
   val extensionManager = new DummyExtensionManager()
@@ -34,7 +36,7 @@ class NLogoFormatIOTest extends AnyFunSuite {
 
   val format = new NLogoFormat
 
-  lazy val antsBenchmarkPath = Paths.get(modelsLibrary, "test", "benchmarks", "Ants Benchmark.nlogo")
+  lazy val antsBenchmarkPath = Paths.get("test", "fileformat", "Ants Benchmark.nlogo")
   // sanity checking, if these fail NetLogo will be pretty unusable
   test("fails when reading in sections from a bad URI") {
     assert(format.sections(new URI("file:///not-a-real-file")).isFailure)
@@ -43,7 +45,6 @@ class NLogoFormatIOTest extends AnyFunSuite {
     assert(format.sections(antsBenchmarkPath.toUri).isSuccess)
   }
   test("saves specified sections to a given URI") {
-    import scala.collection.JavaConverters._
 
     val sections =
       format.sections(antsBenchmarkPath.toUri).get
@@ -78,7 +79,7 @@ class NLogoFormatIOTest extends AnyFunSuite {
 
 class NLogoFormatConversionTest extends AnyFunSuite with ConversionHelper {
   if (canTestConversions) {
-    def testLoader: ModelLoader =
+    def testLoader: AbstractModelLoader =
       new ConfigurableModelLoader().addFormat[Array[String], NLogoFormat](new NLogoFormat)
         .addSerializer[Array[String], NLogoFormat](new NLogoLabFormat(literalParser))
 
@@ -100,7 +101,7 @@ class NLogoFormatConversionTest extends AnyFunSuite with ConversionHelper {
 
     test("carries out conversions on behaviorspace operations") {
       import org.nlogo.api.LabProtocol
-      val protocol = new LabProtocol("foo", "", "movie-grab-view", "", 0, true, false, 0, "", List(), List())
+      val protocol = new LabProtocol("foo", "", "", "movie-grab-view", "", "", 0, true, false, "", 0, "", List(), List())
       val m = Model(code = "to foo end", version = "NetLogo 5.2.1")
         .withOptionalSection("org.nlogo.modelsection.behaviorspace", Some(Seq(protocol)), Seq())
 
@@ -171,11 +172,11 @@ class InterfaceComponentTest extends NLogoFormatTest[Seq[Widget]] {
   def attachComponent(widgets: Seq[Widget]): Model = Model(widgets = widgets)
 
   def sampleWidgetSection(filename: String): Array[String] =
-    scala.io.Source.fromFile(s"test/fileformat/$filename").mkString.lines.toArray
+    scala.io.Source.fromFile(s"test/fileformat/$filename").mkString.linesIterator.toArray
 
   testErrorsOnDeserialization("empty widgets section", Array[String](), "Every model must have at least a view...")
   testRoundTripsObjectForm("default view", Seq(View()))
-  testRoundTripsObjectForm("view and button", Seq(View(), Button(source = Some("abc"), 0, 0, 0, 0)))
+  testRoundTripsObjectForm("view and button", Seq(View(), Button(source = Some("abc"), 0, 0, 0, 0, true)))
 }
 
 class VectorShapesComponentTest extends NLogoFormatTest[Seq[VectorShape]] {
@@ -183,8 +184,8 @@ class VectorShapesComponentTest extends NLogoFormatTest[Seq[VectorShape]] {
   def modelComponent(model: Model): Seq[VectorShape] = model.turtleShapes
   def attachComponent(shapes: Seq[VectorShape]): Model = Model(turtleShapes = shapes)
 
-  testDeserializes("empty shapes to default shapes", Array[String](), Model.defaultShapes)
-  val defaultShape = Model.defaultShapes.find(_.name == "default").get
+  testDeserializes("empty shapes to default shapes", Array[String](), Model.defaultTurtleShapes)
+  val defaultShape = Model.defaultTurtleShapes.find(_.name == "default").get
   testRoundTripsObjectForm("default-only shape list", Seq(defaultShape))
 }
 

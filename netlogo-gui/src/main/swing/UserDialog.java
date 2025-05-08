@@ -9,7 +9,7 @@ import java.util.List;
 
 import static org.nlogo.swing.Utils.icon;
 
-public strictfp class UserDialog
+public class UserDialog
     extends javax.swing.JDialog {
   int selection = 0;
   static final int DIALOG_WIDTH = 400;
@@ -34,7 +34,7 @@ public strictfp class UserDialog
     c.ipadx = 10;
     c.ipady = 0;
     c.insets = new java.awt.Insets(2, 10, 5, 5);
-    List<String> brokenLines = org.nlogo.awt.LineBreaker.breakLines
+    List<String> brokenLines = org.nlogo.awt.LineBreaker.breakLinesJ
         (message,
             getFontMetrics(getFont()), DIALOG_WIDTH);
     for (Iterator<String> iter = brokenLines.iterator();

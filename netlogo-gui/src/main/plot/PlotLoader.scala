@@ -14,7 +14,8 @@ object PlotLoader {
     plot.defaultXMax = corePlot.xmax
     plot.defaultYMax = corePlot.ymax
     plot.defaultYMin = corePlot.ymin
-    plot.defaultAutoPlotOn = corePlot.autoPlotOn
+    plot.defaultAutoPlotX = corePlot.autoPlotX
+    plot.defaultAutoPlotY = corePlot.autoPlotY
     plot.setupCode = corePlot.setupCode
     plot.updateCode = corePlot.updateCode
     plot.pens = corePlot.pens.map(loadPen(plot))
@@ -34,7 +35,7 @@ object PlotLoader {
   }
 
   @deprecated("use loadPlot instead", "hexy")
-  def parsePlot(widget: Array[String], plot: Plot, autoConvert: String => String) {
+  def parsePlot(widget: Array[String], plot: Plot, autoConvert: String => String): Unit = {
     val (plotLines, penLines) =
       widget.toList.span(_ != "PENS")
     plot.name(plotLines(5))
@@ -44,8 +45,10 @@ object PlotLoader {
       plot.defaultYMin = plotLines(10).toDouble
       plot.defaultYMax = plotLines(11).toDouble
     }
-    if (12 < plotLines.length)
-      plot.defaultAutoPlotOn = plotLines(12).toBoolean
+    if (12 < plotLines.length) {
+      plot.defaultAutoPlotX = plotLines(12).toBoolean
+      plot.defaultAutoPlotY = plotLines(12).toBoolean
+    }
     if (14 < plotLines.length) {
       parseStringLiterals(plotLines(14)) match {
         case Nil => // old style model, no new plot code. this is ok.
@@ -66,7 +69,7 @@ object PlotLoader {
       case _ => Nil
     }
 
-    def loadPens(penLines: Seq[String], translateColors: Boolean) {
+    def loadPens(penLines: Seq[String], translateColors: Boolean): Unit = {
       plot.pens = Nil
       for (spec <- penLines.map(parsePen)) {
         val pen = plot.createPlotPen(spec.name, false,
@@ -94,8 +97,10 @@ object PlotLoader {
     require(s.head == '"')
     val (name, rest) = parseOne(s.tail)
     val (rest1, rest2) = rest.span(_ != '"')
-    val List(interval, mode, color, inLegend) =
-      rest1.trim.split("\\s+").toList
+    val (interval, mode, color, inLegend) = rest1.trim.split("\\s+") match {
+      case Array(i, m, c, l) => (i, m, c, l)
+      case a => throw new IllegalStateException
+    }
     require(PlotPen.isValidPlotPenMode(mode.toInt))
     // optional; pre-5.0 models don't have them
     val (setup, update) =
@@ -120,12 +125,12 @@ object PlotLoader {
     else if(s.take(2) == "\\\"")
       parseOne(s.drop(2)) match {
         case (more1, more2) =>
-          ('"' + more1, more2)
+          ("\"" + more1, more2)
       }
     else
       parseOne(s.tail) match {
         case (more1, more2) =>
-          (s.head + more1, more2)
+          (s.head.toString + more1, more2)
       }
 
   // Used to parse a line that may contain multiple string literals, surrounded by double quotes and

@@ -6,31 +6,45 @@ import org.jhotdraw.figures.LineConnection;
 import org.jhotdraw.framework.Connector;
 import org.jhotdraw.framework.Figure;
 import org.jhotdraw.util.Geom;
-import org.nlogo.api.Property;
+import org.nlogo.api.Options;
+import org.nlogo.api.CompilerServices;
+import org.nlogo.editor.Colorizer;
 import org.nlogo.sdm.ModelElement;
 import org.nlogo.sdm.Reservoir;
 import org.nlogo.sdm.Stock;
+import org.nlogo.window.DummyErrorHandler;
+import org.nlogo.window.Editable;
+import org.nlogo.window.EditPanel;
 
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.util.List;
 
-import org.nlogo.api.Options;
 
-public strictfp class RateConnection
+import scala.collection.immutable.Seq;
+
+public class RateConnection
     extends LineConnection
-    implements ModelElementFigure,
-    org.nlogo.api.Editable {
+    implements ModelElementFigure, Editable {
   static final int ICON_SIZE = 25;
 
   private org.nlogo.sdm.Rate rate;
   private String name;
+
+  private transient CompilerServices compiler;
+  private transient Colorizer colorizer;
 
   public RateConnection() {
     setEndDecoration(null);
     setStartDecoration(null);
     rate = new org.nlogo.sdm.Rate();
     rate.setSelected("Select");
+  }
+
+  // if these go in the constructor it messes up the old deserialization code (Isaac B 3/31/25)
+  public void setCompilerAndColorizer(CompilerServices compiler, Colorizer colorizer) {
+    this.compiler = compiler;
+    this.colorizer = colorizer;
   }
 
   public final String getName() {
@@ -54,8 +68,8 @@ public strictfp class RateConnection
   public void error(Object o, Exception e) {
   }
 
-  public Exception error(Object key) {
-    return null;
+  public scala.Option<Exception> error(Object key) {
+    return scala.Option.apply(null);
   }
 
   public int sourceOffset() {
@@ -314,8 +328,8 @@ public strictfp class RateConnection
     return scala.Option.apply(null);
   }
 
-  public List<Property> propertySet() {
-    return Properties.rate();
+  public EditPanel editPanel() {
+    return new RateEditPanel(this, compiler, colorizer);
   }
 
   private boolean dirty = false;

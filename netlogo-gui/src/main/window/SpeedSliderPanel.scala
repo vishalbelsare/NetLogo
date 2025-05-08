@@ -3,17 +3,23 @@
 package org.nlogo.window
 
 import java.awt.{ Color, Component, Dimension, Graphics, GridBagConstraints, GridBagLayout }
-import java.awt.event.{ ComponentEvent, ComponentListener, MouseEvent, MouseListener, MouseWheelEvent, MouseWheelListener }
-import javax.swing.{ JLabel, JPanel, JSlider }
+import java.awt.event.{ MouseEvent, MouseListener, MouseWheelEvent, MouseWheelListener }
+import javax.swing.{ JLabel, JPanel, JSlider, SwingConstants }
 import javax.swing.event.{ ChangeEvent, ChangeListener }
+import javax.swing.plaf.basic.BasicSliderUI
 
-import org.nlogo.awt.Fonts.adjustDefaultFont
 import org.nlogo.core.I18N
 import org.nlogo.log.LogManager
+import org.nlogo.swing.{ Button, Utils }
+import org.nlogo.theme.{ InterfaceColors, ThemeSync }
 import org.nlogo.window.Events.LoadBeginEvent
 
-class SpeedSliderPanel(workspace: GUIWorkspace) extends JPanel with MouseListener with ChangeListener with LoadBeginEvent.Handler {
-  implicit val prefix = I18N.Prefix("tabs.run.speedslider")
+class SpeedSliderPanel(workspace: GUIWorkspace, ticksLabel: Component = null) extends JPanel
+                                                                              with MouseListener
+                                                                              with ChangeListener
+                                                                              with LoadBeginEvent.Handler
+                                                                              with ThemeSync {
+  implicit val prefix: org.nlogo.core.I18N.Prefix = I18N.Prefix("tabs.run.speedslider")
 
   val speedSlider = {
     val slider = new SpeedSlider(workspace.speedSliderPosition.toInt)
@@ -24,35 +30,74 @@ class SpeedSliderPanel(workspace: GUIWorkspace) extends JPanel with MouseListene
     slider
   }
 
-  private val speedLabel = {
-    val label = new SpeedLabel(I18N.gui("normalspeed"), (i: Int) => (i / 2, i / 2))
-    adjustDefaultFont(label)
-    label.resizeWithComponent(speedSlider)
-    label
+  setOpaque(false)
+  setLayout(new GridBagLayout)
+
+  val slower = new Button("", () => speedSlider.setValue(speedSlider.getValue - 11)) {
+    override def getPreferredSize: Dimension =
+      new Dimension(19, 19)
+
+    override def paintComponent(g: Graphics): Unit = {
+      super.paintComponent(g)
+
+      val g2d = Utils.initGraphics2D(g)
+
+      g2d.setColor(InterfaceColors.toolbarText())
+      g2d.fillRect(6, 9, 7, 1)
+    }
   }
 
+  val faster = new Button("", () => speedSlider.setValue(speedSlider.getValue + 11)) {
+    override def getPreferredSize: Dimension =
+      new Dimension(19, 19)
+
+    override def paintComponent(g: Graphics): Unit = {
+      super.paintComponent(g)
+
+      val g2d = Utils.initGraphics2D(g)
+
+      g2d.setColor(InterfaceColors.toolbarText())
+      g2d.fillRect(6, 9, 7, 1)
+      g2d.fillRect(9, 6, 1, 7)
+    }
+  }
+
+  val modelSpeed = new JLabel(I18N.gui("modelSpeed"), SwingConstants.CENTER)
+
+  slower.setFont(slower.getFont.deriveFont(10f))
+  faster.setFont(faster.getFont.deriveFont(10f))
+
   locally {
-    val gridbag = new GridBagLayout()
-    val c = new GridBagConstraints()
-    setOpaque(false)
-    setLayout(gridbag)
+    val c = new GridBagConstraints
 
-    c.fill = GridBagConstraints.VERTICAL
-    c.gridwidth = 1
-    c.gridheight = 1
-    c.gridy = 0
-    c.anchor = GridBagConstraints.PAGE_START
-    add(speedLabel, c)
-
-    c.fill = GridBagConstraints.VERTICAL
-    c.anchor = GridBagConstraints.CENTER
-    c.gridwidth = 1
-    c.gridheight = 1
-    c.weighty = 0.25
+    c.gridx = 0
     c.gridy = 1
+
+    add(slower, c)
+
+    c.gridx = 1
+    c.gridy = 0
+    c.weightx = 1
+
+    add(modelSpeed, c)
+
+    c.gridx = 2
+    c.gridy = 1
+
+    add(faster, c)
+
+    c.gridx = 1
+    c.fill = GridBagConstraints.HORIZONTAL
+    c.anchor = GridBagConstraints.CENTER
+
     add(speedSlider, c)
 
-    enableLabels(0)
+    if (ticksLabel != null) {
+      c.gridy = 2
+      c.fill = GridBagConstraints.NONE
+
+      add(ticksLabel, c)
+    }
   }
 
   override def setEnabled(enabled: Boolean): Unit = {
@@ -61,8 +106,6 @@ class SpeedSliderPanel(workspace: GUIWorkspace) extends JPanel with MouseListene
     // which is a bit jarring, so do this instead - ST 9/16/08
     if (enabled)
       stateChanged(null)
-    else
-      speedLabel.setText(" ")
   }
 
   def stateChanged(e: ChangeEvent): Unit = {
@@ -75,19 +118,10 @@ class SpeedSliderPanel(workspace: GUIWorkspace) extends JPanel with MouseListene
       else if (value > 10) value - 10
       else                 0
 
-    workspace.speedSliderPosition(adjustedValue / 2);
+    workspace.speedSliderPosition(adjustedValue.toDouble / 2);
 
     LogManager.speedSliderChanged(adjustedValue)
-    enableLabels(adjustedValue)
     workspace.updateManager.nudgeSleeper()
-  }
-
-  private[window] def enableLabels(value: Int): Unit = {
-    val (labelText, spaceRatios) =
-      if (value == 0)     (I18N.gui("normalspeed"), (i: Int) => (i / 2, i / 2))
-      else if (value < 0) (I18N.gui("slower"),      (i: Int) => (i / 5, i * 4 / 5))
-      else                (I18N.gui("faster"),      (i: Int) => (i * 4 / 5, i / 5))
-    speedLabel.setUnpaddedText(labelText, spaceRatios)
   }
 
   // mouse listener junk
@@ -113,8 +147,6 @@ class SpeedSliderPanel(workspace: GUIWorkspace) extends JPanel with MouseListene
   def setValue(speed: Int): Unit = {
     if (speedSlider.getValue != speed)
       speedSlider.setValue(speed)
-
-    enableLabels(workspace.speedSliderPosition().toInt)
   }
 
   def getValue: Int = speedSlider.getValue
@@ -123,9 +155,21 @@ class SpeedSliderPanel(workspace: GUIWorkspace) extends JPanel with MouseListene
 
   override def isEnabled: Boolean = speedSlider.isEnabled
 
+  override def syncTheme(): Unit = {
+    slower.syncTheme()
+    faster.syncTheme()
+
+    modelSpeed.setForeground(InterfaceColors.toolbarText())
+  }
+
   class SpeedSlider(defaultSpeed: Int) extends JSlider(-110, 112, defaultSpeed) with MouseWheelListener {
+    private val sliderUI = new SpeedSliderUI
+    private var lastThumbLocation = 0
+
     setExtent(1)
     setToolTipText(I18N.gui("tooltip"))
+    setUI(sliderUI)
+
     addMouseWheelListener(this)
 
     override def getPreferredSize: Dimension =
@@ -139,50 +183,64 @@ class SpeedSliderPanel(workspace: GUIWorkspace) extends JPanel with MouseListene
     }
 
     def mouseWheelMoved(e: MouseWheelEvent): Unit = {
-      setValue(getValue - e.getWheelRotation)
+      setValue(this.getValue - e.getWheelRotation)
     }
 
-    override def paint(g: Graphics): Unit = {
-      val bounds = getBounds()
-      val x = bounds.x + (bounds.width / 2) - 1
-      g.setColor(Color.gray)
-      g.drawLine(x, bounds.y - (bounds.height / 2), x, bounds.y - (bounds.height / 4))
-      super.paint(g)
-    }
-  }
+    override def setValue(value: Int): Unit = {
+      lastThumbLocation = sliderUI.getThumbLocation
 
-  private class SpeedLabel(label: String, private var spaceRatios: Int => (Int, Int)) extends JLabel(label) with ComponentListener {
-    private def fontMetrics = getFontMetrics(getFont)
-
-    private var desiredWidth = 180
-
-    override def getPreferredSize: Dimension = getMinimumSize
-
-    override def getMinimumSize:   Dimension =
-      new Dimension(desiredWidth, super.getPreferredSize.height)
-
-    override def paint(g: Graphics): Unit = {
-      val width = getBounds().width
-      val (spaceBefore, _) = spaceRatios(width - fontMetrics.stringWidth(getText))
-      g.translate(spaceBefore, 0)
-      super.paint(g)
+      super.setValue(value)
     }
 
-    def setUnpaddedText(labelText: String, newSpaceRatios: Int => (Int, Int)): Unit = {
-      setText(labelText)
-      spaceRatios = newSpaceRatios
+    override def paintComponent(g: Graphics): Unit = {
+      val g2d = Utils.initGraphics2D(g)
+
+      g2d.setColor(Color.GRAY)
+      g2d.drawLine(getWidth / 2 - 1, getHeight / 4, getWidth / 2 - 1, getHeight * 3 / 4)
+
+      super.paintComponent(g)
     }
 
-    def resizeWithComponent(component: Component): Unit = {
-      desiredWidth = component.getPreferredSize.width
-      component.addComponentListener(this)
-    }
+    private class SpeedSliderUI extends BasicSliderUI(this) {
+      def getThumbLocation: Int =
+        thumbRect.x
 
-    def componentResized(e: ComponentEvent): Unit = {
-      desiredWidth = e.getComponent.getPreferredSize.width
+      override def getThumbSize: Dimension =
+        new Dimension(12, 12)
+
+      override def paintTrack(g: Graphics): Unit = {
+        val g2d = Utils.initGraphics2D(g)
+
+        val startY = trackRect.y + trackRect.height / 2 - 1
+
+        if (SpeedSlider.this.isEnabled) {
+          g2d.setColor(InterfaceColors.speedSliderBarBackgroundFilled())
+        } else {
+          g2d.setColor(InterfaceColors.speedSliderBarBackground())
+        }
+
+        g2d.fillRoundRect(trackRect.x, startY, thumbRect.x, 2, 2, 2)
+        g2d.setColor(InterfaceColors.speedSliderBarBackground())
+        g2d.fillRoundRect(thumbRect.x, startY, trackRect.width - thumbRect.x, 2, 2, 2)
+      }
+
+      override def paintThumb(g: Graphics): Unit = {
+        if (!SpeedSlider.this.isEnabled)
+          setThumbLocation(lastThumbLocation, 0)
+
+        val g2d = Utils.initGraphics2D(g)
+
+        val width = getThumbSize.width
+        val startY = thumbRect.getCenterY.toInt - width / 2
+
+        if (SpeedSlider.this.isEnabled) {
+          g2d.setColor(InterfaceColors.speedSliderThumb())
+        } else {
+          g2d.setColor(InterfaceColors.speedSliderThumbDisabled())
+        }
+
+        g2d.fillOval(thumbRect.x + thumbRect.width / 2 - width / 2, startY, width, width)
+      }
     }
-    def componentMoved(e: ComponentEvent): Unit = {}
-    def componentShown(e: ComponentEvent): Unit = {}
-    def componentHidden(e: ComponentEvent): Unit = {}
   }
 }

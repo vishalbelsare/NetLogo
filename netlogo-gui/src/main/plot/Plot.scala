@@ -12,6 +12,8 @@ import
 import
   java.io.{ Serializable => JSerializable }
 
+import scala.math.{ log10, pow }
+
 // normally, to create a new Plot, you have to go through PlotManager.newPlot
 // this makes sense because the PlotManager then controls compilation
 // and running of code, and it needs to know about all the Plots.
@@ -21,8 +23,6 @@ import
 // JC - 12/20/10
 @SerialVersionUID(0)
 class Plot private[nlogo] (var name:String) extends PlotInterface with JSerializable {
-
-  import Plot._
 
   var state = PlotState()
 
@@ -48,7 +48,8 @@ class Plot private[nlogo] (var name:String) extends PlotInterface with JSerializ
   private var _defaultXMax = 10.0
   private var _defaultYMin = 0.0
   private var _defaultYMax = 10.0
-  private var _defaultAutoPlotOn = true
+  private var _defaultAutoPlotX = true
+  private var _defaultAutoPlotY = true
   var setupCode: String = ""
   var updateCode: String = ""
 
@@ -64,17 +65,17 @@ class Plot private[nlogo] (var name:String) extends PlotInterface with JSerializ
 
   override def toString = "Plot(" + name + ")"
 
-  def setPlotListener(plotListener:PlotListener){
+  def setPlotListener(plotListener:PlotListener): Unit ={
     if(plotListener == null) sys.error("null plotListener")
     this.plotListener = Some(plotListener)
   }
-  def removePlotListener(){ this.plotListener = None }
+  def removePlotListener(): Unit ={ this.plotListener = None }
 
-  def name(newName:String){ name = newName }
+  def name(newName:String): Unit ={ name = newName }
 
-  def makeDirty(){ dirtyListener.foreach{_.makeDirty() }}
+  def makeDirty(): Unit ={ dirtyListener.foreach{_.makeDirty() }}
   def pens = _pens
-  def pens_=(pens:List[PlotPen]){
+  def pens_=(pens:List[PlotPen]): Unit ={
     _pens = pens
     currentPen = pens.headOption
   }
@@ -97,39 +98,47 @@ class Plot private[nlogo] (var name:String) extends PlotInterface with JSerializ
   def currentPenByName_=(penName: String): Unit = { currentPen=(getPen(penName)) }
   def getPen(penName: String): Option[PlotPen] = pens.find(_.name.toLowerCase==penName.toLowerCase)
   def defaultXMin = _defaultXMin
-  def defaultXMin_=(defaultXMin: Double){
+  def defaultXMin_=(defaultXMin: Double): Unit ={
     _defaultXMin = defaultXMin
     plotListener.foreach(_.defaultXMin(defaultXMin))
   }
 
   def defaultXMax = _defaultXMax
-  def defaultXMax_=(defaultXMax: Double){
+  def defaultXMax_=(defaultXMax: Double): Unit ={
     _defaultXMax = defaultXMax
     plotListener.foreach(_.defaultXMax(defaultXMax))
   }
 
   def defaultYMin = _defaultYMin
-  def defaultYMin_=(defaultYMin: Double) {
+  def defaultYMin_=(defaultYMin: Double): Unit = {
     _defaultYMin = defaultYMin
     plotListener.foreach(_.defaultYMin(defaultYMin))
   }
 
   def defaultYMax = _defaultYMax
-  def defaultYMax_=(defaultYMax: Double){
+  def defaultYMax_=(defaultYMax: Double): Unit ={
     _defaultYMax = defaultYMax
     plotListener.foreach(_.defaultYMax(defaultYMax))
   }
 
-  def defaultAutoPlotOn = _defaultAutoPlotOn
-  def defaultAutoPlotOn_=(defaultAutoPlotOn: Boolean){
-    _defaultAutoPlotOn = defaultAutoPlotOn
-    plotListener.foreach(_.defaultAutoPlotOn(defaultAutoPlotOn))
+  def defaultAutoPlotX = _defaultAutoPlotX
+  def defaultAutoPlotX_=(defaultAutoPlotX: Boolean): Unit ={
+    _defaultAutoPlotX = defaultAutoPlotX
+    plotListener.foreach(_.defaultAutoPlotX(defaultAutoPlotX))
+  }
+
+  def defaultAutoPlotY = _defaultAutoPlotY
+  def defaultAutoPlotY_=(defaultAutoPlotY: Boolean): Unit ={
+    _defaultAutoPlotY = defaultAutoPlotY
+    plotListener.foreach(_.defaultAutoPlotY(defaultAutoPlotY))
   }
 
   /// current properties
   /// (will be copied from defaults at construction time - ST 2/28/06)
 
-  def autoPlotOn = state.autoPlotOn
+  def autoPlotX = state.autoPlotX
+
+  def autoPlotY = state.autoPlotY
 
   def xMin = state.xMin
 
@@ -151,34 +160,34 @@ class Plot private[nlogo] (var name:String) extends PlotInterface with JSerializ
     }
   }
 
-  override def plot(x: Double, y: Double) {
+  override def plot(x: Double, y: Double): Unit = {
     currentPen.foreach { p =>
       plot(p, x, y)
       makeDirty()
     }
   }
 
-  def plot(pen: PlotPen, y: Double) {
+  def plot(pen: PlotPen, y: Double): Unit = {
     pen.plot(y)
     if (pen.state.isDown)
       perhapsGrowRanges(pen, pen.state.x, y)
   }
 
-  def plot(pen: PlotPen, x: Double, y: Double) {
+  def plot(pen: PlotPen, x: Double, y: Double): Unit = {
     pen.plot(x, y)
     if (pen.state.isDown)
       perhapsGrowRanges(pen, x, y)
   }
 
-  def clear() {
+  def clear(): Unit = {
     pens = pens.filterNot(_.temporary)
     currentPen = pens.headOption
     pens.foreach(_.hardReset())
-    state = PlotState(defaultAutoPlotOn, defaultXMin, defaultXMax, defaultYMin, defaultYMax)
+    state = PlotState(defaultAutoPlotX, defaultAutoPlotY, defaultXMin, defaultXMax, defaultYMin, defaultYMax)
     runtimeError = None
     backgroundColor = Color.getARGBbyPremodulatedColorNumber(White)
     makeDirty()
-    plotListener.foreach(_.clear)
+    plotListener.foreach(_.clear())
     pensDirty = true
   }
 
@@ -194,62 +203,72 @@ class Plot private[nlogo] (var name:String) extends PlotInterface with JSerializ
   // At some point, this and client code should be changed to use this method properly.
   def histogramActions(pen: PlotPenInterface, values: Seq[Double]): scala.collection.immutable.Seq[PlotAction] = ???
 
-  def perhapsGrowRanges(pen:PlotPen, x:Double, y: Double){
-    if(autoPlotOn){
-      if(pen.mode == PlotPen.BAR_MODE){
+  def perhapsGrowRanges(pen: PlotPen, x: Double, y: Double): Unit = {
+    if (autoPlotX) {
+      if (pen.mode == PlotPen.BAR_MODE) {
         // allow extra room on the right for bar
-        growRanges(x + pen.interval, y, true)
+        growRangeX(x + pen.interval)
       }
-      // calling growRanges() twice is sometimes redundant,
+
+      // calling growRangeX() twice is sometimes redundant,
       // but it's the easiest way to ensure that both the
       // left and right edges of the bar become visible
       // (consider the case where the bar is causing the
       // min to decrease) - ST 2/23/06
-      growRanges(x, y, true)
+      growRangeX(x)
+    }
+
+    if (autoPlotY)
+      growRangeY(y)
+  }
+
+  private def prettyRange(range: Double): Double = {
+    if (range < 0) {
+      if (range > -1)
+        return -1
+
+      val tmag = pow(10, log10(-range).floor - 1) * 2
+
+      (range / tmag).floor * tmag
+    } else {
+      if (range < 1)
+        return 1
+
+      val tmag = pow(10, log10(range).floor - 1) * 2
+
+      (range / tmag).ceil * tmag
     }
   }
 
-  private def growRanges(x:Double, y:Double, extraRoom:Boolean){
-    def adjust(d:Double, factor: Double) = d * (if(extraRoom) factor else 1)
-    if(x > xMax){
-      val newRange = adjust(x - xMin, AUTOPLOT_X_FACTOR)
-      state = state.copy(
-        xMax = newBound(xMin + newRange, newRange)
-      )
-    }
-    if(x < xMin){
-      val newRange = adjust(xMax - x, AUTOPLOT_X_FACTOR)
-      state = state.copy(
-        xMin = newBound(xMax - newRange, newRange)
-      )
-    }
-    if(y > yMax){
-      val newRange = adjust(y - yMin, AUTOPLOT_Y_FACTOR)
-      state = state.copy(
-        yMax = newBound(yMin + newRange, newRange)
-      )
-    }
-    if(y < yMin){
-      val newRange = adjust(yMax - y, AUTOPLOT_Y_FACTOR)
-      state = state.copy(
-        yMin = newBound(yMax - newRange, newRange)
-      )
-    }
+  private def growRangeX(x: Double): Unit = {
+    if (x > xMax)
+      state = state.copy(xMax = prettyRange(x))
+
+    if (x < xMin)
+      state = state.copy(xMin = prettyRange(x))
+  }
+
+  private def growRangeY(y: Double): Unit = {
+    if (y > yMax)
+      state = state.copy(yMax = prettyRange(y))
+
+    if (y < yMin)
+      state = state.copy(yMin = prettyRange(y))
   }
 
   /// histograms
-  def setHistogramNumBars(pen: PlotPen, numBars: Int) {
+  def setHistogramNumBars(pen: PlotPen, numBars: Int): Unit = {
     pen.interval = (xMax - xMin) / numBars
     plotListener.foreach(_.setHistogramNumBars(numBars))
   }
 
   var histogram: Option[Histogram] = None
 
-  def beginHistogram(pen:PlotPen) {
+  def beginHistogram(pen:PlotPen): Unit = {
     histogram = Some(new Histogram(xMin, xMax, pen.interval))
   }
 
-  def beginHistogram(pen:PlotPen, bars:Array[Int]){
+  def beginHistogram(pen:PlotPen, bars:Array[Int]): Unit ={
     histogram = Some(new Histogram(xMin, pen.interval, bars))
   }
 
@@ -257,78 +276,33 @@ class Plot private[nlogo] (var name:String) extends PlotInterface with JSerializ
 
   // this leaves the pen down, regardless of its previous state
   // historgram cannot be None when entering this method, or boom. - Josh 11/2/09
-  def endHistogram(pen:PlotPen){
+  def endHistogram(pen: PlotPen): Unit = {
     pen.softReset()
-    if(autoPlotOn){
-      // note that we pass extraRoom as false; we know the exact height
-      // of the histogram so there's no point in leaving any extra empty
-      // space like we normally do when growing the ranges;
-      // note also that we never grow the x range, only the y range,
+
+    if (autoPlotY) {
+      // note that we never grow the x range, only the y range,
       // because it's the current x range that determined the extent
       // of the histogram in the first place - ST 2/23/06
-      growRanges(xMin, histogram.get.ceiling, false)
+      growRangeY(histogram.get.ceiling)
     }
+
     for((bar, barNumber) <- histogram.get.bars.zipWithIndex) {
       // there is a design decision here not to generate points corresponding to empty bins.  not
       // sure what the right thing is in general, but in the GasLab models we use the histogram
       // command three times to produce a histogram with three different bar colors, and it looks
       // funny in that model if the bars we aren't histogramming have a horizontal line along the
       // axis - ST 2/24/06
-      if(bar > 0)
+      if (bar > 0)
         // compute the x coordinates by multiplication instead of repeated adding so that floating
         // point error doesn't accumulate - ST 2/23/06
         pen.plot(xMin + barNumber * pen.interval, bar)
     }
-    histogram = None
-  }
 
-  @throws(classOf[java.io.IOException])
-  private def writeObject(out:java.io.ObjectOutputStream){
-    out.writeObject(name)
-    out.writeBoolean(autoPlotOn)
-    out.writeDouble(xMin)
-    out.writeDouble(xMax)
-    out.writeDouble(yMin)
-    out.writeDouble(yMax)
-    out.writeObject(pens)
-    out.writeObject(currentPen.map(_.name))
-  }
-
-  @throws(classOf[java.io.IOException])
-  @throws(classOf[ClassNotFoundException])
-  private def readObject(in:java.io.ObjectInputStream){
-    name = in.readObject().toString
-    val autoPlotOn = in.readBoolean()
-    val xMin = in.readDouble()
-    val xMax = in.readDouble()
-    val yMin = in.readDouble()
-    val yMax = in.readDouble()
-    state = PlotState(autoPlotOn, xMin, xMax, yMin, yMax)
-    plotListener = None
-    pens = in.readObject().asInstanceOf[List[PlotPen]]
-    val currentPenName = in.readObject().asInstanceOf[Option[String]]
-    currentPenName.foreach{ name => _currentPen = pens.find(_.name == name) }
     histogram = None
-    pens.foreach(_.plot = this)
   }
 }
 
 object Plot {
-
-  /// autoplot
-  val AUTOPLOT_X_FACTOR = 1.25
-  val AUTOPLOT_Y_FACTOR = 1.10
-
-  // The purpose of this is to make the new bounds land on nice
-  // numbers like 12.4 instead of long ones like 12.33333333, so
-  // that displaying them in the axis labels doesn't use up a lot of
-  // screen real estate.  (Thus, the x and y growth factors are only
-  // approximate.) - ST 2/23/06
-  def newBound(bound:Double, range:Double): Double = {
-    val places = 2.0 - StrictMath.floor(StrictMath.log(range) / StrictMath.log(10))
-    org.nlogo.api.Approximate.approximate(bound, places.toInt)
-  }
-
   trait DirtyListener {
     def makeDirty(): Unit
   }

@@ -2,26 +2,30 @@
 
 package org.nlogo.app
 
-import java.awt.{ Dimension, Frame, Toolkit }
+import java.awt.{ Dimension, EventQueue, Frame, GraphicsEnvironment, KeyboardFocusManager, Toolkit, BorderLayout}
 import java.awt.event.ActionEvent
 import java.io.File
 import java.util.prefs.Preferences
-import javax.swing.{ JFrame, JOptionPane, JMenu }
+import javax.swing.{ JFrame, JMenu }
+
+import scala.concurrent.ExecutionContext
 
 import org.nlogo.agent.{ Agent, World2D, World3D }
 import org.nlogo.api._
 import org.nlogo.app.codetab.{ ExternalFileManager, TemporaryCodeTab }
 import org.nlogo.app.common.{ CodeToHtml, Events => AppEvents, FileActions, FindDialog, SaveModelingCommonsAction }
-import org.nlogo.app.interfacetab.{ InterfaceToolBar, WidgetPanel }
+import org.nlogo.app.interfacetab.{ CommandCenter, InterfaceTab, InterfaceWidgetControls, WidgetPanel }
 import org.nlogo.app.tools.{ AgentMonitorManager, GraphicsPreview, LibraryManagerErrorDialog, PreviewCommandsEditor }
 import org.nlogo.awt.UserCancelException
-import org.nlogo.core.{ AgentKind, CompilerException, I18N, Model,
+import org.nlogo.core.{ AgentKind, CompilerException, ExternalResource, I18N, Model,
   Shape, Widget => CoreWidget }, Shape.{ LinkShape, VectorShape }
 import org.nlogo.core.model.WidgetReader
-import org.nlogo.fileformat
+import org.nlogo.fileformat.FileFormat
 import org.nlogo.log.{ JsonFileLogger, LogEvents, LogManager }
 import org.nlogo.nvm.{ PresentationCompilerInterface, Workspace }
 import org.nlogo.shape.{ LinkShapesManagerInterface, ShapesManagerInterface, TurtleShapesManagerInterface }
+import org.nlogo.swing.{ DropdownOptionPane, InputOptionPane, OptionPane, SetSystemLookAndFeel, Utils }
+import org.nlogo.theme.{ ClassicTheme, DarkTheme, InterfaceColors, LightTheme, ThemeSync }
 import org.nlogo.util.{ NullAppHandler, Pico }
 import org.nlogo.window._
 import org.nlogo.window.Events._
@@ -30,7 +34,6 @@ import org.nlogo.workspace.{ AbstractWorkspace, AbstractWorkspaceScala, Controll
 import org.picocontainer.parameters.{ ComponentParameter, ConstantParameter }
 import org.picocontainer.Parameter
 
-import scala.io.Codec
 /**
  * The main class for the complete NetLogo application.
  *
@@ -52,6 +55,7 @@ object App {
   private var logEvents: String = null
   private var logDirectory: String = null
   private var popOutCodeTab = false
+  private var colorTheme: String = null
   /**
    * Should be called once at startup to create the application and
    * start it running.  May not be called more than once.  Once
@@ -64,104 +68,139 @@ object App {
    * @param args Should be empty. (Passing non-empty arguments
    *             is not currently documented.)
    */
-  def main(args:Array[String]){
+  def main(args: Array[String]): Unit = {
     mainWithAppHandler(args, NullAppHandler)
   }
 
-  def mainWithAppHandler(args: Array[String], appHandler: Object) {
-    // this call is reflective to avoid complicating dependencies
-    appHandler.getClass.getDeclaredMethod("init").invoke(appHandler)
-
-    AbstractWorkspace.isApp(true)
-    org.nlogo.window.VMCheck.detectBadJVMs()
-    processCommandLineArguments(args)
-    Splash.beginSplash() // also initializes AWT
-    pico.add("org.nlogo.compile.Compiler")
-    if (Version.is3D)
-      pico.addScalaObject("org.nlogo.api.NetLogoThreeDDialect")
-    else
-      pico.addScalaObject("org.nlogo.api.NetLogoLegacyDialect")
-
-    if (Version.systemDynamicsAvailable) {
-      pico.add("org.nlogo.sdm.gui.NLogoGuiSDMFormat")
-      pico.add("org.nlogo.sdm.gui.NLogoThreeDGuiSDMFormat")
+  def mainWithAppHandler(args: Array[String], appHandler: Object): Unit = {
+    val lowerArgs = args.map(_.trim.toLowerCase)
+    if (lowerArgs.contains("--headless") || lowerArgs.contains("--help")) {
+      org.nlogo.headless.Main.main(args)
+      return
     }
-    pico.addScalaObject("org.nlogo.sdm.gui.SDMGuiAutoConvertable")
 
-    pico.addAdapter(new Adapters.ModelLoaderComponent())
+    try {
+      val scalePref = Preferences.userRoot.node("/org/nlogo/NetLogo").getDouble("uiScale", 1.0)
 
-    pico.addAdapter(new Adapters.ModelConverterComponent())
+      if (scalePref > 1.0) {
+        System.setProperty("sun.java2d.uiScale", scalePref.toString)
 
-    pico.addComponent(classOf[CodeToHtml])
-    pico.addComponent(classOf[App])
-    pico.addComponent(classOf[ModelSaver])
-    pico.add("org.nlogo.gl.view.ViewManager")
-    // Anything that needs a parent Frame, we need to use ComponentParameter
-    // and specify classOf[AppFrame], otherwise PicoContainer won't know which
-    // Frame to use - ST 6/16/09
-    pico.add(classOf[TurtleShapesManagerInterface],
-          "org.nlogo.shape.editor.TurtleShapeManagerDialog",
-          Array[Parameter] (
-            new ComponentParameter(classOf[AppFrame]),
-            new ComponentParameter(), new ComponentParameter()))
-    pico.add(classOf[LinkShapesManagerInterface],
-          "org.nlogo.shape.editor.LinkShapeManagerDialog",
-          Array[Parameter] (
-            new ComponentParameter(classOf[AppFrame]),
-            new ComponentParameter(), new ComponentParameter()))
-    pico.add(classOf[AggregateManagerInterface],
-          "org.nlogo.sdm.gui.GUIAggregateManager",
-          Array[Parameter] (
-            new ComponentParameter(classOf[AppFrame]),
-            new ComponentParameter(), new ComponentParameter(),
-            new ComponentParameter(), new ComponentParameter()))
-    pico.add("org.nlogo.lab.gui.LabManager")
-    pico.add("org.nlogo.properties.EditDialogFactory")
-    // we need to make HeadlessWorkspace objects for BehaviorSpace to use.
-    // HeadlessWorkspace uses picocontainer too, but it could get confusing
-    // to use the same container in both places, so I'm going to keep the
-    // containers separate and just use Plain Old Java Reflection to
-    // call HeadlessWorkspace's newInstance() method. - ST 3/11/09
-    // And we'll conveniently reuse it for the preview commands editor! - NP 2015-11-18
-    val factory = new WorkspaceFactory() with CurrentModelOpener {
-      def newInstance: AbstractWorkspaceScala =
-        Class.forName("org.nlogo.headless.HeadlessWorkspace")
-          .getMethod("newInstance").invoke(null).asInstanceOf[AbstractWorkspaceScala]
-      def openCurrentModelIn(w: Workspace): Unit = {
-        w.setModelPath(app.workspace.getModelPath)
-        w.openModel(pico.getComponent(classOf[ModelSaver]).currentModelInCurrentVersion)
+        Utils.setUIScale(scalePref)
+      } else {
+        val devices = GraphicsEnvironment.getLocalGraphicsEnvironment.getScreenDevices
+        val scale = devices(0).getDefaultConfiguration.getDefaultTransform.getScaleX
+
+        Utils.setUIScale(scale)
       }
+
+      // this call is reflective to avoid complicating dependencies
+      appHandler.getClass.getDeclaredMethod("init").invoke(appHandler)
+
+      AbstractWorkspace.isApp(true)
+      org.nlogo.window.VMCheck.detectBadJVMs()
+      processCommandLineArguments(args)
+      Splash.beginSplash() // also initializes AWT
+      pico.add("org.nlogo.compile.Compiler")
+      if (Version.is3D)
+        pico.addScalaObject("org.nlogo.api.NetLogoThreeDDialect")
+      else
+        pico.addScalaObject("org.nlogo.api.NetLogoLegacyDialect")
+
+      if (Version.systemDynamicsAvailable) {
+        pico.add("org.nlogo.sdm.gui.NLogoGuiSDMFormat")
+        pico.add("org.nlogo.sdm.gui.NLogoThreeDGuiSDMFormat")
+      }
+      pico.addScalaObject("org.nlogo.sdm.gui.SDMGuiAutoConvertable")
+
+      pico.addAdapter(new Adapters.AnyModelLoaderComponent())
+
+      pico.addAdapter(new Adapters.ModelConverterComponent())
+
+      pico.addComponent(classOf[CodeToHtml])
+      pico.addComponent(classOf[App])
+      pico.addComponent(classOf[ModelSaver])
+      pico.add("org.nlogo.gl.view.ViewManager")
+      // Anything that needs a parent Frame, we need to use ComponentParameter
+      // and specify classOf[AppFrame], otherwise PicoContainer won't know which
+      // Frame to use - ST 6/16/09
+      pico.add(classOf[TurtleShapesManagerInterface],
+            "org.nlogo.shape.editor.TurtleShapeManagerDialog",
+            Array[Parameter] (
+              new ComponentParameter(classOf[AppFrame]),
+              new ComponentParameter(), new ComponentParameter()))
+      pico.add(classOf[LinkShapesManagerInterface],
+            "org.nlogo.shape.editor.LinkShapeManagerDialog",
+            Array[Parameter] (
+              new ComponentParameter(classOf[AppFrame]),
+              new ComponentParameter(), new ComponentParameter()))
+      pico.add(classOf[AggregateManagerInterface],
+            "org.nlogo.sdm.gui.GUIAggregateManager",
+            Array[Parameter] (
+              new ComponentParameter(classOf[AppFrame]),
+              new ComponentParameter(), new ComponentParameter(),
+              new ComponentParameter(), new ComponentParameter()))
+      pico.add("org.nlogo.lab.gui.LabManager")
+      pico.addComponent(classOf[EditDialogFactory])
+      // we need to make HeadlessWorkspace objects for BehaviorSpace to use.
+      // HeadlessWorkspace uses picocontainer too, but it could get confusing
+      // to use the same container in both places, so I'm going to keep the
+      // containers separate and just use Plain Old Java Reflection to
+      // call HeadlessWorkspace's newInstance() method. - ST 3/11/09
+      // And we'll conveniently reuse it for the preview commands editor! - NP 2015-11-18
+      val factory = new WorkspaceFactory() with CurrentModelOpener {
+        def newInstance: AbstractWorkspaceScala =
+          Class.forName("org.nlogo.headless.HeadlessWorkspace")
+            .getMethod("newInstance").invoke(null).asInstanceOf[AbstractWorkspaceScala]
+        def openCurrentModelIn(w: Workspace): Unit = {
+          w.setModelPath(app.workspace.getModelPath)
+          w.openModel(pico.getComponent(classOf[ModelSaver]).currentModelInCurrentVersion)
+        }
+      }
+
+      pico.addComponent(classOf[WorkspaceFactory], factory)
+      pico.addComponent(classOf[GraphicsPreview])
+      pico.addComponent(classOf[ExternalFileManager])
+      pico.add(
+        classOf[PreviewCommandsEditorInterface],
+        "org.nlogo.app.tools.PreviewCommandsEditor",
+        new ComponentParameter(classOf[AppFrame]),
+        new ComponentParameter(), new ComponentParameter())
+      pico.add(classOf[MenuBar], "org.nlogo.app.MenuBar",
+        new ConstantParameter(AbstractWorkspace.isApp))
+      pico.add(classOf[CommandCenter], "org.nlogo.app.interfacetab.CommandCenter", new ComponentParameter(),
+               new ConstantParameter(true))
+      pico.add("org.nlogo.app.interfacetab.InterfaceTab")
+      pico.addComponent(classOf[AgentMonitorManager])
+
+      System.setProperty("flatlaf.menuBarEmbedded", "false")
+      System.setProperty("sun.awt.noerasebackground", "true") // stops view2.5d and 3d windows from blanking to white until next interaction
+
+      app = pico.getComponent(classOf[App])
+      // It's pretty silly, but in order for the splash screen to show up
+      // for more than a fraction of a second, we want to initialize as
+      // much stuff as we can from main() before handing off to the event
+      // thread.  So what happens in the App constructor and what happens
+      // in finishStartup() is pretty arbitrary -- it's whatever makes
+      // the splash screen come up early without getting a bunch of Java
+      // exceptions because we're doing too much on the main thread.
+          // Hey, it's important to make a good first impression.
+      //   - ST 8/19/03
+      org.nlogo.awt.EventQueue.invokeAndWait(() => app.finishStartup(appHandler))
+    }
+    catch {
+      case ex: java.lang.Throwable =>
+        StartupError.report(ex)
+        return
     }
 
-    pico.addComponent(classOf[WorkspaceFactory], factory)
-    pico.addComponent(classOf[GraphicsPreview])
-    pico.addComponent(classOf[ExternalFileManager])
-    pico.add(
-      classOf[PreviewCommandsEditorInterface],
-      "org.nlogo.app.tools.PreviewCommandsEditor",
-      new ComponentParameter(classOf[AppFrame]),
-      new ComponentParameter(), new ComponentParameter())
-    pico.add(classOf[MenuBar], "org.nlogo.app.MenuBar",
-      new ConstantParameter(AbstractWorkspace.isApp))
-    pico.add("org.nlogo.app.interfacetab.CommandCenter")
-    pico.add("org.nlogo.app.interfacetab.InterfaceTab")
-    pico.addComponent(classOf[Tabs])
-    pico.addComponent(classOf[AgentMonitorManager])
-    app = pico.getComponent(classOf[App])
-    // It's pretty silly, but in order for the splash screen to show up
-    // for more than a fraction of a second, we want to initialize as
-    // much stuff as we can from main() before handing off to the event
-    // thread.  So what happens in the App constructor and what happens
-    // in finishStartup() is pretty arbitrary -- it's whatever makes
-    // the splash screen come up early without getting a bunch of Java
-    // exceptions because we're doing too much on the main thread.
-        // Hey, it's important to make a good first impression.
-    //   - ST 8/19/03
-    org.nlogo.awt.EventQueue.invokeAndWait(() => app.finishStartup(appHandler))
   }
 
-  private def processCommandLineArguments(args: Array[String]) {
-    def printAndExit(s:String){ println(s); sys.exit(0) }
+  private def processCommandLineArguments(args: Array[String]): Unit = {
+    def printAndExit(s: String): Unit = {
+      println(s)
+      sys.exit(0)
+    }
+
     // note: this method is static so that it can be called from main()
     // before App is instantiated, which means we can use the --version
     // flags without the AWT ever being initialized, which is handy when
@@ -199,6 +238,15 @@ object App {
                 commandLineURL == null)
         commandLineURL = nextToken()
       }
+      else if (token == "--color-theme") {
+        colorTheme = nextToken()
+
+        colorTheme match {
+          case "classic" =>
+          case "light" =>
+          case _ => throw new IllegalArgumentException(I18N.errors.getN("themes.unknown", colorTheme))
+        }
+      }
       else if (token == "--version") printAndExit(Version.version)
       else if (token == "--extension-api-version") printAndExit(APIVersion.version)
       else if (token == "--builddate") printAndExit(Version.buildDate)
@@ -234,6 +282,7 @@ class App extends
     BeforeLoadEvent.Handler with
     LoadBeginEvent.Handler with
     LoadEndEvent.Handler with
+    LoadModelEvent.Handler with
     ModelSavedEvent.Handler with
     ModelSections with
     AppEvents.SwitchedTabsEvent.Handler with
@@ -252,11 +301,7 @@ class App extends
   private var _workspace: GUIWorkspace = null
   def workspace = _workspace
   lazy val owner = new SimpleJobOwner("App", workspace.world.mainRNG, AgentKind.Observer)
-  private var _tabs: Tabs = null
-  private var _codeTabsPanel: CodeTabsPanel = null
-  private var _tabManager : AppTabManager= null
-  def tabs = _tabs
-  def codeTabsPanel = _codeTabsPanel
+  private var _tabManager: TabManager = null
   def tabManager = _tabManager
   var menuBar: MenuBar = null
   var _fileManager: FileManager = null
@@ -268,6 +313,7 @@ class App extends
   var recentFilesMenu: RecentFilesMenu = null
   private var errorDialogManager: ErrorDialogManager = null
   private val listenerManager = new NetLogoListenerManager
+  private var syncComponents = Set[ThemeSync]()
   lazy val modelingCommons = pico.getComponent(classOf[ModelingCommonsInterface])
   private val runningInMacWrapper = Option(System.getProperty("org.nlogo.mac.appClassName")).nonEmpty
   private val ImportWorldURLProp = "netlogo.world_state_url"
@@ -282,28 +328,37 @@ class App extends
   // part of controlling API; used by e.g. the Mathematica-NetLogo link
   // - ST 8/21/07
   @throws(classOf[UserCancelException])
-  def quit(){ fileManager.quit() }
+  def quit(): Unit ={ fileManager.quit() }
 
   locally {
     frame.addLinkComponent(this)
     pico.addComponent(frame)
 
-    org.nlogo.swing.Utils.setSystemLookAndFeel()
+    if (App.colorTheme == null)
+      App.colorTheme = prefs.get("colorTheme", "light")
+
+    SetSystemLookAndFeel.setSystemLookAndFeel()
+
+    InterfaceColors.setTheme(App.colorTheme match {
+      case "classic" => ClassicTheme
+      case "light" => LightTheme
+      case "dark" => DarkTheme
+    })
 
     errorDialogManager = new ErrorDialogManager(frame,
       Map(classOf[MetadataLoadingException] -> new LibraryManagerErrorDialog(frame)))
 
     org.nlogo.api.Exceptions.setHandler(this)
     Thread.setDefaultUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler() {
-      def uncaughtException(t: Thread, e: Throwable) { org.nlogo.api.Exceptions.handle(e) }
+      def uncaughtException(t: Thread, e: Throwable): Unit = { org.nlogo.api.Exceptions.handle(e) }
     })
 
     val interfaceFactory = new InterfaceFactory() {
       def widgetPanel(workspace: GUIWorkspace): AbstractWidgetPanel =
         new WidgetPanel(workspace)
-      def toolbar(wp: AbstractWidgetPanel, workspace: GUIWorkspace, buttons: List[WidgetInfo], frame: Frame) = {
-        new InterfaceToolBar(wp.asInstanceOf[WidgetPanel], workspace, buttons, frame,
-          pico.getComponent(classOf[EditDialogFactoryInterface]))
+      def widgetControls(wp: AbstractWidgetPanel, workspace: GUIWorkspace, buttons: List[WidgetInfo], frame: Frame) = {
+        new InterfaceWidgetControls(wp.asInstanceOf[WidgetPanel], workspace, buttons, frame,
+          pico.getComponent(classOf[EditDialogFactory]))
       }
     }
     pico.add(classOf[HubNetManagerFactory], "org.nlogo.hubnet.server.gui.HubNetManagerFactory",
@@ -334,11 +389,11 @@ class App extends
         override def updateMode = _workspace.updateMode
       }
       def aggregateManager: AggregateManagerInterface = App.this.aggregateManager
-      def inspectAgent(agent: org.nlogo.api.Agent, radius: Double) {
+      def inspectAgent(agent: org.nlogo.api.Agent, radius: Double): Unit = {
         val a = agent.asInstanceOf[org.nlogo.agent.Agent]
         monitorManager.inspect(a.kind, a, radius)
       }
-      override def inspectAgent(agentClass: AgentKind, agent: Agent, radius: Double) {
+      override def inspectAgent(agentClass: AgentKind, agent: Agent, radius: Double): Unit = {
         monitorManager.inspect(agentClass, agent, radius)
       }
       override def stopInspectingAgent(agent: Agent): Unit = {
@@ -347,7 +402,7 @@ class App extends
       override def stopInspectingDeadAgents(): Unit = {
         monitorManager.stopInspectingDeadAgents()
       }
-      override def closeAgentMonitors() { monitorManager.closeAll() }
+      override def closeAgentMonitors(): Unit = { monitorManager.closeAll() }
       override def newRenderer: RendererInterface = {
         // yikes, it's really ugly that we do this stuff
         // way inside here (should be top level). not sure
@@ -383,27 +438,16 @@ class App extends
     monitorManager = pico.getComponent(classOf[AgentMonitorManager])
     frame.addLinkComponent(monitorManager)
 
-    _tabs = pico.getComponent(classOf[Tabs])
-    controlSet.tabs = Some(_tabs)
-    if (popOutCodeTab) {
-      _codeTabsPanel = new CodeTabsPanel(workspace,
-                        tabs.interfaceTab,
-                        tabs.externalFileManager,
-                        tabs.mainCodeTab,
-                        tabs.externalFileTabs)
+    _tabManager = new TabManager(workspace, pico.getComponent(classOf[InterfaceTab]),
+                                 pico.getComponent(classOf[ExternalFileManager]))
 
-      _tabManager = new AppTabManager(_tabs, Some(_codeTabsPanel))
-      _codeTabsPanel.setTabManager(_tabManager)
-    } else {
-      _tabManager = new AppTabManager(_tabs, None)
-    }
+    frame.addLinkComponent(_tabManager)
+    controlSet.interfaceTab = Some(_tabManager.interfaceTab)
 
-    _tabs.setTabManager(_tabManager)
+    pico.addComponent(_tabManager.interfaceTab.getInterfacePanel)
+    frame.getContentPane.add(_tabManager.mainTabs, BorderLayout.CENTER)
 
-    pico.addComponent(tabs.interfaceTab.getInterfacePanel)
-    frame.getContentPane.add(tabs, java.awt.BorderLayout.CENTER)
-
-    frame.addLinkComponent(new CompilerManager(workspace, world, tabs.mainCodeTab))
+    frame.addLinkComponent(new CompilerManager(workspace, world, _tabManager.mainCodeTab))
     frame.addLinkComponent(listenerManager)
 
     def switchOrPref(switchValue: String, prefName: String, default: String) = {
@@ -421,91 +465,107 @@ class App extends
       val studentName       = askForName()
       val addListener       = (l) => listenerManager.addListener(l)
       val loggerFactory     = (p) => new JsonFileLogger(p)
-      LogManager.start(addListener, loggerFactory, finalLogDirectory, events, studentName)
+      LogManager.start(addListener, loggerFactory, finalLogDirectory, events, studentName, () =>
+        new OptionPane(frame, I18N.gui.get("common.messages.warning"), I18N.gui.get("error.dialog.logDirectory"),
+                       OptionPane.Options.Ok, OptionPane.Icons.Warning))
     }
 
   }
 
-  private def finishStartup(appHandler: Object) {
-    val app = pico.getComponent(classOf[App])
-    val currentModelAsString = {() =>
-      val modelSaver = pico.getComponent(classOf[ModelSaver])
-      modelSaver.modelAsString(modelSaver.currentModel, ModelReader.modelSuffix)
+  private def finishStartup(appHandler: Object): Unit = {
+    try {
+      val app = pico.getComponent(classOf[App])
+      val currentModelAsString = {() =>
+        val modelSaver = pico.getComponent(classOf[ModelSaver])
+        modelSaver.modelAsString(modelSaver.currentModel, ModelReader.modelSuffix)
+      }
+
+      pico.add(classOf[ModelingCommonsInterface],
+            "org.nlogo.mc.ModelingCommons",
+            Array[Parameter] (
+              new ConstantParameter(currentModelAsString),
+              new ComponentParameter(classOf[AppFrame]),
+              new ConstantParameter(() => workspace.exportView),
+              new ConstantParameter(() => Boolean.box(
+                workspace.procedures.get("SETUP") != null &&
+                  workspace.procedures.get("GO") != null)),
+              new ComponentParameter()))
+      aggregateManager = pico.getComponent(classOf[AggregateManagerInterface])
+      frame.addLinkComponent(aggregateManager)
+
+      labManager = pico.getComponent(classOf[LabManagerInterface])
+      frame.addLinkComponent(labManager)
+
+      val titler = (file: Option[String]) => { file map externalFileTitle getOrElse modelTitle() }
+      pico.add(classOf[DirtyMonitor], "org.nlogo.app.DirtyMonitor",
+        new ComponentParameter, new ComponentParameter, new ComponentParameter, new ComponentParameter,
+        new ConstantParameter(titler), new ConstantParameter(_tabManager.separateTabsWindow))
+      dirtyMonitor = pico.getComponent(classOf[DirtyMonitor])
+      frame.addLinkComponent(dirtyMonitor)
+
+      val menuBar = pico.getComponent(classOf[MenuBar])
+
+      pico.add(classOf[FileManager],
+        "org.nlogo.app.FileManager",
+        new ComponentParameter(), new ComponentParameter(), new ComponentParameter(),
+        new ComponentParameter(), new ComponentParameter(),
+        new ConstantParameter(menuBar), new ConstantParameter(frame), new ConstantParameter(_tabManager))
+      setFileManager(pico.getComponent(classOf[FileManager]))
+
+      val viewManager = pico.getComponent(classOf[GLViewManagerInterface])
+      workspace.init(viewManager)
+      frame.addLinkComponent(viewManager)
+
+      app.setMenuBar(menuBar)
+      frame.setJMenuBar(menuBar)
+
+      _tabManager.init(fileManager, dirtyMonitor, menuBar, allActions)
+
+      // OK, this is a little kludgy.  First we pack so everything
+      // is realized, and all addNotify() methods are called.  But
+      // the actual size we get won't be right yet, because the
+      // default model hasn't been loaded.  So load it, then pack
+      // again.  The first pack is needed because until everything
+      // has been realized, the NetLogo event system won't work.
+      //  - ST 8/16/03
+      frame.pack()
+
+      loadDefaultModel()
+
+      _tabManager.interfaceTab.packSplitPane()
+
+      smartPack(frame.getPreferredSize, true)
+
+      _tabManager.interfaceTab.resetSplitPane()
+
+      if (! isMac) { org.nlogo.awt.Positioning.center(frame, null) }
+
+      org.nlogo.app.common.FindDialog.init(frame, _tabManager.separateTabsWindow)
+
+      Splash.endSplash()
+      frame.setVisible(true)
+      if (isMac) {
+        appHandler.getClass.getDeclaredMethod("ready", classOf[AnyRef]).invoke(appHandler, this)
+      }
+
+      frame.addLinkComponent(_tabManager.separateTabsWindow)
+
+      if (popOutCodeTab || prefs.getBoolean("startSeparateCodeTab", false)) {
+        _tabManager.switchWindow(true)
+      }
+
+      import ExecutionContext.Implicits.global
+      AnnouncementsInfoDownloader.fetch().foreach(_tabManager.interfaceTab.appendAnnouncements)
+
+      syncWindowThemes()
+
+    }
+    catch {
+      case ex: java.lang.Throwable =>
+        StartupError.report(ex)
+        return
     }
 
-    pico.add(classOf[ModelingCommonsInterface],
-          "org.nlogo.mc.ModelingCommons",
-          Array[Parameter] (
-            new ConstantParameter(currentModelAsString),
-            new ComponentParameter(classOf[AppFrame]),
-            new ConstantParameter(() => workspace.exportView),
-            new ConstantParameter(() => Boolean.box(
-              workspace.procedures.get("SETUP") != null &&
-                workspace.procedures.get("GO") != null)),
-            new ComponentParameter()))
-    aggregateManager = pico.getComponent(classOf[AggregateManagerInterface])
-    frame.addLinkComponent(aggregateManager)
-
-    labManager = pico.getComponent(classOf[LabManagerInterface])
-    frame.addLinkComponent(labManager)
-
-    val titler = (file: Option[String]) => { file map externalFileTitle getOrElse modelTitle() }
-    pico.add(classOf[DirtyMonitor], "org.nlogo.app.DirtyMonitor",
-      new ComponentParameter, new ComponentParameter, new ComponentParameter, new ComponentParameter,
-      new ConstantParameter(titler))
-    dirtyMonitor = pico.getComponent(classOf[DirtyMonitor])
-    frame.addLinkComponent(dirtyMonitor)
-
-    val menuBar = pico.getComponent(classOf[MenuBar])
-
-    pico.add(classOf[FileManager],
-      "org.nlogo.app.FileManager",
-      new ComponentParameter(), new ComponentParameter(), new ComponentParameter(),
-      new ComponentParameter(), new ComponentParameter(),
-      new ConstantParameter(menuBar), new ConstantParameter(menuBar))
-    setFileManager(pico.getComponent(classOf[FileManager]))
-
-    val viewManager = pico.getComponent(classOf[GLViewManagerInterface])
-    workspace.init(viewManager)
-    frame.addLinkComponent(viewManager)
-
-    tabs.init(fileManager, dirtyMonitor)
-
-    if (popOutCodeTab) {
-      codeTabsPanel.init(fileManager, dirtyMonitor)
-    }
-
-    app.setMenuBar(menuBar)
-    frame.setJMenuBar(menuBar)
-
-    // OK, this is a little kludgy.  First we pack so everything
-    // is realized, and all addNotify() methods are called.  But
-    // the actual size we get won't be right yet, because the
-    // default model hasn't been loaded.  So load it, then pack
-    // again.  The first pack is needed because until everything
-    // has been realized, the NetLogo event system won't work.
-    //  - ST 8/16/03
-    frame.pack()
-
-    loadDefaultModel()
-    // smartPack respects the command center's current size, rather
-    // than its preferred size, so we have to explicitly set the
-    // command center to the size we want - ST 1/7/05
-    tabs.interfaceTab.commandCenter.setSize(tabs.interfaceTab.commandCenter.getPreferredSize)
-    smartPack(frame.getPreferredSize, true)
-
-    if (! isMac) { org.nlogo.awt.Positioning.center(frame, null) }
-
-    org.nlogo.app.common.FindDialog.init(frame)
-
-    Splash.endSplash()
-    frame.setVisible(true)
-    if (isMac) {
-      appHandler.getClass.getDeclaredMethod("ready", classOf[AnyRef]).invoke(appHandler, this)
-    }
-    if (popOutCodeTab) {
-      frame.addLinkComponent(codeTabsPanel.getCodeTabContainer)
-    }
   }
 
   // This is for other windows to get their own copy of the menu
@@ -513,7 +573,7 @@ class App extends
   // doesn't get shared across windows.  -- AZS 6/17/2005
   private class MenuBarFactory extends org.nlogo.window.MenuBarFactory {
     import org.nlogo.swing.UserAction, UserAction.{ ActionCategoryKey, EditCategory, FileCategory, HelpCategory, ToolsCategory }
-    def actions = allActions ++ tabs.permanentMenuActions
+    def actions = allActions ++ _tabManager.permanentMenuActions
 
     def createMenu(newMenu: org.nlogo.swing.Menu, category: String): JMenu = {
       actions.filter(_.getValue(ActionCategoryKey) == category).foreach(newMenu.offerAction)
@@ -527,7 +587,7 @@ class App extends
     def createZoomMenu:  JMenu = new ZoomMenu
   }
 
-  private def loadDefaultModel() {
+  private def loadDefaultModel(): Unit = {
     if (commandLineModel != null) {
       if (commandLineModelIsLaunch) { // --launch through InstallAnywhere?
         // open up the blank model first so in case
@@ -586,18 +646,18 @@ class App extends
       catch {
         case ex: java.net.ConnectException =>
           fileManager.newModel()
-          JOptionPane.showConfirmDialog(null,
-            I18N.gui.getN("file.open.error.unloadable.message", commandLineURL),
-            I18N.gui.get("file.open.error.unloadable.title"), JOptionPane.DEFAULT_OPTION)
+          new OptionPane(frame, I18N.gui.get("file.open.error.unloadable.title"),
+                         I18N.gui.getN("file.open.error.unloadable.message", commandLineURL),
+                         OptionPane.Options.OkCancel, OptionPane.Icons.Warning)
       }
 
     } else if (prefs.get("loadLastOnStartup", "false").toBoolean) {
       // if recent list is empty we need the new model, or if loading the recent model
       // fails then we'll fall back on it.  -Jeremy B June 2021
       fileManager.newModel()
-      val recentFiles = new RecentFiles
-      if (!recentFiles.models.isEmpty) {
-        val modelEntry = recentFiles.models.head
+      val recentFiles = (new RecentFiles).models
+      if (!recentFiles.isEmpty) {
+        val modelEntry = recentFiles.head
         fileManager.openFromPath(modelEntry.path, modelEntry.modelType)
       }
     } else {
@@ -607,24 +667,26 @@ class App extends
 
   /// zooming
 
-  def handle(e: ZoomedEvent) {
+  def handle(e: ZoomedEvent): Unit = {
     smartPack(frame.getPreferredSize, false)
   }
 
-  def resetZoom() {
+  def resetZoom(): Unit = {
     new ZoomedEvent(0).raise(this)
   }
 
-  lazy val openPreferencesDialog = new ShowPreferencesDialog(frame, tabs)
+  lazy val openPreferencesDialog = new ShowPreferencesDialog(frame, _tabManager)
+
+  lazy val showThemesDialog = new ShowThemesDialog(frame)
 
   lazy val openAboutDialog = new ShowAboutWindow(frame)
 
-  lazy val openColorDialog = new OpenColorDialog(frame)
+  lazy val openRGBAColorDialog = new OpenRGBAColorDialog(frame)
 
   lazy val openLibrariesDialog = {
     val updateSource =
       (transform: (String) => String) =>
-        tabs.mainCodeTab.innerSource = transform(tabs.mainCodeTab.innerSource)
+        _tabManager.mainCodeTab.innerSource = transform(_tabManager.mainCodeTab.innerSource)
     new OpenLibrariesDialog( frame, workspace.getLibraryManager, () => compile()
                            , updateSource, () => workspace.getExtensionPathMappings())
   }
@@ -638,8 +700,9 @@ class App extends
     val workspaceActions = org.nlogo.window.WorkspaceActions(workspace)
 
     val generalActions = Seq[javax.swing.Action](
+      showThemesDialog,
       openLibrariesDialog,
-      openColorDialog,
+      openRGBAColorDialog,
       new ShowShapeManager("turtleShapesEditor", turtleShapesManager),
       new ShowShapeManager("linkShapesEditor",   linkShapesManager),
       new ShowSystemDynamicsModeler(aggregateManager),
@@ -651,7 +714,8 @@ class App extends
         () => pico.getComponent(classOf[ModelSaver]).asInstanceOf[ModelSaver].currentModel),
       new SaveModelingCommonsAction(modelingCommons, menuBar.fileMenu),
       FindDialog.FIND_ACTION,
-      FindDialog.FIND_NEXT_ACTION
+      FindDialog.FIND_NEXT_ACTION,
+      new ConvertWidgetSizes(frame, _tabManager.interfaceTab.iP)
     ) ++
     HelpActions.apply ++
     FileActions(workspace, menuBar.fileMenu) ++
@@ -665,8 +729,6 @@ class App extends
   def setMenuBar(menuBar: MenuBar): Unit = {
     if (menuBar != this.menuBar) {
       this.menuBar = menuBar
-      tabs.setMenu(menuBar)
-      _tabManager.setAppMenuBar(menuBar)
       allActions.foreach(menuBar.offerAction)
       Option(recentFilesMenu).foreach(_.setMenu(menuBar))
     }
@@ -683,11 +745,16 @@ class App extends
     }
   }
 
+  // used by external tools to make GUI automation smoother (Isaac B 3/13/25)
+  def setIgnorePopups(ignore: Boolean): Unit = {
+    tabManager.setIgnoreChanges(ignore)
+  }
+
   // AppEvent stuff (kludgy)
   /**
    * Internal use only.
    */
-  def handle(e: AppEvent) {
+  def handle(e: AppEvent): Unit = {
     import AppEventType._
     e.`type` match {
       case RELOAD => reload()
@@ -696,62 +763,137 @@ class App extends
     }
   }
 
-  private def reload() {
+  private def reload(): Unit = {
     val modelType = workspace.getModelType
     val path = workspace.getModelPath
-    if (modelType != ModelType.New && path != null) openFromSource(FileIO.fileToString(path)(Codec.UTF8), path, modelType)
+    if (modelType != ModelType.New && path != null) tryOpenFromSource(path, modelType)
     else commandLater("print \"can't, new model\"")
   }
 
-  private def magicOpen(name: String) {
+  private def tryOpenFromSource(path: String, modelType: ModelType): Unit = {
+    val source = FileIO.fileToString(path)
+    // sometimes the filesystem does weird things and the file is empty for a moment,
+    // so we keep trying until the file contents are resolved (Isaac B 4/22/25)
+    if (source.isEmpty) {
+      EventQueue.invokeLater(() => tryOpenFromSource(path, modelType))
+    } else {
+      openFromSource(source, path, modelType)
+    }
+  }
+
+  private def magicOpen(name: String): Unit = {
     val matches = org.nlogo.workspace.ModelsLibrary.findModelsBySubstring(name)
     if (matches.isEmpty) commandLater("print \"no models matching \\\"" + name + "\\\" found\"")
     else {
       val fullName =
-        if (matches.size == 1) matches(0)
-        else {
-          val options = matches.map(_.replaceAllLiterally(".nlogo3d", "").replaceAllLiterally(".nlogo", "")).toArray[AnyRef]
-          val i = org.nlogo.swing.OptionDialog.showAsList(frame, I18N.gui.get("tools.magicModelMatcher"), I18N.gui.get("tools.magicModelMathcer.mustChoose"), options)
-          if (i != -1) matches(i) else null
+        if (matches.size == 1) {
+          Some(matches(0))
+        } else {
+          new DropdownOptionPane(frame, I18N.gui.get("tools.magicModelMatcher"),
+                                 I18N.gui.get("tools.magicModelMatcher.mustChoose"),
+                                 matches.map(_.replace(".nlogox3d", "")
+                                              .replace(".nlogox", "")))
+            .getSelectedChoice
         }
-      if (fullName != null) {
-        org.nlogo.workspace.ModelsLibrary.getModelPath(fullName).foreach { path =>
-          val source = org.nlogo.api.FileIO.fileToString(path)(Codec.UTF8)
+      fullName.foreach(name => {
+        org.nlogo.workspace.ModelsLibrary.getModelPath(name).foreach { path =>
+          val source = FileIO.fileToString(path)
           org.nlogo.awt.EventQueue.invokeLater(() => openFromSource(source, path, ModelType.Library))
         }
-      }
+      })
     }
   }
 
   ///
 
+  def setWindowTitles(): Unit = {
+    if (tabManager.separateTabsWindow.isVisible) {
+      frame.setTitle(modelTitle())
+      tabManager.separateTabsWindow.setTitle(
+        tabManager.separateTabs.getSelectedComponent match {
+          case tempTab: TemporaryCodeTab => externalFileTitle(tempTab.filename.merge)
+          case _ => modelTitle()
+        }
+      )
+    } else {
+      frame.setTitle(
+        tabManager.mainTabs.getSelectedComponent match {
+          case tempTab: TemporaryCodeTab => externalFileTitle(tempTab.filename.merge)
+          case _ => modelTitle()
+        }
+      )
+    }
+  }
+
+  /// ThemeSync stuff
+
+  def addSyncComponent(ts: ThemeSync): Unit = {
+    syncComponents = syncComponents + ts
+  }
+
+  def removeSyncComponent(ts: ThemeSync): Unit = {
+    syncComponents = syncComponents - ts
+  }
+
+  def syncWindowThemes(): Unit = {
+    FindDialog.syncTheme()
+
+    menuBar.syncTheme()
+
+    tabManager.syncTheme()
+    frame.repaint()
+    tabManager.separateTabsWindow.repaint()
+
+    workspace.glView.syncTheme()
+    workspace.glView.repaint()
+
+    monitorManager.syncTheme()
+
+    _turtleShapesManager match {
+      case ts: ThemeSync => ts.syncTheme()
+      case _ =>
+    }
+
+    _linkShapesManager match {
+      case ts: ThemeSync => ts.syncTheme()
+      case _ =>
+    }
+
+    labManager.syncTheme()
+
+    openPreferencesDialog.syncTheme()
+    showThemesDialog.syncTheme()
+    openAboutDialog.syncTheme()
+    openRGBAColorDialog.syncTheme()
+    openLibrariesDialog.syncTheme()
+
+    workspace.hubNetManager match {
+      case Some(manager: ThemeSync) => manager.syncTheme()
+      case _ =>
+    }
+
+    aggregateManager match {
+      case ts: ThemeSync => ts.syncTheme()
+      case _ =>
+    }
+
+    errorDialogManager.syncTheme()
+
+    // this allows external objects like extension GUIs to sync with the theme (Isaac B 1/12/25)
+    syncComponents.foreach(_.syncTheme())
+  }
+
   /**
    * Internal use only.
    */
   final def handle(e: AppEvents.SwitchedTabsEvent): Unit = {
-    if (e.newTab == tabs.interfaceTab) {
+    if (e.newTab == _tabManager.interfaceTab) {
       monitorManager.showAll()
       frame.toFront()
-    } else if (e.oldTab == tabs.interfaceTab) {
+    } else if (e.oldTab == _tabManager.interfaceTab) {
       monitorManager.hideAll()
     }
-    tabManager.codeTabsPanelOption match {
-      case None           => {
-        val appWindowTitle = e.newTab match {
-          case tab: TemporaryCodeTab => externalFileTitle(tab.filename.merge)
-          case _                     => modelTitle()
-        }
-        frame.setTitle(appWindowTitle)
-      }
-      case Some(thePanel) =>  {
-        val codeWindowTitle = e.newTab match {
-          case tab: TemporaryCodeTab => externalFileTitle(tab.filename.merge)
-          case _                     => modelTitle(allowDirtyMarker = false)
-        }
-        thePanel.codeTabContainer.setTitle(codeWindowTitle)
-        frame.setTitle(modelTitle())
-      }
-    }
+    setWindowTitles()
   }
 
   /**
@@ -767,11 +909,7 @@ class App extends
     workspace.modelSaved(e.modelPath)
     errorDialogManager.setModelName(workspace.modelNameForDisplay)
     if (AbstractWorkspace.isApp) {
-      frame.setTitle(modelTitle())
-      tabManager.codeTabsPanelOption match {
-        case None           =>
-        case Some(thePanel) => thePanel.codeTabContainer.setTitle(modelTitle(allowDirtyMarker = false))
-      }
+      setWindowTitles()
       workspace.hubNetManager.foreach { manager =>
         manager.setTitle(workspace.modelNameForDisplay, workspace.getModelDir, workspace.getModelType)
       }
@@ -784,14 +922,10 @@ class App extends
   def handle(e: LoadBeginEvent): Unit = {
     val modelName = workspace.modelNameForDisplay
     errorDialogManager.setModelName(modelName)
-    if (AbstractWorkspace.isApp) {
-      frame.setTitle(modelTitle())
-      tabManager.codeTabsPanelOption match {
-        case None           =>
-        case Some(thePanel) => thePanel.codeTabContainer.setTitle(modelTitle(allowDirtyMarker = false))
-      }
-    }
+    if (AbstractWorkspace.isApp)
+      setWindowTitles()
     workspace.hubNetManager.foreach(_.closeClientEditor())
+    errorDialogManager.closeAllDialogs()
   }
 
   private var wasAtPreferredSizeBeforeLoadBegan = false
@@ -800,7 +934,7 @@ class App extends
   /**
    * Internal use only.
    */
-  def handle(e: BeforeLoadEvent) {
+  def handle(e: BeforeLoadEvent): Unit = {
     wasAtPreferredSizeBeforeLoadBegan =
             preferredSizeAtLoadEndTime == null ||
             frame.getSize == preferredSizeAtLoadEndTime ||
@@ -820,7 +954,7 @@ class App extends
   /**
    * Internal use only.
    */
-  def handle(e: LoadEndEvent) {
+  def handle(e: LoadEndEvent): Unit = {
     turtleShapesManager.reset()
     linkShapesManager.reset()
     workspace.view.repaint()
@@ -828,7 +962,7 @@ class App extends
     if(AbstractWorkspace.isApp){
       // if we don't call revalidate() here we don't get up-to-date
       // preferred size information - ST 11/4/03
-      tabs.interfaceTab.getInterfacePanel.revalidate()
+      _tabManager.interfaceTab.packSplitPane()
       if(wasAtPreferredSizeBeforeLoadBegan) smartPack(frame.getPreferredSize, true)
       else{
         val currentSize = frame.getSize
@@ -839,16 +973,26 @@ class App extends
         if(preferredSize.height > newHeight) newHeight = preferredSize.height
         if(newWidth != currentSize.width || newHeight != currentSize.height) smartPack(new Dimension(newWidth, newHeight), true)
       }
+      _tabManager.interfaceTab.resetSplitPane()
       preferredSizeAtLoadEndTime = frame.getPreferredSize()
     }
-    frame.toFront()
-    tabs.interfaceTab.requestFocus()
+
+    if (KeyboardFocusManager.getCurrentKeyboardFocusManager.getActiveWindow != null) {
+      frame.toFront()
+      _tabManager.interfaceTab.requestFocus()
+    }
+
+    syncWindowThemes()
+  }
+
+  def handle(e: LoadModelEvent): Unit = {
+    workspace.getResourceManager.setResources(e.model.resources)
   }
 
   /**
    * Internal use only.
    */
-  def handle(e: AboutToQuitEvent) {
+  def handle(e: AboutToQuitEvent): Unit = {
     LogManager.stop()
   }
 
@@ -874,7 +1018,7 @@ class App extends
 
   private def externalFileTitle(path: String) = {
     val filename = TemporaryCodeTab.stripPath(path)
-    (tabs.getTabWithFilename(Right(path)) orElse tabs.getTabWithFilename(Left(path))).
+    (_tabManager.getTabWithFilename(Right(path)) orElse _tabManager.getTabWithFilename(Left(path))).
       map (tab => frameTitle(filename, tab.saveNeeded)).
       getOrElse(frameTitle(filename, false))
   }
@@ -944,9 +1088,8 @@ class App extends
     } catch {
       case ex: UserCancelException => org.nlogo.api.Exceptions.ignore(ex)
       case ex: java.io.IOException =>
-        javax.swing.JOptionPane.showMessageDialog(
-          frame, ex.getMessage,
-          I18N.gui.get("common.messages.error"), javax.swing.JOptionPane.ERROR_MESSAGE)
+        new OptionPane(frame, I18N.gui.get("common.messages.error"), ex.getMessage, OptionPane.Options.Ok,
+                       OptionPane.Icons.Error)
     }
   }
 
@@ -972,7 +1115,7 @@ class App extends
   }
 
   @throws(classOf[java.io.IOException])
-  def libraryOpen(path: String) {
+  def libraryOpen(path: String): Unit = {
     dispatchThreadOrBust(fileManager.openFromPath(path, ModelType.Library))
   }
 
@@ -982,12 +1125,12 @@ class App extends
    * @param source The complete model, including widgets and so forth,
    *               in the same format as it would be stored in a file.
    */
-  def openFromSource(name:String, source:String){
+  def openFromSource(name:String, source:String): Unit ={
     // I'm not positive that NORMAL is right here.
     openFromSource(source, name, ModelType.Normal)
   }
 
-  def openFromSource(source:String, path:String, modelType:ModelType){
+  def openFromSource(source:String, path:String, modelType:ModelType): Unit ={
     import java.nio.file.Paths
     dispatchThreadOrBust(
       try fileManager.openFromSource(Paths.get(path).toUri, source, modelType)
@@ -1005,7 +1148,7 @@ class App extends
    * @see #commandLater
    */
   @throws(classOf[CompilerException])
-  def command(source: String) {
+  def command(source: String): Unit = {
     org.nlogo.awt.EventQueue.cantBeEventDispatchThread()
     workspace.evaluateCommands(owner, source)
   }
@@ -1019,7 +1162,7 @@ class App extends
    * @see #command
    */
   @throws(classOf[CompilerException])
-  def commandLater(source: String){
+  def commandLater(source: String): Unit ={
     workspace.evaluateCommands(owner, source, false)
   }
 
@@ -1045,7 +1188,7 @@ class App extends
    * Returns the contents of the Code tab.
    * @return contents of Code tab
    */
-  def getProcedures: String = dispatchThreadOrBust(tabs.mainCodeTab.innerSource)
+  def getProcedures: String = dispatchThreadOrBust(_tabManager.mainCodeTab.innerSource)
 
   /**
    * Replaces the contents of the Code tab.
@@ -1053,14 +1196,14 @@ class App extends
    * @param source new contents
    * @see #compile
    */
-  def setProcedures(source:String) { dispatchThreadOrBust(tabs.mainCodeTab.innerSource = source) }
+  def setProcedures(source:String): Unit = { dispatchThreadOrBust(_tabManager.mainCodeTab.innerSource = source) }
 
   /**
    * Recompiles the model.  Useful after calling
    * <code>setProcedures()</code>.
    * @see #setProcedures
    */
-  def compile(){ dispatchThreadOrBust(new CompileAllEvent().raise(this)) }
+  def compile(): Unit ={ dispatchThreadOrBust(new CompileAllEvent().raise(this)) }
 
   /**
    * Recompiles the model after any other events in progress have finished.  Useful if you interrupt
@@ -1068,7 +1211,7 @@ class App extends
    * from the library.
    * @see #compile
    */
-  def compileLater(){ dispatchThreadOrBust(new CompileAllEvent().raiseLater(this)) }
+  def compileLater(): Unit ={ dispatchThreadOrBust(new CompileAllEvent().raiseLater(this)) }
 
   /**
    * Not currently supported.  For now, use <code>command</code>
@@ -1077,7 +1220,7 @@ class App extends
    * @see #command
    * @see #commandLater
    */
-  def pressButton(name:String) {
+  def pressButton(name:String): Unit = {
     if (java.awt.EventQueue.isDispatchThread()) throw new IllegalStateException("can't call on event thread")
     val button = findButton(name)
     if (button.forever) {
@@ -1104,63 +1247,63 @@ class App extends
    * in the same (undocumented) format found in a saved model.
    * @param text the widget specification
    */
-  def makeWidget(text:String) {
+  def makeWidget(text:String): Unit = {
     dispatchThreadOrBust(
-      tabs.interfaceTab.getInterfacePanel.loadWidget(WidgetReader.read(text.lines.toList, workspace, fileformat.nlogoReaders(Version.is3D))))
+      _tabManager.interfaceTab.getInterfacePanel.loadWidget(WidgetReader.read(text.linesIterator.toList, workspace, FileFormat.nlogoReaders(Version.is3D))))
   }
 
   /// helpers for controlling methods
 
   private def findButton(name:String): ButtonWidget =
-    tabs.interfaceTab.getInterfacePanel.getComponents
+    _tabManager.interfaceTab.getInterfacePanel.getComponents
       .collect{case bw: ButtonWidget => bw}
       .find(_.displayName == name)
       .getOrElse{throw new IllegalArgumentException(
         "button '" + name + "' not found")}
 
-  def smartPack(targetSize:Dimension, allowShrink: Boolean) {
-    val gc = frame.getGraphicsConfiguration
-    val maxBounds = gc.getBounds
-    val insets = Toolkit.getDefaultToolkit.getScreenInsets(gc)
-    val maxWidth = maxBounds.width - insets.left - insets.right
-    val maxHeight = maxBounds.height - insets.top - insets.bottom
-    val maxBoundsX = maxBounds.x + insets.left
-    val maxBoundsY = maxBounds.y + insets.top
-    val maxX = maxBoundsX + maxWidth
-    val maxY = maxBoundsY + maxHeight
+  def smartPack(targetSize: Dimension, allowShrink: Boolean): Unit = {
+    if (frame.getExtendedState != Frame.MAXIMIZED_BOTH) {
+      val gc = frame.getGraphicsConfiguration
+      val maxBounds = gc.getBounds
+      val insets = Toolkit.getDefaultToolkit.getScreenInsets(gc)
+      val maxWidth = maxBounds.width - insets.left - insets.right
+      val maxHeight = maxBounds.height - insets.top - insets.bottom
+      val maxBoundsX = maxBounds.x + insets.left
+      val maxBoundsY = maxBounds.y + insets.top
+      val maxX = maxBoundsX + maxWidth
+      val maxY = maxBoundsY + maxHeight
 
-    tabs.interfaceTab.adjustTargetSize(targetSize)
+      val (currentWidth, currentHeight) = (frame.getWidth, frame.getHeight)
 
-    import StrictMath.{ max, min }
+      // Maybe grow the window, but never shrink it
+      var newWidth  = targetSize.width.max(tabManager.interfaceTab.getMinimumWidth).min(maxWidth)
+      var newHeight = targetSize.height.min(maxHeight)
+      if (!allowShrink) {
+        newWidth = newWidth.max(currentWidth)
+        newHeight = newHeight.max(currentHeight)
+      }
 
-    val (currentWidth, currentHeight) = (frame.getWidth, frame.getHeight)
+      // move up/left to get more room if possible and necessary
+      val moveLeft = 0.max(frame.getLocation().x + newWidth  - maxX)
+      val moveUp   = 0.max(frame.getLocation().y + newHeight - maxY)
 
-    // Maybe grow the window, but never shrink it
-    var newWidth  = min(targetSize.width, maxWidth)
-    var newHeight = min(targetSize.height, maxHeight)
-    if (!allowShrink) {
-      newWidth = max(newWidth, currentWidth)
-      newHeight = max(newHeight, currentHeight)
+      // now we can compute our new position
+      val newX = maxBoundsX.max(frame.getLocation().x - moveLeft)
+      val newY = maxBoundsY.max(frame.getLocation().y - moveUp)
+
+      // and now that we know our position, we can compute our new size
+      newWidth  = newWidth.min(maxX - newX)
+      newHeight = newHeight.min(maxY - newY)
+
+      // now do it!
+      frame.setBounds(newX, newY, newWidth, newHeight)
+      frame.validate()
+
+      frame.setMinimumSize(new Dimension(_tabManager.interfaceTab.getMinimumWidth / 2, 300))
+
+      // not sure why this is sometimes necessary - ST 11/24/03
+      _tabManager.mainTabs.requestFocus()
     }
-
-    // move up/left to get more room if possible and necessary
-    val moveLeft = max(0, frame.getLocation().x + newWidth  - maxX)
-    val moveUp   = max(0, frame.getLocation().y + newHeight - maxY)
-
-    // now we can compute our new position
-    val newX = max(maxBoundsX, frame.getLocation().x - moveLeft)
-    val newY = max(maxBoundsY, frame.getLocation().y - moveUp)
-
-    // and now that we know our position, we can compute our new size
-    newWidth  = min(newWidth, maxX - newX)
-    newHeight = min(newHeight, maxY - newY)
-
-    // now do it!
-    frame.setBounds(newX, newY, newWidth, newHeight)
-    frame.validate()
-
-    // not sure why this is sometimes necessary - ST 11/24/03
-    tabs.requestFocus()
   }
 
   /**
@@ -1189,30 +1332,32 @@ class App extends
   }
 
   def procedureSource:  String =
-    tabs.mainCodeTab.innerSource
+    _tabManager.mainCodeTab.innerSource
   def widgets:          Seq[CoreWidget] = {
-    tabs.interfaceTab.iP.getWidgetsForSaving
+    _tabManager.interfaceTab.iP.getWidgetsForSaving
   }
   def info:             String =
-    tabs.infoTab.info
+    _tabManager.infoTab.info
   def turtleShapes:     Seq[VectorShape] =
-    tabs.workspace.world.turtleShapeList.shapes.collect { case s: VectorShape => s }
+    workspace.world.turtleShapeList.shapes.collect { case s: VectorShape => s }
   def linkShapes:       Seq[LinkShape] =
-    tabs.workspace.world.linkShapeList.shapes.collect { case s: LinkShape => s }
+    workspace.world.linkShapeList.shapes.collect { case s: LinkShape => s }
   def additionalSections: Seq[ModelSections.ModelSaveable] = {
     val sections =
-      Seq[ModelSections.ModelSaveable](tabs.workspace.previewCommands,
+      Seq[ModelSections.ModelSaveable](workspace.previewCommands,
         labManager,
         aggregateManager,
-        tabs.workspace)
+        workspace)
     workspace.hubNetManager.map(_ +: sections).getOrElse(sections)
   }
+  def resources:        Seq[ExternalResource] =
+    workspace.getResourceManager.getResources
 
   def askForName() = {
     val frame = new JFrame()
     frame.setAlwaysOnTop(true)
     val prompt = I18N.gui.get("tools.loggingMode.enterName")
-    val name   = JOptionPane.showInputDialog(frame, prompt, "", JOptionPane.QUESTION_MESSAGE, null, null, "")
+    val name   = new InputOptionPane(frame, "", prompt).getInput
     if (name == null) { "unknown" } else { name.toString.trim() }
   }
 

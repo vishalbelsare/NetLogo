@@ -2,7 +2,7 @@
 
 package org.nlogo.fileformat
 
-import org.nlogo.api.{ EnumeratedValueSet, LabProtocol, RefEnumeratedValueSet, SteppedValueSet }
+import org.nlogo.api.{ LabProtocol, RefEnumeratedValueSet, RefValueSet, SteppedValueSet }
 import javax.xml.transform
 import transform.{OutputKeys,TransformerFactory}
 import transform.sax.{SAXTransformerFactory,TransformerHandler}
@@ -39,40 +39,22 @@ object LabSaver {
   }
   def attributes(specs: (String,String)*) = {
     val result = new AttributesImpl
-    for((name,value) <- specs if name != "sequentialRunOrder" || 
+    for((name,value) <- specs if name != "sequentialRunOrder" ||
         (name == "sequentialRunOrder" && value == "false"))
       result.addAttribute("", "", name, "CDATA", value)
     result
   }
-  def saveProtocol(hd: TransformerHandler, protocol: LabProtocol) {
-    def element(name: String, value: String) {
+  def saveProtocol(hd: TransformerHandler, protocol: LabProtocol): Unit = {
+    def element(name: String, value: String): Unit = {
       hd.startElement("","",name,attributes())
       hd.characters(value.toCharArray,0,value.length)
       hd.endElement("","",name)
     }
-    def elementWithAttributes(name: String, attributes: AttributesImpl) {
+    def elementWithAttributes(name: String, attributes: AttributesImpl): Unit = {
       hd.startElement("", "", name, attributes)
       hd.endElement("", "", name)
     }
-    hd.startElement("", "", "experiment",
-                    attributes(("name", protocol.name),
-                               ("repetitions", protocol.repetitions.toString),
-                               ("sequentialRunOrder", protocol.sequentialRunOrder.toString),
-                               ("runMetricsEveryStep", protocol.runMetricsEveryStep.toString)))
-    if(protocol.setupCommands.trim != "")
-      element("setup", protocol.setupCommands)
-    if(protocol.goCommands.trim != "")
-      element("go", protocol.goCommands)
-    if(protocol.finalCommands.trim != "")
-      element("final", protocol.finalCommands)
-    if(protocol.timeLimit != 0)
-      elementWithAttributes("timeLimit",
-                            attributes(("steps",protocol.timeLimit.toString)))
-    if(protocol.exitCondition != "")
-      element("exitCondition", protocol.exitCondition)
-    for(metric <- protocol.metrics)
-      element("metric", metric)
-    for(valueSet <- protocol.valueSets)
+    def matchValueSet(valueSet: RefValueSet): Unit = {
       valueSet match {
         case steppedValueSet:SteppedValueSet =>
           elementWithAttributes(
@@ -81,14 +63,6 @@ object LabSaver {
                        ("first", Dump.number(steppedValueSet.firstValue.toDouble)),
                        ("step", Dump.number(steppedValueSet.step.toDouble)),
                        ("last", Dump.number(steppedValueSet.lastValue.toDouble))))
-        case enumeratedValueSet: EnumeratedValueSet =>
-          hd.startElement("", "", "enumeratedValueSet",
-                          attributes(("variable", valueSet.variableName)))
-          for(value <- enumeratedValueSet)
-            elementWithAttributes("value",
-                                  attributes(("value", Dump.logoObject(
-                                    value.asInstanceOf[AnyRef],true,false))))
-          hd.endElement("", "", "enumeratedValueSet")
         case enumeratedValueSet: RefEnumeratedValueSet =>
           hd.startElement("", "", "enumeratedValueSet",
             attributes(("variable", valueSet.variableName)))
@@ -97,6 +71,37 @@ object LabSaver {
               attributes(("value", Dump.logoObject(value, true, false))))
           hd.endElement("", "", "enumeratedValueSet")
       }
+    }
+    hd.startElement("", "", "experiment",
+                    attributes(("name", protocol.name),
+                               ("repetitions", protocol.repetitions.toString),
+                               ("sequentialRunOrder", protocol.sequentialRunOrder.toString),
+                               ("runMetricsEveryStep", protocol.runMetricsEveryStep.toString)))
+    if (protocol.preExperimentCommands.trim != "")
+      element("preExperiment", protocol.preExperimentCommands)
+    if (protocol.setupCommands.trim != "")
+      element("setup", protocol.setupCommands)
+    if (protocol.goCommands.trim != "")
+      element("go", protocol.goCommands)
+    if (protocol.postRunCommands.trim != "")
+      element("postRun", protocol.postRunCommands)
+    if (protocol.postExperimentCommands.trim != "")
+      element("postExperiment", protocol.postExperimentCommands)
+    if (protocol.timeLimit != 0)
+      elementWithAttributes("timeLimit",
+                            attributes(("steps",protocol.timeLimit.toString)))
+    if (protocol.exitCondition != "")
+      element("exitCondition", protocol.exitCondition)
+    for(metric <- protocol.metrics)
+      element("metric", metric)
+    if (!protocol.runMetricsCondition.isEmpty)
+      element("runMetricsCondition", protocol.runMetricsCondition)
+    protocol.constants.foreach(matchValueSet _)
+    for (subExperiment <- protocol.subExperiments) {
+      hd.startElement("", "", "subExperiment", attributes())
+      subExperiment.foreach(matchValueSet _)
+      hd.endElement("", "", "subExperiment")
+    }
     hd.endElement("", "", "experiment")
   }
 }

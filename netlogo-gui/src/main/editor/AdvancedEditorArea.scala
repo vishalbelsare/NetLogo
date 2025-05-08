@@ -2,11 +2,16 @@
 
 package org.nlogo.editor
 
-import javax.swing.{ Action, JMenu, JPopupMenu }
+import java.awt.Component
+import java.awt.event.{ KeyAdapter, KeyEvent, MouseAdapter, MouseEvent }
+import javax.swing.{ Action, JMenu, JMenuItem, JPopupMenu }
 import javax.swing.text.EditorKit
 
 import org.fife.ui.rtextarea.RTextArea
 import org.fife.ui.rsyntaxtextarea.{ RSyntaxTextArea, Theme }
+
+import org.nlogo.swing.{ Menu, MenuItem, PopupMenu }
+import org.nlogo.theme.{ InterfaceColors, ThemeSync }
 
 class AdvancedEditorArea(val configuration: EditorConfiguration)
   extends RSyntaxTextArea(configuration.rows, configuration.columns) with AbstractEditorArea {
@@ -20,6 +25,8 @@ class AdvancedEditorArea(val configuration: EditorConfiguration)
   val theme =
     Theme.load(getClass.getResourceAsStream("/system/netlogo-editor-style.xml"))
   theme.apply(this)
+
+  private val defaultSelectionColor = getSelectionColor
 
   configuration.configureAdvancedEditorArea(this)
 
@@ -35,17 +42,40 @@ class AdvancedEditorArea(val configuration: EditorConfiguration)
     discardAllEdits()
   }
 
-  override def createPopupMenu(): JPopupMenu = {
-    val popupMenu = super.createPopupMenu
-    val toggleFolds = new ToggleFoldsAction(this)
-    popupMenu.getComponents.last match {
-      case foldMenu: JMenu => foldMenu.add(toggleFolds)
-      case _               => popupMenu.add(toggleFolds)
+  override def createPopupMenu(): PopupMenu = {
+    new PopupMenu {
+      // RSyntaxTextArea creates menu items that don't sync with the color theme,
+      // so we have to convert them to the synced versions (Isaac B 11/5/24)
+      AdvancedEditorArea.super.createPopupMenu.getComponents.foreach(_ match {
+        case menu: JMenu => add(new Menu(menu.getText) {
+          menu.getMenuComponents.foreach(_ match {
+            case item: JMenuItem => add(new MenuItem(item.getAction))
+            case _ =>
+          })
+          add(new MenuItem(new ToggleFoldsAction(AdvancedEditorArea.this)))
+        })
+        case item: JMenuItem => add(new MenuItem(item.getAction))
+        case separator: JPopupMenu.Separator => addSeparator()
+        case _ =>
+      })
+
+      addSeparator()
+
+      configuration.contextActions.foreach(action => add(new MenuItem(action)))
+
+      addPopupMenuListener(new SuspendCaretPopupListener(AdvancedEditorArea.this))
+
+      override def show(component: Component, x: Int, y: Int): Unit = {
+        setBackground(InterfaceColors.menuBackground())
+
+        getComponents.foreach(_ match {
+          case ts: ThemeSync => ts.syncTheme()
+          case _ =>
+        })
+
+        super.show(component, x, y)
+      }
     }
-    popupMenu.addSeparator()
-    configuration.contextActions.foreach(popupMenu.add)
-    popupMenu.addPopupMenuListener(new SuspendCaretPopupListener(this))
-    popupMenu
   }
 
   def setIndenter(indenter: Indenter): Unit = {
@@ -56,9 +86,7 @@ class AdvancedEditorArea(val configuration: EditorConfiguration)
   // This method will receive null input if a partial accent character is entered in the editor, e.g., via Option+e on
   // MacOS. This also occurs when int'l keyboards enter "^" -- BCH 12/31/2016, RGG 1/3/17
   override def replaceSelection(s: String): Unit = if (s != null) {
-    val selection =
-      s.dropWhile(c => Character.getType(c) == Character.FORMAT)
-        .replaceAllLiterally("\t", "  ")
+    val selection = s.dropWhile(c => Character.getType(c) == Character.FORMAT).replace("\t", "  ")
     super.replaceSelection(s)
     indenter.foreach(_.handleInsertion(selection))
   } else {
@@ -68,6 +96,49 @@ class AdvancedEditorArea(val configuration: EditorConfiguration)
   // this needs to be implemented if we ever allow tab-based focus traversal
   // with this editor area
   def setSelection(s: Boolean): Unit = { }
+
+  def selectError(start: Int, end: Int): Unit = {
+    setSelectionColor(InterfaceColors.errorHighlight())
+
+    select(start, end)
+  }
+
+  override def setSelectionStart(i: Int): Unit = {
+    Option(getFoldManager.getFoldForLine(getFoldManager.getVisibleLineAbove(getLineOfOffset(i))))
+      .foreach(_.setCollapsed(false))
+
+    super.setSelectionStart(i)
+  }
+
+  override def setSelectionEnd(i: Int): Unit = {
+    Option(getFoldManager.getFoldForLine(getFoldManager.getVisibleLineAbove(getLineOfOffset(i))))
+      .foreach(_.setCollapsed(false))
+
+    super.setSelectionEnd(i)
+  }
+
+  override def select(start: Int, end: Int): Unit = {
+    for (i <- 0 until getFoldManager.getFoldCount) {
+      val fold = getFoldManager.getFold(i)
+
+      if (fold.getStartOffset < end && fold.getEndOffset > start)
+        fold.setCollapsed(false)
+    }
+
+    super.select(start, end)
+  }
+
+  addMouseListener(new MouseAdapter {
+    override def mousePressed(e: MouseEvent): Unit = {
+      setSelectionColor(defaultSelectionColor)
+    }
+  })
+
+  addKeyListener(new KeyAdapter {
+    override def keyPressed(e: KeyEvent): Unit = {
+      setSelectionColor(defaultSelectionColor)
+    }
+  })
 
   def undoAction = RTextArea.getAction(RTextArea.UNDO_ACTION)
   def redoAction = RTextArea.getAction(RTextArea.REDO_ACTION)

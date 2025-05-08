@@ -36,13 +36,11 @@ object LibraryInfo {
 
   def parseVersion(version: String): (Int, Int, Int, String) = {
     val versionRegex = new Regex("(\\d+)\\.(\\d+)(?:\\.(\\d+))?(.*)?")
-    val versionRegex(major, minor, patch, extra) = version
-    (
-      major.toInt
-    , minor.toInt
-    , Option(patch).map(_.toInt).getOrElse(0)
-    , Option(extra).getOrElse("")
-    )
+    version match {
+      case versionRegex(major, minor, patch, extra) =>
+        (major.toInt, minor.toInt, Option(patch).map(_.toInt).getOrElse(0), Option(extra).getOrElse(""))
+      case _ => throw new IllegalStateException
+    }
   }
 }
 
@@ -53,11 +51,12 @@ case class LibraryInfo(
   longDescription: String,
   version: String,
   homepage: URL,
-  downloadURL: URL,
   bundled: Boolean,
   installedVersionOpt: Option[String],
-  minNetLogoVersion: Option[String]
+  minNetLogoVersion: Option[String],
+  rootURL: URL
 ) {
+
 
   def status: LibraryStatus =
     installedVersionOpt.map {
@@ -75,6 +74,9 @@ case class LibraryInfo(
     minNetLogoVersion.map( (v) =>
       VersionUtils.isNetLogoVersionString(v) && (VersionUtils.numericValue(currentVersion) >= VersionUtils.numericValue(v))
     ).getOrElse(true)
+
+  def downloadURL: URL =
+    new URL(s"$rootURL/extensions/$codeName-$version.zip")
 
   // We override `equals`, because we don't want to compare URLs directly. Checking equality
   // for URLs (which is what the case class would do otherwise), results in

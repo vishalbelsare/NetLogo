@@ -3,7 +3,7 @@
 package org.nlogo.app
 
 import java.awt.{ Component, Frame }
-import java.awt.event.ActionEvent
+import java.awt.event.{ ActionEvent, WindowAdapter, WindowEvent }
 import java.net.URI
 import java.nio.file.Path
 import javax.swing.{ Action, AbstractAction }
@@ -13,6 +13,7 @@ import org.nlogo.api.Version
 import org.nlogo.swing.{ BrowserLauncher, UserAction },
   BrowserLauncher.docPath,
   UserAction._
+import org.nlogo.theme.ThemeSync
 
 class LocalBrowseAction(name: String, path: Path)
 extends AbstractAction(name)
@@ -51,6 +52,8 @@ object HelpActions {
       docPath("index.html")),
     new LocalBrowseAction(I18N.gui.get("menu.help.netLogoDictionary"),
       docPath("index2.html")),
+    new RemoteBrowseAction(I18N.gui.get("menu.help.news"),
+      new URI("https://ccl.northwestern.edu/netlogo/announce.shtml")),
     new RemoteBrowseAction(I18N.gui.get("menu.help.bind"),
       new URI("https://ccl.northwestern.edu/netlogo/bind")),
     new RemoteBrowseAction(I18N.gui.get("menu.help.netLogoUsersGroup"),
@@ -60,18 +63,45 @@ object HelpActions {
     new RemoteBrowseAction(I18N.gui.get("menu.help.donate"),
       new URI("http://ccl.northwestern.edu/netlogo/giving.shtml")) {
       putValue(ActionGroupKey, HelpAboutGroup)
-    })
+    },
+    new RemoteBrowseAction(I18N.gui.get("menu.help.forum"),
+      new URI("https://forum.netlogo.org")) {
+      putValue(ActionGroupKey, HelpAboutGroup)
+      },
+    new RemoteBrowseAction(I18N.gui.get("menu.help.contact"),
+      new URI("https://ccl.northwestern.edu/netlogo/contact.shtml")) {
+      putValue(ActionGroupKey, HelpAboutGroup)
+      })
   }
 }
 
 class ShowAboutWindow(frame: Frame)
 extends AbstractAction(I18N.gui.getN("menu.help.aboutVersion", Version.versionDropZeroPatch))
-with MenuAction {
+with MenuAction with ThemeSync {
   category = HelpCategory
   group    = HelpAboutGroup
 
+  private var aboutWindow: Option[AboutWindow] = None
+
   override def actionPerformed(e: ActionEvent): Unit = {
-    println(e.getSource)
-    new AboutWindow(frame).setVisible(true)
+    aboutWindow match {
+      case Some(window) =>
+        window.setVisible(true)
+
+      case None =>
+        aboutWindow = Some(new AboutWindow(frame) {
+          addWindowListener(new WindowAdapter {
+            override def windowClosed(e: WindowEvent): Unit = {
+              aboutWindow = None
+            }
+          })
+
+          setVisible(true)
+        })
+    }
+  }
+
+  override def syncTheme(): Unit = {
+    aboutWindow.foreach(_.syncTheme())
   }
 }

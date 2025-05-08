@@ -17,7 +17,7 @@ import org.nlogo.api.Color;
 import org.nlogo.api.Dump;
 import org.nlogo.api.LogoException;
 
-public strictfp class Patch
+public class Patch
     extends Agent
     implements org.nlogo.api.Patch, AgentColors {
 
@@ -246,7 +246,7 @@ public strictfp class Patch
           if (value instanceof Double) {
             pcolor((Double) value);
           } else if (value instanceof LogoList) {
-            pcolor((LogoList) value, VAR_PCOLOR, false);
+            pcolor((LogoList) value, VAR_PCOLOR, true);
           } else {
             wrongTypeForVariable(AgentVariables.getImplicitPatchVariables(false)[vn],
                 Double.class, value);

@@ -2,28 +2,19 @@
 
 package org.nlogo.window
 
-import org.nlogo.api.{ CompilerServices, Dump, Editable, Property }
-import org.nlogo.core.{ I18N, LogoList }
-import org.nlogo.core.{ Chooseable, Chooser => CoreChooser, CompilerException }
+import org.nlogo.api.{ CompilerServices, Dump }
+import org.nlogo.core.{ I18N, Chooseable, Chooser => CoreChooser, CompilerException, LogoList, Widget => CoreWidget }
+import org.nlogo.editor.Colorizer
 
-import java.util.{ List => JList }
-
-class DummyChooserWidget(val compiler: CompilerServices)
-    extends Chooser
-    with Editable {
-
-  type WidgetModel = CoreChooser
-
+class DummyChooserWidget(val compiler: CompilerServices, colorizer: Colorizer) extends Chooser with Editable {
   private var _name = ""
 
   def name: String = _name
 
-  def name(newName: String): Unit = {
+  def setVarName(newName: String): Unit = {
     _name = newName
     repaint()
   }
-
-  setBorder(widgetBorder)
 
   override def updateConstraints(): Unit = {
     // we never update constraints in a dummy widget -- CLB
@@ -32,11 +23,11 @@ class DummyChooserWidget(val compiler: CompilerServices)
   override def classDisplayName: String =
     I18N.gui.get("tabs.run.widgets.chooser")
 
-  def propertySet: JList[Property] = Properties.dummyChooser
+  override def editPanel: EditPanel = new DummyChooserEditPanel(this, compiler, colorizer)
 
-  override def editFinished: Boolean = {
-    super.editFinished
-    name(name)
+  override def editFinished(): Boolean = {
+    super.editFinished()
+    setVarName(name)
     true
   }
 
@@ -45,7 +36,7 @@ class DummyChooserWidget(val compiler: CompilerServices)
       .map(v => Dump.logoObject(v, true, false))
       .mkString("", "\n", "\n")
 
-  def choicesWrapper(choicesString: String): Unit = {
+  def setChoicesWrapper(choicesString: String): Unit = {
     try {
       val oldValue = value
       val newChoices =
@@ -68,20 +59,26 @@ class DummyChooserWidget(val compiler: CompilerServices)
   }
 
 
-  override def load(model: WidgetModel): AnyRef = {
-    setSize(model.right - model.left, model.bottom - model.top)
-    name(model.varName)
-    choicesWrapper(model.choices.map(c => Dump.logoObject(c.value, true, false)).mkString("\n"))
-    index(model.currentChoice)
-    this
+  override def load(model: CoreWidget): Unit = {
+    model match {
+      case chooser: CoreChooser =>
+        oldSize(chooser.oldSize)
+        setSize(chooser.width, chooser.height)
+        setVarName(chooser.varName)
+        setChoicesWrapper(chooser.choices.map(c => Dump.logoObject(c.value, true, false)).mkString("\n"))
+        index(chooser.currentChoice)
+
+      case _ =>
+    }
   }
 
-  override def model: WidgetModel = {
-    val b = getBoundsTuple
+  override def model: CoreWidget = {
+    val b = getUnzoomedBounds
     CoreChooser(
       display  = name.potentiallyEmptyStringToOption,
-      left     = b._1, top    = b._2,
-      right    = b._3, bottom = b._4,
+      x        = b.x,     y      = b.y,
+      width    = b.width, height = b.height,
+      oldSize  = _oldSize,
       variable = name.potentiallyEmptyStringToOption,
       choices  = constraint.acceptedValues.map(Chooseable.apply).toList,
       currentChoice = index)

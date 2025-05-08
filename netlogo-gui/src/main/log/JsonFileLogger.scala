@@ -2,6 +2,7 @@
 
 package org.nlogo.log
 
+
 import java.io.{ File, FilenameFilter, FileWriter, PrintWriter }
 import java.lang.{
   Boolean => BoxedBoolean
@@ -12,10 +13,11 @@ import java.lang.{
 import java.nio.file.Path
 import java.time.LocalDateTime
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters.{ MapHasAsJava, SeqHasAsJava }
 
 import org.json.simple.JSONValue
 
+import org.nlogo.api.Exceptions.warning
 import org.nlogo.core.LogoList
 
 // This JSON logger is kept in `netlogo` outside of `core` to avoid `headless` needing the
@@ -34,6 +36,7 @@ class JsonFileLogger(private val logDirectoryPath: Path) extends FileLogger {
     val logFileName = s"netlogo_log_${now.format(DateTimeFormats.file)}.json"
     val logFilePath = logDirectoryPath.resolve(logFileName)
     val logFile     = logFilePath.toFile()
+    logFile.getParentFile.mkdirs
     new PrintWriter(new FileWriter(logFile))
   }
 
@@ -44,34 +47,36 @@ class JsonFileLogger(private val logDirectoryPath: Path) extends FileLogger {
   writer.write("[\n")
   private var first = true
 
-  override def log(event: String, eventInfo: Map[String, Any]) {
-    if (first) {
-      first = false
-      writer.write("  ")
-    } else {
-      writer.write(", ")
-    }
+  override def log(event: String, eventInfo: Map[String, Any]): Unit = {
+    warning(classOf[Exception]) {
+      if (first) {
+        first = false
+        writer.write("  ")
+      } else {
+        writer.write(", ")
+      }
 
-    val timeStamp = LocalDateTime.now
+      val timeStamp = LocalDateTime.now
 
-    val map = Map[String, Any](
-      "event"     -> event
-    , "timeStamp" -> timeStamp.format(DateTimeFormats.logEntry)
-    )
-    val finalMap = if (!eventInfo.isEmpty) {
-      val formattedEventInfo = eventInfo.map({ case (key, value) =>
-        val formattedValue = value match {
-          case v: AnyRef => formatAnyRef(v)
-          case v         => v
-        }
-        (key, formattedValue)
-      })
-      map + ("eventInfo" -> formattedEventInfo.asJava)
-    } else {
-      map
+      val map = Map[String, Any](
+        "event"     -> event
+      , "timeStamp" -> timeStamp.format(DateTimeFormats.logEntry)
+      )
+      val finalMap = if (!eventInfo.isEmpty) {
+        val formattedEventInfo = eventInfo.map({ case (key, value) =>
+          val formattedValue = value match {
+            case v: AnyRef => formatAnyRef(v)
+            case v         => v
+          }
+          (key, formattedValue)
+        })
+        map + ("eventInfo" -> formattedEventInfo.asJava)
+      } else {
+        map
+      }
+      JSONValue.writeJSONString(finalMap.asJava, writer)
+      writer.write("\n")
     }
-    JSONValue.writeJSONString(finalMap.asJava, writer)
-    writer.write("\n")
   }
 
   // The values NetLogo provides can be boxed, and we don't want to turn them into strings;
@@ -91,7 +96,7 @@ class JsonFileLogger(private val logDirectoryPath: Path) extends FileLogger {
     }
   }
 
-  override def close() {
+  override def close(): Unit = {
     writer.write("]")
     writer.flush()
     writer.close()

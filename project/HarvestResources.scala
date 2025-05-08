@@ -19,9 +19,9 @@ import scala.util.matching.Regex
 // integrates better with our UUID archival system.
 
 object HarvestResources {
-  val WiXNamespace = "http://schemas.microsoft.com/wix/2006/wi"
+  val WiXNamespace = "http://wixtoolset.org/schemas/v4/wxs"
 
-  class AuthoringVisitor(root: Path, doc: Document, directoryRefName: String, wixNode: Node, excludedFiles: Seq[String], variables: Map[String, String]) extends FileVisitor[Path] {
+  class AuthoringVisitor(root: Path, doc: Document, directoryRefName: String, wixNode: Node, excludedFiles: Set[String], variables: Map[String, String]) extends FileVisitor[Path] {
     var directoryNodes: List[Element] = Nil
     var componentNodes: List[Element] = Nil
     var generatedUUIDs: Map[String, String] = Map()
@@ -58,7 +58,7 @@ object HarvestResources {
         generatedUUIDs += "InstallationRootComponent" -> uuid
         topComponent.setAttribute("Guid", "{" + uuid + "}")
         topComponent.setAttribute("Id", "InstallationRootComponent")
-        topComponent.setAttribute("Win64", variables("win64"))
+        topComponent.setAttribute("Bitness", variables("bitness"))
         topDirectory.appendChild(topComponent)
         componentNodes = topComponent :: componentNodes
       } else {
@@ -75,7 +75,7 @@ object HarvestResources {
         generatedUUIDs += componentId -> uuid
         newComponent.setAttribute("Guid", "{" + uuid + "}")
         newComponent.setAttribute("Id", componentId)
-        newComponent.setAttribute("Win64", variables("win64"))
+        newComponent.setAttribute("Bitness", variables("bitness"))
         newDirectory.appendChild(newComponent)
         componentNodes = newComponent :: componentNodes
       }
@@ -103,19 +103,19 @@ object HarvestResources {
 
     private def idSafe(s: String): String = {
       // Replace $ with . to make scaladoc pages look different
-      idIllegalCharacters.replaceAllIn(s, "").replaceAllLiterally("$", ".").takeRight(72)
+      idIllegalCharacters.replaceAllIn(s, "").replace("$", ".").takeRight(72)
     }
 
     private def nameSafe(s: String): String = {
       // $ must be replaced by $$ for WiX to find it
-      s.replaceAllLiterally("$", "$$")
+      s.replace("$", "$$")
     }
 
     private def generateUUID: String = java.util.UUID.randomUUID.toString.toUpperCase
 
   }
 
-  def harvest(dir: Path, directoryRefName: String, componentGroupName: String, excludedFiles: Seq[String], variables: Map[String, String], outputFile: Path): Map[String, String] = {
+  def harvest(dir: Path, directoryRefName: String, componentGroupName: String, excludedFiles: Set[String], variables: Map[String, String], outputFile: Path): Map[String, String] = {
     val docBuilderFactory = DocumentBuilderFactory.newInstance
     docBuilderFactory.setNamespaceAware(true)
     val document = docBuilderFactory.newDocumentBuilder.newDocument

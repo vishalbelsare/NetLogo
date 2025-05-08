@@ -9,17 +9,15 @@ import scala.collection.mutable
 import org.nlogo.agent.Agent
 import org.nlogo.core.AgentKind
 import org.nlogo.swing.Tiler
+import org.nlogo.theme.ThemeSync
 import org.nlogo.window.{ Event, GUIWorkspace }
 
-class AgentMonitorManager(val workspace: GUIWorkspace)
-extends Event.LinkChild with Event.LinkParent
-{
-
+class AgentMonitorManager(val workspace: GUIWorkspace) extends Event.LinkChild with Event.LinkParent with ThemeSync {
   private val monitorWindows      = mutable.Map[Agent, AgentMonitorWindow]()
   private val emptyMonitorWindows = mutable.Map[AgentKind, AgentMonitorWindow]()
   private val monitorList         = collection.mutable.Buffer[Agent]()
 
-  def closeAll() {
+  def closeAll(): Unit = {
     monitorWindows.values.foreach( (w) => {
       w.setVisible(false)
       w.dispose()
@@ -36,7 +34,7 @@ extends Event.LinkChild with Event.LinkParent
     monitorList.clear()
   }
 
-  def closeTopMonitor() {
+  def closeTopMonitor(): Unit = {
     for (topMonitor <- monitorList.headOption.map(monitorWindows)) {
       topMonitor.setVisible(false)
       topMonitor.dispose()
@@ -54,7 +52,7 @@ extends Event.LinkChild with Event.LinkParent
     list.toArray
   }
 
-  def agentChangeNotify(window: AgentMonitorWindow, oldAgent: Agent) {
+  def agentChangeNotify(window: AgentMonitorWindow, oldAgent: Agent): Unit = {
     if (oldAgent == null) {
       if (window.agent != null) {
         emptyMonitorWindows.remove(window.agent.kind)
@@ -69,7 +67,7 @@ extends Event.LinkChild with Event.LinkParent
     }
   }
 
-  def remove(window: AgentMonitorWindow) {
+  def remove(window: AgentMonitorWindow): Unit = {
     if (window.agent != null) {
       monitorWindows -= window.agent
       monitorList    -= window.agent
@@ -96,7 +94,7 @@ extends Event.LinkChild with Event.LinkParent
     window
   }
 
-  def inspect(agentKind: AgentKind, a0: Agent, radius: Double) {
+  def inspect(agentKind: AgentKind, a0: Agent, radius: Double): Unit = {
     val agent = if (a0 == null && agentKind == AgentKind.Observer) {
       workspace.world.observer
     } else {
@@ -109,6 +107,8 @@ extends Event.LinkChild with Event.LinkParent
       emptyMonitorWindows.getOrElse(agentKind, newWindow(agentKind, agent, radius))
     }
 
+    window.syncTheme()
+
     window.radius(radius)
     window.setVisible(true)
     org.nlogo.window.Event.rehash()
@@ -117,7 +117,7 @@ extends Event.LinkChild with Event.LinkParent
     }
   }
 
-  def stopInspecting(agent: Agent) {
+  def stopInspecting(agent: Agent): Unit = {
     if (agent != null) {
       monitorWindows.get(agent).collect {
         case window: AgentMonitorWindow =>
@@ -128,7 +128,7 @@ extends Event.LinkChild with Event.LinkParent
     }
   }
 
-  def stopInspectingDeadAgents() {
+  def stopInspectingDeadAgents(): Unit = {
     monitorWindows.keys.foreach { case agent =>
       if (agent.id == -1) {
         stopInspecting(agent)
@@ -136,11 +136,14 @@ extends Event.LinkChild with Event.LinkParent
     }
   }
 
-  def showAll() { showOrHideAll(show = true) }
-  def hideAll() { showOrHideAll(show = false) }
+  def showAll(): Unit = { showOrHideAll(show = true) }
+  def hideAll(): Unit = { showOrHideAll(show = false) }
 
-  private def showOrHideAll(show: Boolean) {
-    monitorWindows.values.foreach(_.setVisible(show))
+  private def showOrHideAll(show: Boolean): Unit = {
+    monitorWindows.values.foreach(monitor => {
+      monitor.syncTheme()
+      monitor.setVisible(show)
+    })
     emptyMonitorWindows.values.foreach(_.setVisible(show))
   }
 
@@ -148,7 +151,12 @@ extends Event.LinkChild with Event.LinkParent
     monitorWindows.values.exists(_.isVisible()) || emptyMonitorWindows.values.exists(_.isVisible())
   }
 
-  def refresh() {
+  def refresh(): Unit = {
     monitorWindows.values.foreach(_.refresh())
+  }
+
+  override def syncTheme(): Unit = {
+    monitorWindows.values.foreach(_.syncTheme())
+    emptyMonitorWindows.values.foreach(_.syncTheme())
   }
 }

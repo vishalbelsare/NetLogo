@@ -7,7 +7,9 @@ import java.lang.Process
 import java.io.IOException
 import java.net.{ URI, URISyntaxException }
 import java.nio.file.{ Files, Path, Paths }
-import javax.swing.{ JDialog, JOptionPane }
+import javax.swing.JDialog
+
+import org.nlogo.core.I18N
 
 object BrowserLauncher {
   private val osName = System.getProperty("os.name")
@@ -23,19 +25,24 @@ object BrowserLauncher {
   }
 
   def openURI(comp: Component, uri: URI): Unit = {
+    val normalUri = uri.normalize()
     try {
       val opened =
-        desktop.map(d => {d.browse(uri); true}).getOrElse(false)
-      if (! opened)
-        osSpecificBrowserRunner.getOrElse(browserNotFound()).apply(uri.toString)
+        desktop.map( d => { d.browse(normalUri); true } ).getOrElse(false)
+      if (!opened)
+        osSpecificBrowserRunner.getOrElse(browserNotFound()).apply(normalUri.toString)
     } catch {
       case ex: UnsupportedOperationException =>
-        JOptionPane.showMessageDialog(comp, unableToOpenBrowserError)
+        new OptionPane(comp, I18N.gui.get("common.messages.error"), unableToOpenBrowserError, OptionPane.Options.Ok,
+                       OptionPane.Icons.Error)
       case ex: BrowserNotFoundException =>
-        JOptionPane.showMessageDialog(comp, ex.getLocalizedMessage)
+        new OptionPane(comp, I18N.gui.get("common.messages.error"), ex.getLocalizedMessage, OptionPane.Options.Ok,
+                       OptionPane.Icons.Error)
       case ex: IOException =>
-        JOptionPane.showMessageDialog(comp, s"Unable to open a browser to: ${uri.toString}\n" +
-          "Please report to bugs@ccl.northwestern.edu")
+        new OptionPane(comp, I18N.gui.get("common.messages.error"),
+                       s"""Unable to open a browser to: ${normalUri.toString}
+                       ${if (normalUri.toString != uri.toString) { s"with original URI: ${uri.toString}" } else { "" }}
+                       Please report to bugs@ccl.northwestern.edu""", OptionPane.Options.Ok, OptionPane.Icons.Error)
     }
   }
 
@@ -81,8 +88,9 @@ object BrowserLauncher {
       new URI(s)
     } catch {
       case ue: URISyntaxException =>
-        JOptionPane.showMessageDialog(comp, s"Unable to open a browser to: $s\n" +
-          "Please report to bugs@ccl.northwestern.edu")
+        new OptionPane(comp, I18N.gui.get("common.messages.error"),
+                       s"Unable to open a browser to: $s\n" + "Please report to bugs@ccl.northwestern.edu",
+                       OptionPane.Options.Ok, OptionPane.Icons.Error)
       null
     }
   }

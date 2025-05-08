@@ -3,7 +3,6 @@
 package org.nlogo.api
 
 import java.io.File
-import java.lang.Boolean
 import java.net.URL
 import java.nio.file.{ Files, FileAlreadyExistsException, Path, Paths }
 
@@ -14,30 +13,38 @@ import org.nlogo.core.{ LibraryManager => CoreLibraryManager }
 
 object LibraryManager {
 
-  def enabled: Boolean = !Boolean.getBoolean("netlogo.libraries.disabled")
-
   private val libsLocationSite = "https://ccl.northwestern.edu/netlogo/config"
   private val libsLocation     = "libraries-location.conf"
   private val allLibsName      = "libraries.conf"
   private val bundledsConfig   = ConfigFactory.parseResources("system/bundled-libraries.conf")
   private val metadataURL      = getMetadataURL()
 
-  private def getMetadataURL(): URL = {
-    if (enabled) {
-      val locationURL    = new URL(s"$libsLocationSite/$libsLocation")
-      LibraryInfoDownloader(locationURL)
-      val locationPath   = FileIO.perUserFile(libsLocation)
-      val locationConfig = ConfigFactory.parseFile(new File(locationPath))
-      val location       = try {
-        locationConfig.getString("location")
-      } catch {
-        case ex: ConfigException => bundledsConfig.getString("fallback-libraries-location")
+  private lazy val branchURL: URL = {
+
+    val baseURL =
+      if (LibraryInfoDownloader.enabled) {
+
+        val locationURL    = new URL(s"$libsLocationSite/$libsLocation")
+        LibraryInfoDownloader(locationURL)
+        val locationPath   = FileIO.perUserFile(libsLocation)
+        val locationConfig = ConfigFactory.parseFile(new File(locationPath))
+
+        try {
+          locationConfig.getString("location")
+        } catch {
+          case ex: ConfigException => bundledsConfig.getString("fallback-libraries-location")
+        }
+
+      } else {
+        bundledsConfig.getString("fallback-libraries-location")
       }
-      new URL(s"$location/${APIVersion.version}/$allLibsName")
-    } else {
-      val location = bundledsConfig.getString("fallback-libraries-location")
-      new URL(s"$location/${APIVersion.version}/$allLibsName")
-    }
+
+    new URL(s"$baseURL/${APIVersion.version}")
+
+  }
+
+  private def getMetadataURL(): URL = {
+    new URL(s"${branchURL}/$allLibsName")
   }
 
   private var loadedOnce = false
@@ -46,7 +53,7 @@ object LibraryManager {
     // If not first load (user clicked a button) or metadata not loaded once, load it!
     // This is an attempt to avoid multiple redundant remote fetches during test runs.
     // -JeremyB April 2019
-    if (enabled && (!isFirstLoad || !loadedOnce)) {
+    if (!isFirstLoad || !loadedOnce) {
       LibraryInfoDownloader.invalidateCache(metadataURL)
       LibraryInfoDownloader(metadataURL)
       loadedOnce = true
@@ -86,14 +93,14 @@ class LibraryManager(userExtPath: Path, unloadExtensions: () => Unit) extends Co
     libraries.find(ext => ext.codeName == name)
 
   override def installExtension(ext: LibraryInfo): Unit = {
-    if (LibraryManager.enabled) {
+    if (LibraryInfoDownloader.enabled) {
       extInstaller.install(ext)
       updateInstalledVersion("extensions", ext)
     }
   }
 
   def uninstallExtension(ext: LibraryInfo): Unit = {
-    if (LibraryManager.enabled) {
+    if (LibraryInfoDownloader.enabled) {
       extInstaller.uninstall(ext)
       updateInstalledVersion("extensions", ext, uninstall = true)
     }
@@ -135,7 +142,7 @@ class LibraryManager(userExtPath: Path, unloadExtensions: () => Unit) extends Co
 
   private def updateList(config: Config, installedLibsConf: Config, category: String, useBundled: Boolean) = {
 
-    import scala.collection.JavaConverters._
+    import scala.jdk.CollectionConverters.ListHasAsScala
 
     def getStringOption(c: Config, path: String, default: Option[String] = None): Option[String] =
       if (c.hasPath(path)) Option(c.getString(path)) else default
@@ -150,16 +157,16 @@ class LibraryManager(userExtPath: Path, unloadExtensions: () => Unit) extends Co
           val longDesc    = c.getString("longDescription")
           val version     = c.getString("version")
           val homepage    = new URL(c.getString("homepage"))
-          val downloadURL = new URL(c.getString("downloadURL"))
 
           val installedVersionPath = s"""$category."$codeName".installedVersion"""
           val installedVersion     = getStringOption(installedLibsConf, installedVersionPath)
           val bundled              = useBundled && bundledsConfig.hasPath(installedVersionPath) && installedVersion.isEmpty
           val minNetLogoVersion    = getStringOption(c, "minNetLogoVersion")
 
-          LibraryInfo(name, codeName, shortDesc, longDesc, version, homepage, downloadURL, bundled, installedVersion, minNetLogoVersion)
+          LibraryInfo( name, codeName, shortDesc, longDesc, version, homepage, bundled, installedVersion
+                     , minNetLogoVersion, LibraryManager.branchURL)
 
-      }
+      }.toSeq
 
     infoChangeCallbacks.foreach(_.apply(libraries))
 

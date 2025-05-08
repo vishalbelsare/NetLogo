@@ -2,11 +2,9 @@
 
 package org.nlogo.app.tools
 
-import java.awt.{ BorderLayout, Color, FlowLayout, Font, GridBagConstraints, GridBagLayout, Rectangle }
+import java.awt.{ BorderLayout, FlowLayout, Font, GridBagConstraints, GridBagLayout, Insets, Rectangle }
 import java.awt.event.{ FocusEvent, FocusListener, KeyEvent, KeyListener }
-import javax.swing.{ BorderFactory, JLabel, JPanel, JScrollPane, ScrollPaneConstants }
-
-import scala.collection.mutable
+import javax.swing.{ JLabel, JPanel, ScrollPaneConstants }
 
 import org.nlogo.agent.{ Agent, AgentSet, Turtle, Patch, Link }
 import org.nlogo.api.{ AgentVariables, Dump }
@@ -14,81 +12,85 @@ import org.nlogo.awt.Fonts
 import org.nlogo.core.{ AgentKind, I18N, Nobody, Widget => CoreWidget }
 import org.nlogo.editor.EditorField
 import org.nlogo.nvm.Procedure
-import org.nlogo.swing.OptionDialog
-import org.nlogo.window.{ EditorColorizer, Events => WindowEvents, InterfaceColors, JobWidget }
+import org.nlogo.swing.{ OptionPane, ScrollPane, Transparent }
+import org.nlogo.theme.{ InterfaceColors, ThemeSync }
+import org.nlogo.window.{ EditorColorizer, Events => WindowEvents, JobWidget }
 
-class AgentMonitorEditor(parent: AgentMonitor) extends JPanel {
-  setBackground(InterfaceColors.AGENT_EDITOR_BACKGROUND)
-  setBorder(BorderFactory.createEmptyBorder(1, 1, 1, 1))
-
-  private var editor: AgentVarEditor = null
-  private val editors = new mutable.ArrayBuffer[AgentVarEditor]
+class AgentMonitorEditor(parent: AgentMonitor) extends JPanel with ThemeSync {
+  private val noVarLabel = new JLabel(I18N.gui.get("tools.agentMonitor.editor.noVariables"))
+  private var editors: List[AgentVarEditor] = Nil
 
   reset()
 
-  override def requestFocus() {
+  override def requestFocus(): Unit = {
     editors.headOption.foreach(_.requestFocus())
   }
 
-  def refresh() {
+  def refresh(): Unit = {
     editors.foreach(_.refresh(false))
   }
 
-  def reset() {
+  def reset(): Unit = {
     removeAll()
-    editors.clear()
+    editors = Nil
     if(vars == null || vars.isEmpty) {
       setLayout(new FlowLayout)
-      add(new JLabel(I18N.gui.get("tools.agentMonitor.editor.noVariables")))
+      add(noVarLabel)
     }
     else fill()
+    syncTheme()
   }
 
-  private def fill() {
-    import scala.collection.JavaConverters._
+  private def fill(): Unit = {
+    import scala.jdk.CollectionConverters.ListHasAsScala
 
-    val layout = new GridBagLayout
-    setLayout(layout)
+    setLayout(new GridBagLayout)
     val labelConstraints = new GridBagConstraints
+    labelConstraints.gridx = 0
     labelConstraints.anchor = GridBagConstraints.EAST
-    labelConstraints.gridwidth = GridBagConstraints.RELATIVE
+    labelConstraints.insets = new Insets(0, 3, 0, 3)
     val editorConstraints = new GridBagConstraints
+    editorConstraints.gridx = 1
     editorConstraints.fill = GridBagConstraints.HORIZONTAL
-    editorConstraints.weightx = 1.0
-    editorConstraints.gridwidth = GridBagConstraints.REMAINDER
+    editorConstraints.weightx = 1
+    editorConstraints.insets = new Insets(3, 0, 0, 3)
     // add components
-    for(variableName <- vars.asScala) {
+    editors = for (variableName <- vars.asScala.toList) yield {
       val label = new JLabel(variableName.toLowerCase)
-      label.setFont(new Font(Fonts.platformFont, Font.PLAIN, 10))
-      label.setBorder(BorderFactory.createEmptyBorder(0, 1, 0, 1))
       val index =
-        if(agent == null)
+        if (agent == null)
           workspace.world.indexOfVariable(agentKind, variableName)
         else
           workspace.world.indexOfVariable(agent, variableName)
-      editor = new AgentVarEditor(this, index, variableName, label)
+      val editor = new AgentVarEditor(this, index, variableName, label)
       editor.agentKind(agentKind)
-      editors += editor
-      layout.setConstraints(label, labelConstraints)
-      add(label)
-      layout.setConstraints(editor, editorConstraints)
-      add(editor)
+      add(label, labelConstraints)
+      add(editor, editorConstraints)
+      editor
     }
     val fillerConstraints = new GridBagConstraints
+    fillerConstraints.gridx = 0
+    fillerConstraints.gridwidth = 2
     fillerConstraints.fill = GridBagConstraints.BOTH
-    fillerConstraints.weighty = 1.0
-    val fillerPanel = new JPanel
-    fillerPanel.setLayout(new GridBagLayout)
-    layout.setConstraints(fillerPanel, fillerConstraints)
-    add(fillerPanel)
+    fillerConstraints.weighty = 1
+    val fillerPanel = new JPanel with Transparent
+    add(fillerPanel, fillerConstraints)
     revalidate()
   }
 
   def vars = parent.vars
   def agent = parent.agent
   def agentKind = parent.agentKind
-  def setAgent(agent: Agent) { parent.setAgent(agent, 3) }
+  def setAgent(agent: Agent): Unit = { parent.setAgent(agent, 3) }
   def workspace = parent.workspace
+
+  override def syncTheme(): Unit = {
+    setBackground(InterfaceColors.dialogBackground())
+
+    noVarLabel.setForeground(InterfaceColors.dialogText())
+
+    editors.foreach(_.syncTheme())
+  }
 }
 
 // this gets complicated... if there's any way to make it less complicated I'd love to know about it
@@ -102,10 +104,7 @@ extends JobWidget(parent.workspace.world.auxRNG)
 with KeyListener
 with FocusListener
 with WindowEvents.JobRemovedEvent.Handler
-{
-
-  type WidgetModel = org.nlogo.core.Widget
-
+with ThemeSync {
   private def specialCase = {
     parent.agentKind match {
       case AgentKind.Turtle if AgentVariables.isSpecialTurtleVariable(index) =>
@@ -139,17 +138,13 @@ with WindowEvents.JobRemovedEvent.Handler
   var editorFocus = false
 
   setLayout(new BorderLayout)
-  setBorder(
-    BorderFactory.createLineBorder(InterfaceColors.AGENT_EDITOR_BACKGROUND, 1))
 
-  private val editor = new EditorField(
-    17, new Font(Fonts.platformMonospacedFont, Font.PLAIN, 12),
-    true, new EditorColorizer(workspace))
+  private val editor = new EditorField(17, new Font(Fonts.platformMonospacedFont, Font.PLAIN, 12), true,
+                                       new EditorColorizer(workspace))
   editor.setFont(editor.getFont.deriveFont(10f))
-  add(new JScrollPane(editor,
-    ScrollPaneConstants.VERTICAL_SCROLLBAR_NEVER,
-    ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER),
-    BorderLayout.CENTER)
+  private val scrollPane = new ScrollPane(editor, ScrollPaneConstants.VERTICAL_SCROLLBAR_NEVER,
+                                          ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER)
+  add(scrollPane, BorderLayout.CENTER)
   editor.addKeyListener(this)
   editor.addFocusListener(this)
   refresh(true)
@@ -172,26 +167,26 @@ with WindowEvents.JobRemovedEvent.Handler
   override def isCommandCenter = true
 
   // this is how we're notified when we've been recompiled
-  override def procedure_=(procedure: Procedure) {
+  override def procedure_=(procedure: Procedure): Unit = {
     super.procedure_=(procedure)
     if (procedure != null)
       new WindowEvents.AddJobEvent(this, agents, procedure).raise(this)
   }
 
   // our job has finished, so we can fetch a new value for our variable
-  def handle(e: WindowEvents.JobRemovedEvent)
+  def handle(e: WindowEvents.JobRemovedEvent): Unit =
   {
     if(e.owner eq this)
       refresh(true)
   }
 
-  override def handle(e: WindowEvents.CompiledEvent) {
+  override def handle(e: WindowEvents.CompiledEvent): Unit = {
     super.handle(e)
     if(e.sourceOwner == this) {
       error(e.error)
-      if(error != null) {
-        OptionDialog.showMessage(
-          workspace.getFrame, I18N.gui.get("common.messages.error"), error.getMessage, Array(I18N.gui.get("common.buttons.ok")))
+      error().foreach { e =>
+        new OptionPane(workspace.getFrame, I18N.gui.get("common.messages.error"), e.getMessage,
+                       OptionPane.Options.Ok, OptionPane.Icons.Error)
         setEnabled(true)
         editor.setText(get)
         lastTextBeforeUserChangedAnything = editor.getText()
@@ -202,7 +197,7 @@ with WindowEvents.JobRemovedEvent.Handler
 
   // put together a full procedure definition. calling source at the end causes JobWidget and
   // CompileMoreSourceEvent stuff to call the compiler and add a job if compilation succeeds
-  def wrapSource(innerSource: String) {
+  def wrapSource(innerSource: String): Unit = {
     setEnabled(false)
     this.innerSource = innerSource
     var header = "to __agentvareditor [] "
@@ -228,9 +223,9 @@ with WindowEvents.JobRemovedEvent.Handler
 
   ///
 
-  def keyReleased(e: KeyEvent) { }
-  def keyTyped(e: KeyEvent) { }
-  def keyPressed(e: KeyEvent) {
+  def keyReleased(e: KeyEvent): Unit = { }
+  def keyTyped(e: KeyEvent): Unit = { }
+  def keyPressed(e: KeyEvent): Unit = {
     e.getKeyCode match {
       case KeyEvent.VK_ENTER =>
         action()
@@ -249,18 +244,18 @@ with WindowEvents.JobRemovedEvent.Handler
     }
   }
 
-  def focusGained(e: FocusEvent) {
+  def focusGained(e: FocusEvent): Unit = {
     editorFocus = true
     lastTextBeforeUserChangedAnything = editor.getText()
   }
 
-  def focusLost(e: FocusEvent) {
+  def focusLost(e: FocusEvent): Unit = {
     editorFocus = false
     if(editor.getText() != lastTextBeforeUserChangedAnything)
       action()
   }
 
-  override def requestFocus() {
+  override def requestFocus(): Unit = {
     editor.requestFocus()
   }
 
@@ -268,7 +263,7 @@ with WindowEvents.JobRemovedEvent.Handler
 
   // without this, the scrollpane in AgentMonitor scrolls every time a variable changes for any
   // reason, which is very annoying - ST 8/17/03
-  override def scrollRectToVisible(rect: Rectangle) {
+  override def scrollRectToVisible(rect: Rectangle): Unit = {
     if(editorFocus)
       super.scrollRectToVisible(rect)
   }
@@ -278,7 +273,7 @@ with WindowEvents.JobRemovedEvent.Handler
   // The "force" flag is so if a new value comes in at periodic update time, we don't interrupt the
   // user in the middle of typing something.  true means go ahead and interrupt the user if
   // necessary, false means refrain. - ST 8/17/03
-  def refresh(force: Boolean) {
+  def refresh(force: Boolean): Unit = {
     if(force || isEnabled) {
       setEnabled((agent != null && agent.id != -1 && agent.getVariable(index) != null) ||
                   specialCase == TURTLE_WHO ||
@@ -296,25 +291,25 @@ with WindowEvents.JobRemovedEvent.Handler
     }
   }
 
-  override def setEnabled(enabled: Boolean) {
+  override def setEnabled(enabled: Boolean): Unit = {
     if(enabled != isEnabled) {
       super.setEnabled(enabled)
       if((enabled || agent == null || agent.id == -1 || agent.getVariable(index) == null) &&
           editor.isEnabled != enabled)
         editor.setEnabled(enabled)
-      label.setForeground(if (enabled) Color.BLACK else Color.DARK_GRAY)
+      syncTheme()
       label.repaint()
     }
   }
 
   private def get =
-    if(agent == null || agent.id == -1)
+    if(agent == null || agent.id == -1  || agent.getVariable(index) == null)
       ""
     else workspace.world.synchronized{
       Dump.logoObject(agent.getVariable(index), true, false)
     }
 
-  private def action() {
+  private def action(): Unit = {
     if(isEnabled)
       if(editor.getText().trim.isEmpty) {
         editor.setText(get)
@@ -329,7 +324,7 @@ with WindowEvents.JobRemovedEvent.Handler
       }
   }
 
-  private def doAgentSwitch() {
+  private def doAgentSwitch(): Unit = {
     val newAgent = try {
       workspace.world.synchronized {
         specialCase match {
@@ -345,6 +340,8 @@ with WindowEvents.JobRemovedEvent.Handler
                 case Patch.VAR_PYCOR =>
                   (if (agent == null) 0 else agent.asInstanceOf[Patch].pxcor,
                    editor.getText().toInt)
+                case _ =>
+                  throw new IllegalStateException
               }
             workspace.world.getPatchAt(pxcor, pycor)
           case LINK_WHO =>
@@ -368,6 +365,8 @@ with WindowEvents.JobRemovedEvent.Handler
                   agent.setLinkVariable(index, breed)
                   agent
                 }
+              case _ =>
+                throw new IllegalStateException
             }
         }
       }
@@ -424,7 +423,7 @@ with WindowEvents.JobRemovedEvent.Handler
 
   /// load and save are inapplicable
 
-  override def load(model: CoreWidget): AnyRef =
+  override def load(model: CoreWidget): Unit =
     throw new UnsupportedOperationException
 
   override def model: CoreWidget =
@@ -434,4 +433,16 @@ with WindowEvents.JobRemovedEvent.Handler
   override def raiseWidgetRemoved(): Unit = {}
   override def raiseWidgetAdded(): Unit = {}
 
+  override def syncTheme(): Unit = {
+    label.setForeground(
+      if (isEnabled)
+        InterfaceColors.dialogText()
+      else
+        InterfaceColors.menuTextDisabled())
+
+    editor.setBackground(InterfaceColors.textAreaBackground())
+    editor.setCaretColor(InterfaceColors.textAreaText())
+
+    scrollPane.setBackground(InterfaceColors.textAreaBackground())
+  }
 }

@@ -66,6 +66,8 @@ object ShapeConverter {
         rect.filled = br.filled
         rect.marked = br.marked
         rect
+      case _ =>
+        throw new IllegalStateException
     }
 
   def coreLinkLineToLinkLine(l: BaseLinkLine): LinkLine = {

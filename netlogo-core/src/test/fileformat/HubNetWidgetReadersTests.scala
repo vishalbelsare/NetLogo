@@ -47,8 +47,9 @@ object HubNetGenerators {
     pos       <- genPos
     actionKey <- optionalOneChar
   } yield Button(display = display,
-    left  = pos._1, top    = pos._2,
-    right = pos._3, bottom = pos._4,
+    x  = pos._1, y    = pos._2,
+    width = pos._3 - pos._1, height = pos._4 - pos._2,
+    oldSize = true,
     source = None, forever = false, actionKey = actionKey)
 
   val escapedChars = Gen.oneOf('\n', '\t', '\r', '\\', '"')
@@ -70,8 +71,9 @@ object HubNetGenerators {
     choices       <- chooseableList
     currentChoice <- Gen.choose(0, choices.length)
   } yield Chooser(display = varName,
-    left  = pos._1, top    = pos._2,
-    right = pos._3, bottom = pos._4,
+    x  = pos._1, y    = pos._2,
+    width = pos._3 - pos._1, height = pos._4 - pos._2,
+    oldSize = true,
     variable = varName, choices = choices,
     currentChoice = currentChoice)
 
@@ -82,8 +84,9 @@ object HubNetGenerators {
       pos       <- genPos
       precision <- Gen.choose(0, 17)
     } yield Monitor(display = display,
-      left = pos._1, top = pos._2,
-      right = pos._3, bottom = pos._4,
+      x = pos._1, y = pos._2,
+      width = pos._3 - pos._1, height = pos._4 - pos._2,
+      oldSize = true,
       source = source, precision = precision, fontSize = 11)
 
   val sliderWidget: Gen[Slider] =
@@ -98,8 +101,9 @@ object HubNetGenerators {
       direction <- Gen.oneOf(Horizontal, Vertical)
       } yield {
         Slider(display = name,
-          left = pos._1,       top = pos._2,
-          right = pos._3,      bottom = pos._4,
+          x = pos._1, y = pos._2,
+          width = pos._3 - pos._1, height = pos._4 - pos._2,
+          oldSize = true,
           min = min.toString,  max = max.toString,
           variable = name, default = value,
           step = inc.toString, units = units,
@@ -112,8 +116,9 @@ object HubNetGenerators {
     isOn    <- Arbitrary.arbBool.arbitrary
     } yield {
       Switch(display = name,
-        left = pos._1,       top = pos._2,
-        right = pos._3,      bottom = pos._4,
+        x = pos._1, y = pos._2,
+        width = pos._3 - pos._1, height = pos._4 - pos._2,
+        oldSize = true,
         variable = name, on = isOn)
     }
 
@@ -124,14 +129,14 @@ object HubNetGenerators {
     minPy <- Arbitrary.arbInt.arbitrary
     maxPy <- Arbitrary.arbInt.arbitrary.map(_ + minPy)
   } yield View(
-    left  = pos._1, top    = pos._2,
-    right = pos._3, bottom = pos._4,
+    x = pos._1, y = pos._2,
+    width = pos._3 - pos._1, height = pos._4 - pos._2,
     dimensions = WorldDimensions(minPx, maxPx, minPy, maxPy))
 
   val hubNetWidgets: Gen[Widget] =
     Gen.oneOf(buttonWidget, chooserWidget, monitorWidget, sliderWidget, switchWidget, viewWidget)
 
-  implicit val arbWidget = Arbitrary(hubNetWidgets)
+  implicit val arbWidget: org.scalacheck.Arbitrary[org.nlogo.core.Widget] = Arbitrary(hubNetWidgets)
 
   val classyReaders =
     HubNetWidgetReaders.additionalReaders
@@ -157,11 +162,11 @@ class HubNetWidgetReadersTest extends AnyFunSuite with ScalaCheckDrivenPropertyC
 
   test("pathological case 1") {
     val chooser =
-      Chooser(None,-2147483648,-185212488,2147483647,859780949,None,List(ChooseableBoolean(true), ChooseableBoolean(true), ChooseableBoolean(false), ChooseableDouble(8.502858506075463E-83)), 10)
+      Chooser(None,-2147483648,-185212488,2147483647,859780949,true,None,List(ChooseableBoolean(true), ChooseableBoolean(true), ChooseableBoolean(false), ChooseableDouble(8.502858506075463E-83)), 10)
     val reader = HubNetChooserReader
     val serialized = reader.format(chooser)
-    assert(reader.validate(serialized.lines.toList), "serialized wiget should be valid")
-    val deserialized = reader.parse(serialized.lines.toList, litParser)
+    assert(reader.validate(serialized.linesIterator.toList), "serialized wiget should be valid")
+    val deserialized = reader.parse(serialized.linesIterator.toList, litParser)
     assert(chooser == deserialized, "round-trip must not change widget, written as:\n" + serialized)
   }
 }
@@ -182,9 +187,9 @@ class ClassyReader(val reader: WidgetReader) {
     reader.classTag.unapply(w).map(reader.format).get
 
   def validate(s: String): Boolean =
-    reader.validate(s.lines.toList)
+    reader.validate(s.linesIterator.toList)
 
   def parse(s: String): Widget = {
-    reader.parse(s.lines.toList, litParser)
+    reader.parse(s.linesIterator.toList, litParser)
   }
 }

@@ -63,7 +63,7 @@
   </experiment>
   <experiment name="testImmediateExit" repetitions="1" runMetricsEveryStep="true">
     <setup>set foo 0</setup>
-    <final>set foo 99</final>
+    <postRun>set foo 99</postRun>
     <timeLimit steps="4"/>
     <exitCondition>true</exitCondition>
     <metric>5</metric>
@@ -76,7 +76,7 @@
   <experiment name="experiment1" repetitions="5" runMetricsEveryStep="true">
     <setup>setup-random</setup>
     <go>go</go>
-    <final>show timer</final>
+    <postRun>show timer</postRun>
     <timeLimit steps="50"/>
     <exitCondition>"foo&amp;bar!"
 
@@ -137,7 +137,7 @@
   </experiment>
   <experiment name="testExportGraphics" repetitions="1" runMetricsEveryStep="false">
     <setup>ask patches [ set pcolor black ] crt 10 [ set size 10 fd random 40 ]</setup>
-    <final>export-view "tmp/testExportGraphics.png"</final>
+    <postRun>export-view "tmp/testExportGraphics.png"</postRun>
     <timeLimit steps="20"/>
     <metric>random 1000</metric>
   </experiment>
@@ -239,5 +239,209 @@
     <go>tick</go>
     <timeLimit steps="2"/>
     <metric>behaviorspace-run-number</metric>
+  </experiment>
+  <experiment name="basicRunCondition" repetitions="1" runMetricsEveryStep="false">
+    <setup>reset-ticks</setup>
+    <go>tick</go>
+    <timeLimit steps="50"/>
+    <metric>ticks</metric>
+    <runMetricsCondition>ticks mod 5 = 0</runMetricsCondition>
+  </experiment>
+  <experiment name="Run metrics every step" repetitions="1" runMetricsEveryStep="true">
+    <setup>setup</setup>
+    <go>go</go>
+    <timeLimit steps="100"/>
+    <metric>count turtles with [color = red]</metric>
+    <metric>count turtles with [color = white]</metric>
+    <runMetricsCondition>count turtles with [color = red] &gt; count turtles with [color = white]</runMetricsCondition>
+    <steppedValueSet variable="num-turtles" first="1" step="1" last="20"/>
+  </experiment>
+  <experiment name="Run metrics when count red &gt; count white" repetitions="1" runMetricsEveryStep="false">
+    <setup>setup</setup>
+    <go>go</go>
+    <timeLimit steps="100"/>
+    <metric>count turtles with [color = red]</metric>
+    <metric>count turtles with [color = white]</metric>
+    <runMetricsCondition>count turtles with [color = red] &gt; count turtles with [color = white]</runMetricsCondition>
+    <steppedValueSet variable="num-turtles" first="1" step="1" last="20"/>
+  </experiment>
+  <experiment name="Run metrics when reporter box is empty" repetitions="1" runMetricsEveryStep="false">
+    <setup>setup</setup>
+    <go>go</go>
+    <timeLimit steps="100"/>
+    <metric>count turtles with [color = red]</metric>
+    <metric>count turtles with [color = white]</metric>
+    <steppedValueSet variable="num-turtles" first="1" step="1" last="20"/>
+  </experiment>
+  <experiment name="testBasicSubExperiment" repetitions="1" runMetricsEveryStep="false">
+    <timeLimit steps="1"/>
+    <metric>a</metric>
+    <metric>b</metric>
+    <subExperiment>
+      <steppedValueSet variable="a" first="1" step="1" last="5"/>
+      <enumeratedValueSet variable="b">
+        <value value="23"/>
+        <value value="77"/>
+      </enumeratedValueSet>
+    </subExperiment>
+  </experiment>
+  <experiment name="testMultipleSubExperiments" repetitions="1" runMetricsEveryStep="false">
+    <timeLimit steps="1"/>
+    <metric>a</metric>
+    <metric>b</metric>
+    <subExperiment>
+      <steppedValueSet variable="a" first="1" step="1" last="3"/>
+      <steppedValueSet variable="b" first="4" step="1" last="6"/>
+    </subExperiment>
+    <subExperiment>
+      <steppedValueSet variable="a" first="7" step="1" last="9"/>
+      <steppedValueSet variable="b" first="10" step="1" last="12"/>
+    </subExperiment>
+  </experiment>
+  <experiment name="testConstantOverride" repetitions="1" runMetricsEveryStep="false">
+    <timeLimit steps="1"/>
+    <steppedValueSet variable="a" first="1" step="1" last="5"/>
+    <subExperiment>
+      <steppedValueSet variable="a" first="6" step="1" last="10"/>
+    </subExperiment>
+  </experiment>
+  <experiment name="testConstantReplace" repetitions="1" runMetricsEveryStep="false">
+    <timeLimit steps="1"/>
+    <enumeratedValueSet variable="a">
+      <value value="6"/>
+    </enumeratedValueSet>
+    <subExperiment>
+      <enumeratedValueSet variable="a">
+        <value value="5"/>
+      </enumeratedValueSet>
+      <enumeratedValueSet variable="b">
+        <value value="1"/>
+      </enumeratedValueSet>
+    </subExperiment>
+    <subExperiment>
+      <enumeratedValueSet variable="b">
+        <value value="2"/>
+      </enumeratedValueSet>
+    </subExperiment>
+  </experiment>
+  <experiment name="testMultipleConstantReplace" repetitions="1" runMetricsEveryStep="false">
+    <timeLimit steps="1"/>
+    <enumeratedValueSet variable="a">
+      <value value="1"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="b">
+      <value value="1"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="c">
+      <value value="1"/>
+    </enumeratedValueSet>
+    <subExperiment>
+      <enumeratedValueSet variable="a">
+        <value value="2"/>
+      </enumeratedValueSet>
+    </subExperiment>
+    <subExperiment>
+      <enumeratedValueSet variable="b">
+        <value value="2"/>
+      </enumeratedValueSet>
+    </subExperiment>
+    <subExperiment>
+      <enumeratedValueSet variable="c">
+        <value value="2"/>
+      </enumeratedValueSet>
+    </subExperiment>
+  </experiment>
+  <experiment name="testSubExperimentRepetitionsNonSequential" repetitions="2" sequentialRunOrder="false" runMetricsEveryStep="false">
+    <timeLimit steps="1"/>
+    <subExperiment>
+      <enumeratedValueSet variable="a">
+        <value value="1"/>
+        <value value="2"/>
+      </enumeratedValueSet>
+      <enumeratedValueSet variable="b">
+        <value value="3"/>
+      </enumeratedValueSet>
+    </subExperiment>
+    <subExperiment>
+      <enumeratedValueSet variable="a">
+        <value value="3"/>
+        <value value="4"/>
+      </enumeratedValueSet>
+      <enumeratedValueSet variable="b">
+        <value value="5"/>
+      </enumeratedValueSet>
+    </subExperiment>
+  </experiment>
+  <experiment name="testSubExperimentRepetitionsSequential" repetitions="2" runMetricsEveryStep="false">
+    <timeLimit steps="1"/>
+    <subExperiment>
+      <enumeratedValueSet variable="a">
+        <value value="1"/>
+        <value value="2"/>
+      </enumeratedValueSet>
+      <enumeratedValueSet variable="b">
+        <value value="3"/>
+      </enumeratedValueSet>
+    </subExperiment>
+    <subExperiment>
+      <enumeratedValueSet variable="a">
+        <value value="3"/>
+        <value value="4"/>
+      </enumeratedValueSet>
+      <enumeratedValueSet variable="b">
+        <value value="5"/>
+      </enumeratedValueSet>
+    </subExperiment>
+  </experiment>
+  <experiment name="testComplexSubExperiments" repetitions="1" runMetricsEveryStep="false">
+    <timeLimit steps="1"/>
+    <steppedValueSet variable="a" first="1" step="1" last="10"/>
+    <steppedValueSet variable="b" first="5" step="3" last="26"/>
+    <enumeratedValueSet variable="c">
+      <value value="15"/>
+      <value value="16"/>
+    </enumeratedValueSet>
+    <subExperiment>
+      <enumeratedValueSet variable="a">
+        <value value="2"/>
+      </enumeratedValueSet>
+    </subExperiment>
+    <subExperiment>
+      <steppedValueSet variable="a" first="1" step="1" last="15"/>
+    </subExperiment>
+    <subExperiment>
+      <steppedValueSet variable="c" first="15" step="1" last="18"/>
+    </subExperiment>
+    <subExperiment>
+      <steppedValueSet variable="b" first="50" step="2" last="60"/>
+      <steppedValueSet variable="c" first="50" step="2" last="60"/>
+    </subExperiment>
+  </experiment>
+  <experiment name="testSimpleLists" repetitions="1" runMetricsEveryStep="true">
+    <setup>clear-turtles reset-ticks create-turtles n [setxy n n]</setup>
+    <timeLimit steps="2"/>
+    <metric>[xcor] of turtles</metric>
+    <metric>[ycor] of turtles</metric>
+    <enumeratedValueSet variable="n">
+      <value value="2"/>
+      <value value="4"/>
+    </enumeratedValueSet>
+  </experiment>
+  <experiment name="testListsEmptyExperiment" repetitions="1" runMetricsEveryStep="true">
+    <timeLimit steps="1"/>
+  </experiment>
+  <experiment name="testStats" repetitions="3" runMetricsEveryStep="true">
+    <setup>ca reset-ticks random-seed behaviorspace-run-number</setup>
+    <go>create-turtles random 10 [setxy random 4 random 4] tick</go>
+    <timeLimit steps="5"/>
+    <metric>count turtles</metric>
+    <metric>[ pxcor ] of turtles</metric>
+  </experiment>
+  <experiment name="testStatsExcludeMetrics" repetitions="3" runMetricsEveryStep="true">
+    <setup>ca reset-ticks set string-test "a"</setup>
+    <go>ifelse ticks mod 2 = 0 [ set list-test (list 1 2) ] [ set list-test 3 ] tick</go>
+    <timeLimit steps="2"/>
+    <metric>string-test</metric>
+    <metric>list-test</metric>
   </experiment>
 </experiments>

@@ -41,7 +41,7 @@ object SmartIndenterTests {
       }
     }
 
-    def selectAll() { selectionStart = 0; selectionEnd = text.size }
+    def selectAll(): Unit = { selectionStart = 0; selectionEnd = text.size }
 
     def offsetToLine(offset: Int): Int = lines.indices.find(lineToEndOffset(_) > offset)
             .getOrElse(lines.size - 1)
@@ -57,9 +57,9 @@ object SmartIndenterTests {
 
     def getText(start: Int, len: Int) = text.substring(start, start + len)
 
-    def insertString(pos: Int, str: String) { text = text.substring(0, pos) + str + text.substring(pos, text.length) }
+    def insertString(pos: Int, str: String): Unit = { text = text.substring(0, pos) + str + text.substring(pos, text.length) }
 
-    def replaceSelection(str: String) {
+    def replaceSelection(str: String): Unit = {
       text = text.take(selectionStart) + str + text.drop(selectionEnd)
       val originalStart = selectionStart
       _caretPosition = selectionStart + str.length
@@ -67,7 +67,7 @@ object SmartIndenterTests {
       selectionEnd   = originalStart + str.length
     }
 
-    def remove(start: Int, len: Int) { text = text.substring(0, start) + text.substring(start + len, text.length) }
+    def remove(start: Int, len: Int): Unit = { text = text.substring(0, start) + text.substring(start + len, text.length) }
 
     def replace(start: Int, len: Int, str: String): Unit = {
       text = text.substring(0, start) + str + text.substring(start + len, text.length)
@@ -111,8 +111,9 @@ class SmartIndenterTests extends AnyFunSuite {
                   Array[String](name,
                                 spec.map(spec2in).mkString("\n"),
                                 spec.map(spec2out).mkString("\n"))
+                case _ => throw new IllegalStateException
               }
-            }
+            }.toIndexedSeq
   }
 
   val compiler = new DefaultCompilerServices(
@@ -142,7 +143,7 @@ class SmartIndenterTests extends AnyFunSuite {
     }
 
     test("indent a single line in " + name) {
-      val lineCount = out.lines.length
+      val lineCount = out.linesIterator.length
       for {
         lineNumber <- (0 until lineCount)
       } {
@@ -151,12 +152,12 @@ class SmartIndenterTests extends AnyFunSuite {
         code.setSelectionStart(code.lineToStartOffset(lineNumber))
         code.setSelectionEnd(code.lineToEndOffset(lineNumber) - 1)
         indenter.handleTab()
-        assert(out.lines.toSeq(lineNumber) === code.lines(lineNumber))
+        assert(out.linesIterator.toSeq(lineNumber) === code.lines(lineNumber))
         if (lineNumber > 0) {
-          assert(in.lines.toSeq(lineNumber - 1) === code.lines(lineNumber - 1))
+          assert(in.linesIterator.toSeq(lineNumber - 1) === code.lines(lineNumber - 1))
         }
         if (lineNumber < lineCount - 2) {
-          assert(in.lines.toSeq(lineNumber + 1) === code.lines(lineNumber + 1))
+          assert(in.linesIterator.toSeq(lineNumber + 1) === code.lines(lineNumber + 1))
         }
       }
     }
@@ -166,13 +167,13 @@ class SmartIndenterTests extends AnyFunSuite {
       for {
         (newLine, i) <- (newline.findAllMatchIn(in).toSeq.zipWithIndex)
       } {
-        if (i < out.lines.length) {
+        if (i < out.linesIterator.length) {
           val code = new Scaffold(in)
           val indenter = new SmartIndenter(code, compiler)
           code.setSelectionStart(newLine.start)
           code.setSelectionEnd(newLine.end)
           indenter.handleEnter()
-          assert(out.lines.toSeq(i + 1) === code.lines(i + 1))
+          assert(out.linesIterator.toSeq(i + 1) === code.lines(i + 1))
         }
       }
     }

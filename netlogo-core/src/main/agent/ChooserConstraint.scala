@@ -10,8 +10,8 @@ class ChooserConstraint(private var _acceptedValues: LogoList = LogoList(),
 extends ValueConstraint
 {
   def acceptedValues = _acceptedValues
-  def acceptedValues(vals: LogoList) {
-    val newdef = indexForValue(defaultValue)
+  def acceptedValues(vals: LogoList): Unit = {
+    val newdef = indexForValue(defaultValue).max(0)
     _acceptedValues = vals
     defaultIndex = newdef
   }
@@ -21,13 +21,13 @@ extends ValueConstraint
     // empty when they start up before they've input anything, and also maybe when they put in
     // something unparsable from a file.
     if(_acceptedValues.isEmpty) ""
-    else acceptedValues.get(defaultIndex min acceptedValues.size)
+    else acceptedValues.get(defaultIndex.min(acceptedValues.size).max(0))
 
   def indexForValue(value: AnyRef): Int =
     acceptedValues.indexWhere(Equality.equals(_, value))
 
   @throws(classOf[ValueConstraint.Violation])
-  def assertConstraint(value: AnyRef) {
+  def assertConstraint(value: AnyRef): Unit = {
     if(!acceptedValues.contains(value))
       throw new ValueConstraint.Violation(
         I18N.errors.getN("org.nlogo.agent.ChooserConstraint.invalidValue", Dump.logoObject(acceptedValues, true, false))

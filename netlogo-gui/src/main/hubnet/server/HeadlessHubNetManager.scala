@@ -5,15 +5,15 @@ package org.nlogo.hubnet.server
 import org.nlogo.hubnet.connection.{ HubNetException, NetworkUtils }
 import org.nlogo.workspace.AbstractWorkspaceScala
 import org.nlogo.core.{ Model, Widget => CoreWidget }
-import org.nlogo.api.{ ModelType, ModelLoader }
+import org.nlogo.api.{ AbstractModelLoader, ModelType }
 import org.nlogo.hubnet.protocol.{ ComputerInterface, TestClient }
-import org.nlogo.fileformat.ModelConversion
+import org.nlogo.fileformat.FileFormat.ModelConversion
 import collection.mutable.ListBuffer
 import java.util.concurrent.{Executors, ExecutorService}
 
 // TODO: we really need to do something about the printlns in this class.
 // but what?
-class HeadlessHubNetManager(workspace: AbstractWorkspaceScala, loader: ModelLoader, modelConverter: ModelConversion)
+class HeadlessHubNetManager(workspace: AbstractWorkspaceScala, loader: AbstractModelLoader, modelConverter: ModelConversion)
   extends HubNetManager(workspace, loader, modelConverter) {
   // since the server is headless, the clients cant be, or no one would have a view.
   // so, set this to true by default. JC 12/28/10
@@ -24,7 +24,7 @@ class HeadlessHubNetManager(workspace: AbstractWorkspaceScala, loader: ModelLoad
   // load is called from HeadlessModelOpener
   // save should never be called.
   var widgets: Seq[CoreWidget] = Seq()
-  def load(m: Model) {
+  def load(m: Model): Unit = {
     m.optionalSectionValue[Seq[CoreWidget]]("org.nlogo.modelsection.hubnetclient").foreach { ws =>
       widgets = ws
     }
@@ -39,26 +39,26 @@ class HeadlessHubNetManager(workspace: AbstractWorkspaceScala, loader: ModelLoad
 
   // should we be logging or doing something else here besides just println? JC - 12/28/10
   private val listener = new ClientEventListener() {
-    def addClient(clientId: String, remoteAddress: String) {
+    def addClient(clientId: String, remoteAddress: String): Unit = {
       //println("added client: " + clientId + " on: " + remoteAddress)
     }
-    def clientDisconnect(clientId: String) {
+    def clientDisconnect(clientId: String): Unit = {
       //println("client disconnected: " + clientId)
     }
-    def logMessage(message:String) {
+    def logMessage(message:String): Unit = {
       //println(message)
     }
   }
   val connectionManager = new ConnectionManager(this, listener, this.workspace)
 
   /// connection management
-  def disconnect() {
+  def disconnect(): Unit = {
     connectionManager.shutdown()
     messagesList.clear()
   }
 
   @throws(classOf[HubNetException])
-  def reset() {
+  def reset(): Unit = {
     if (connectionManager.isRunning) {
       connectionManager.shutdown()
       // when we reset, make sure to get rid of any locally connected clients.
@@ -80,19 +80,19 @@ class HeadlessHubNetManager(workspace: AbstractWorkspaceScala, loader: ModelLoad
   def clientEditor: AnyRef = null
   def getInterfaceWidth = 0
   def getInterfaceHeight = 0
-  def openClientEditor() {}
-  def closeClientEditor() {}
+  def openClientEditor(): Unit = {}
+  def closeClientEditor(): Unit = {}
 
   // other no-op gui related stuff
-  def setTitle(name: String, dir: String, modelType: ModelType) {}
-  def importClientInterface(model: Model, client: Boolean) {} // only called from the File menu.
+  def setTitle(name: String, dir: String, modelType: ModelType): Unit = {}
+  def importClientInterface(model: Model, client: Boolean): Unit = {} // only called from the File menu.
 
   private val clientIds = Iterator.from(0)
   private val clientsAddedViaNewClient = ListBuffer[TestClient]()
   lazy val executor: ExecutorService = Executors.newCachedThreadPool()
 
   // creates a new local client. this method should be renamed.
-  def newClient(isRobo: Boolean, waitTime: Int) {
+  def newClient(isRobo: Boolean, waitTime: Int): Option[AnyRef] = {
     // login happens automatically in the constructor.
     // its debateable that i should do this, but ok for now.
     // JC - 3/30/11
@@ -103,6 +103,8 @@ class HeadlessHubNetManager(workspace: AbstractWorkspaceScala, loader: ModelLoad
         clientsAddedViaNewClient.synchronized(clientsAddedViaNewClient += client)
       }
     })
+
+    None
   }
 
   // send a message from a local client to the server
@@ -118,5 +120,5 @@ class HeadlessHubNetManager(workspace: AbstractWorkspaceScala, loader: ModelLoad
     }
   }
 
-  def showControlCenter() {} // maybe we could log a message here.
+  def showControlCenter(): Unit = {} // maybe we could log a message here.
 }

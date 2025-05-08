@@ -8,6 +8,7 @@ import org.nlogo.{ api, agent, core }
 import org.nlogo.core.{CompilerException, Femto, Model, View}
 import CompilerException.{RuntimeErrorAtCompileTimePrefix => runtimePrefix}
 import org.nlogo.nvm.CompilerInterface
+import org.nlogo.api.PlotCompilationErrorAction
 import org.nlogo.headless.test.{RunMode, NormalMode, TestMode, CompileError,
                                 Success, Result, Reporter, Command, Compile,
                                 AbstractFixture, RuntimeError, StackTrace}
@@ -67,7 +68,7 @@ class Fixture(name: String) extends AbstractFixture {
   // tempted to DRY runReporter and runCommand together since they're so similar, but refraining
   // since there are many little differences, too - ST 8/15/13
 
-  def runReporter(reporter: Reporter, mode: TestMode = NormalMode) {
+  def runReporter(reporter: Reporter, mode: TestMode = NormalMode): Unit = {
     require(workspace.modelOpened)
     try {
       workspace.clearLastLogoException()
@@ -93,7 +94,7 @@ class Fixture(name: String) extends AbstractFixture {
     catch catcher(s"$mode: reporter: $reporter", reporter.result)
   }
 
-  def runCommand(command: Command, mode: TestMode = NormalMode) {
+  def runCommand(command: Command, mode: TestMode = NormalMode): Unit = {
     require(workspace.modelOpened)
     try {
       workspace.clearLastLogoException()
@@ -157,4 +158,11 @@ class Fixture(name: String) extends AbstractFixture {
   def openModel(model: Model, shouldAutoInstallLibs: Boolean = false) =
     workspace.openModel(model, shouldAutoInstallLibs)
 
+/**
+   * Set the PlotCompilationErrorAction in the workspace.
+   * See netlogo-core/src/main/api/Controllable.scala for information on PlotCompilationErrorAction.
+   */
+  def setPlotCompilationErrorAction(plotCompilationErrorAction: PlotCompilationErrorAction): Unit = {
+      workspace.setPlotCompilationErrorAction(plotCompilationErrorAction)
+  }
 }

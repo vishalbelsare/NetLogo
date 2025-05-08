@@ -28,7 +28,7 @@ import java.util.Set;
 // methods like distance() and towards() take a boolean argument "wrap";
 // it's true for the normal prims, false for the nowrap prims. - ST 5/24/06
 
-public abstract strictfp class Turtle
+public abstract class Turtle
     extends Agent
     implements org.nlogo.api.Turtle, AgentColors {
 
@@ -1113,6 +1113,52 @@ public abstract strictfp class Turtle
 
   private List<Link> links = null;
 
+  public boolean isLinkedWith(Turtle dest, AgentSet linkSet) {
+    if (links == null || links.isEmpty()) {
+      return false;
+    }
+
+    boolean checkAllBreeds = linkSet == _world.links();
+    boolean isBreedSet     = !linkSet.isBreedSet();
+
+    for (Link link : links) {
+      if (checkAllBreeds || (isBreedSet ? linkSet == link.getBreed() : linkSet.contains(link))) {
+        Agent otherEnd = (link._end1 == this) ? link._end2 : link._end1;
+        if (otherEnd == dest) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  public boolean isLinkedTo(Turtle dest, AgentSet linkSet) {
+    if (links == null || links.isEmpty()) {
+      return false;
+    }
+
+    boolean checkAllBreeds = linkSet == _world.links();
+    boolean isBreedSet     = !linkSet.isBreedSet();
+
+    for (Link link : links) {
+      if (checkAllBreeds || (isBreedSet ? linkSet == link.getBreed() : linkSet.contains(link))) {
+        if (link.isDirectedLink()) {
+          if (link._end1 == this && link._end2 == dest) {
+            return true;
+          }
+        } else {
+          Agent otherEnd = (link._end1 == this) ? link._end2 : link._end1;
+          if (otherEnd == dest) {
+            return true;
+          }
+        }
+      }
+    }
+
+    return false;
+  }
+
   public void addLink(Link link) {
     if (links == null) {
       links = new ArrayList<>(1);
@@ -1147,8 +1193,8 @@ public abstract strictfp class Turtle
       if (allBreeds || linkSet == link.getBreed() || (notBreedSet && linkSet.contains(link))) {
         // check directedness -- note that undirected links are *always* returned.
         if ((out && in) ||
-            (out && link.end1 == this) ||
-            (in  && link.end2 == this) ||
+            (out && link._end1 == this) ||
+            (in  && link._end2 == this) ||
             !link.isDirectedLink()) {
           result[writeTo] = link;
           writeTo++;

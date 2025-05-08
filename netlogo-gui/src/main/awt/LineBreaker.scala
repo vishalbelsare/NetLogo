@@ -8,11 +8,11 @@ import java.awt.FontMetrics
 // This is pretty raw converted Java code that ought to be made a lot more Scala-tastic.
 
 object LineBreaker {
-  def breakLines(_text: String, metrics: FontMetrics, width: Int): JList[String] = {
+  def breakLinesJ(_text: String, metrics: FontMetrics, width: Int): JList[String] = {
     var text = _text
     val result = collection.mutable.Buffer[String]()
     def nonEmptyResult = {
-      import scala.collection.JavaConverters._
+      import scala.jdk.CollectionConverters.{ BufferHasAsJava, SeqHasAsJava }
 
       if (result.isEmpty) List("").asJava
       else result.asJava
@@ -50,5 +50,11 @@ object LineBreaker {
       text = text.drop(index)
     }
     nonEmptyResult
+  }
+
+  def breakLines(_text: String, metrics: FontMetrics, width: Int): Seq[String] = {
+    import scala.jdk.CollectionConverters.IterableHasAsScala
+
+    breakLinesJ(_text, metrics, width).asScala.toSeq
   }
 }

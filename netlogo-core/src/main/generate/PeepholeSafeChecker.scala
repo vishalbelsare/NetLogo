@@ -38,17 +38,19 @@ class PeepholeSafeChecker(profilingEnabled: Boolean = false) {
   // we have to synchronize because we could be compiling stuff on multiple threads
   def isSafe(m: Method): Boolean = synchronized {
     val hashKey = getHashKey(m)
-    if (!methodSafeTable.contains(hashKey))
+    if (!methodSafeTable.contains(hashKey)) {
       processClass(m.getDeclaringClass)
+    }
     methodSafeTable(hashKey)
   }
   private val methodSafeTable = new collection.mutable.HashMap[String, Boolean]
   private def getHashKey(m: Method): String =
     m.getDeclaringClass.getName + "." + m.getName
-  private def processClass(c: Class[_]) {
+  private def processClass(c: Class[_]): Unit = {
     val reader = PrimitiveCache.getClassReader(c)
-    for (m <- BytecodeUtils.getMethods(c, profilingEnabled))
+    for (m <- BytecodeUtils.getMethods(c, profilingEnabled)) {
       reader.accept(new MethodExtractorClassAdapter(m), ClassReader.SKIP_DEBUG)
+    }
   }
   private class MethodExtractorClassAdapter(method: Method) extends EmptyClassVisitor {
     override def visitMethod(arg0: Int, name: String, descriptor: String, signature: String, exceptions: Array[String]): MethodVisitor =
@@ -60,7 +62,7 @@ class PeepholeSafeChecker(profilingEnabled: Boolean = false) {
     private var thisMethodFailedTest = false
     val paramLocalsCount = Type.getArgumentTypes(method).map(_.getSize).sum
     val alreadyLoaded = Array.fill(paramLocalsCount)(false)
-    override def visitVarInsn(opcode: Int, variable: Int) {
+    override def visitVarInsn(opcode: Int, variable: Int): Unit = {
       val check =
         !thisMethodFailedTest &&
           List(ILOAD, DLOAD, LLOAD, FLOAD, ALOAD).contains(opcode) &&
@@ -72,7 +74,7 @@ class PeepholeSafeChecker(profilingEnabled: Boolean = false) {
         } else alreadyLoaded(variable - 2) = true
       }
     }
-    override def visitEnd() {
+    override def visitEnd(): Unit = {
       if (!thisMethodFailedTest)
         methodSafeTable(getHashKey(method)) = true
     }

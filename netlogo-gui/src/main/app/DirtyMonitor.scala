@@ -7,7 +7,7 @@ import java.io.IOException
 import java.nio.file.{ Files, Path, Paths }
 import javax.swing.JFrame
 
-import org.nlogo.api.{ Exceptions, ModelLoader, ModelReader, ModelType, Version }
+import org.nlogo.api.{ AbstractModelLoader, Exceptions, ModelReader, ModelType, Version }
 import org.nlogo.window.Events._
 import org.nlogo.workspace.{ ModelTracker, SaveModel }
 
@@ -23,7 +23,8 @@ object DirtyMonitor {
   }
 }
 
-class DirtyMonitor(frame: JFrame, modelSaver: ModelSaver, modelLoader: ModelLoader, modelTracker: ModelTracker, title: Option[String] => String)
+class DirtyMonitor(frame: JFrame, modelSaver: ModelSaver, modelLoader: AbstractModelLoader, modelTracker: ModelTracker,
+                   title: Option[String] => String, codeWindow: JFrame)
 extends BeforeLoadEvent.Handler
 with AfterLoadEvent.Handler
 with WidgetAddedEvent.Handler
@@ -38,10 +39,6 @@ with SaveModel.Controller
   private var loading = true
   private var _modelDirty = false
   private var priorTempFile = Option.empty[Path]
-  private var _codeWindow : Option[JFrame] = None
-  def setCodeWindow(codeWindow: Option[JFrame]): Unit = {
-    _codeWindow = codeWindow
-  }
 
   def modelDirty = _modelDirty && !loading
   private def setDirty(dirty: Boolean, path: Option[String] = None): Unit = {
@@ -53,17 +50,10 @@ with SaveModel.Controller
       if (System.getProperty("os.name").startsWith("Mac"))
         frame.getRootPane.putClientProperty("Window.documentModified", dirty)
     }
-    _codeWindow match {
-      case None           => frame.setTitle(title(path))
-      case Some(window) => {
-        window.setTitle(title(path))
-        _codeWindow = None
-      }
-    }
-
+    App.app.setWindowTitles()
   }
 
-  def handle(e: AboutToQuitEvent) {
+  def handle(e: AboutToQuitEvent): Unit = {
     new java.io.File(DirtyMonitor.autoSaveFileName).delete()
     Exceptions.ignoring(classOf[IOException]) {
       priorTempFile.foreach(Files.deleteIfExists)
@@ -71,7 +61,7 @@ with SaveModel.Controller
   }
 
   private var lastTimeAutoSaved = 0L
-  private def doAutoSave() {
+  private def doAutoSave(): Unit = {
     // autoSave when we get a dirty event but no more than once a minute I have no idea if this is a
     // good number or even the right ballpark.  feel free to change it. ev 8/22/06
     if (!modelDirty || (System.currentTimeMillis() - lastTimeAutoSaved) < 60000)
@@ -130,7 +120,7 @@ with SaveModel.Controller
   object TempFileModelTracker extends ModelTracker {
     val delegate = modelTracker
     def compiler: org.nlogo.nvm.PresentationCompilerInterface = delegate.compiler
-    def getExtensionManager(): org.nlogo.workspace.ExtensionManager = delegate.getExtensionManager
+    def getExtensionManager(): org.nlogo.workspace.ExtensionManager = delegate.getExtensionManager()
     override def getModelType = delegate.getModelType
     override def getModelFileUri: Option[URI] = {
       delegate.getModelFileUri.map { u =>

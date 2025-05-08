@@ -353,9 +353,10 @@ can set the color of patch 0 0 to pure red using the following code:
 
     set pcolor [255 0 0]
 
-Turtles, links, and labels can all contain RGBA lists as their color variables,
-however, patches can only have RGBA `pcolors` in NetLogo 3D. You can set the color of a turtle to
-be approximately half transparent pure red with the following code:
+Turtles, links, and labels can all contain RGBA lists as their color variables.
+Patches only use the alpha value of an RGBA `pcolors` in NetLogo 3D, it's
+ignored in 2D NetLogo. You can set the color of a turtle to be approximately
+half transparent pure red with the following code:
 
     set color [255 0 0 125]
 
@@ -402,20 +403,10 @@ See the [documentation](palette.html) of the palette extension for more informat
 
 > **Code Examples:** Palette Example, Color Bubbles, Color Painting, Color Reveal
 
-**Color Swatches dialog**
+**Color Picker dialog**
 
-The Color Swatches dialog helps you experiment with and choose colors. Open it
-by choosing Color Swatches on the Tools Menu.
-![[colorswatches.gif]]
-
-When you click on a color swatch (or a color button), that color will be shown
-against other colors. In the bottom left, the code for the currently selected
-color is displayed (for example, `red + 2`) so you can copy and paste it into
-your code. On the bottom right there are three increment options, 1, 0.5, and
-0.1. These numbers indicate the difference between two adjacent swatches. When
-the increment is 1 there are 10 different shades in each row; when the increment
-is 0.1 there are 100 different shades in each row. 0.5 is an intermediate
-setting.
+The Color Picker dialog helps you experiment with and choose colors. Open it
+by choosing Color Picker on the Tools Menu.
 
 ## Ask
 
@@ -2858,14 +2849,22 @@ block as input.
 
 Operator precedences are as follows, high to low:
 
-- [[with]], [[at-points]], [[in-radius]], [[in-cone]]
-- (all other primitives and user-defined procedures)
+- [[with]], [[with-min]], [[with-max]], [[at-points]], [[in-radius]], [[in-cone]], [[who-are-not]]
+- [[of]]
+- All other primitives and user-defined procedures, including [[not]]
 - `^`
 - `*`, `/`, `mod`
 - `+`, `-`
 - `<`, `>`, `<=`, `>=`
 - `=`, `!=`
 - [[and]], [[or]], [[xor]]
+- [[ifelse-value]]
+
+When an expression contains multiple operators with the same precedence, they are read in code order left-to-right.
+Example:  `true or false and false` is read as `(true or false) and false` and so results in `(true) and false`, which
+is `false`.  This is different than many other programming languages where `or` has a lower precedence than `and`, so
+the above statement would be read as `true or (false and false)`, `true or (false)`, so `true`.  You can surround
+expressions in parentheses to ensure you get your desired order of operations.
 
 ### Compared to other Logos
 

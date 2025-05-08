@@ -41,7 +41,7 @@ object StructureParser {
           firstResults
         else {
           Iterator.iterate(firstResults) { results =>
-            val suppliedPath = results.includes.head.value.asInstanceOf[String]
+            val suppliedPath = resolveIncludePath(results.includes.head.value.asInstanceOf[String])
             cAssert(suppliedPath.endsWith(".nls"), IncludeFilesEndInNLS, results.includes.head)
             includeFile(compilationEnvironment, suppliedPath) match {
               case Some((path, fileContents)) =>
@@ -51,7 +51,7 @@ object StructureParser {
               case None =>
                 exception(I18N.errors.getN("compiler.StructureParser.includeNotFound", suppliedPath), results.includes.head)
             }
-          }.dropWhile(_.includes.nonEmpty).next
+          }.dropWhile(_.includes.nonEmpty).next()
         }
       }
   }
@@ -149,19 +149,28 @@ object StructureParser {
     if (includesPositionedTokens.isEmpty)
       Seq()
     else {
-      includesPositionedTokens.next
+      includesPositionedTokens.next()
       val includesWithoutComments = includesPositionedTokens.filter(_.tpe != TokenType.Comment)
-      if (includesWithoutComments.next.tpe != TokenType.OpenBracket)
-        exception("Did not find expected open bracket for __includes declaration", tokens.next)
+      if (includesWithoutComments.next().tpe != TokenType.OpenBracket)
+        exception("Did not find expected open bracket for __includes declaration", tokens.next())
       else
         includesWithoutComments
           .takeWhile(_.tpe != TokenType.CloseBracket)
           .filter(_.tpe == TokenType.Literal)
           .map(_.value)
           .collect {
-            case s: String => s
+            case s: String => resolveIncludePath(s)
           }.toSeq
     }
+  }
+
+  def resolveIncludePath(path: String) = {
+    val name = System.getProperty("os.name")
+
+    if (name == null || name.startsWith("Windows"))
+      path
+    else
+      path.replaceFirst("^~", System.getProperty("user.home"))
   }
 
 }
@@ -174,17 +183,23 @@ class StructureParser(
   def parse(tokens: Iterator[Token], oldResults: StructureResults): StructureResults =
     StructureCombinators.parse(tokens) match {
       case Right(declarations) =>
+        StructureChecker.rejectMisplacedConstants(declarations)
         StructureChecker.rejectDuplicateDeclarations(declarations)
         StructureChecker.rejectDuplicateNames(declarations,
           StructureParser.usedNames(
             oldResults.program, oldResults.procedures))
+        StructureChecker.rejectMissingReport(declarations)
         StructureConverter.convert(declarations, displayName,
           if (subprogram)
             StructureResults(program = oldResults.program)
           else oldResults,
           subprogram)
       case Left((msg, token)) =>
-        exception(msg, token)
+        if (token.tpe == TokenType.Keyword) {
+          exception(s"""Keyword ${token.text.toUpperCase} cannot be used in this context.""", token)
+        } else {
+          exception(msg, token)
+        }
     }
 
 }

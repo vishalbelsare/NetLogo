@@ -25,7 +25,7 @@ object BreedIdentifierHandler {
     TurtlePrimitive("<BREEDS>"      , Reporter,  "_breed"             ),
     TurtlePrimitive("<BREEDS>-AT"   , Reporter,  "etc._breedat"       ),
     TurtlePrimitive("<BREEDS>-HERE" , Reporter,  "etc._breedhere"     ),
-    TurtlePrimitive("<BREEDS>-ON"   , Reporter,  "etc._breedon"       ),
+    TurtlePrimitive("<BREEDS>-ON"   , Reporter,  "_breedon"       ),
     TurtlePrimitive("<BREED>"       , Reporter,  "etc._breedsingular" ),
     TurtlePrimitive("IS-<BREED>?"   , Reporter,  "etc._isbreed"       ),
 
@@ -57,16 +57,16 @@ object BreedIdentifierHandler {
   // example input:  Token("hatch-frogs", TokenType.Ident, "HATCH-FROGS")
   // example result: Some(("_hatch", "FROGS", TokenType.Command))
   def process(token: Token, program: Program): Option[(String, String, TokenType)] =
-    handlers.toStream.flatMap(_.process(token, program)).headOption
+    handlers.to(LazyList).flatMap(_.process(token, program)).headOption
 
   def breedCommands(breed: DeclBreed): Seq[String] =
-    handlers.collect(breedPrimitivesMatching(breed, Command) andThen refineName(breed))
+    handlers.collect(breedPrimitivesMatching(breed, Command) andThen refineName(breed) _)
 
   def breedReporters(breed: DeclBreed): Seq[String] =
-    handlers.collect(breedPrimitivesMatching(breed, Reporter) andThen refineName(breed))
+    handlers.collect(breedPrimitivesMatching(breed, Reporter) andThen refineName(breed) _)
 
   def breedHomonymProcedures(breed: DeclBreed): Seq[String] =
-    handlers.collect(primitivesNamedLike(breed) andThen refineName(breed)).distinct
+    handlers.collect(primitivesNamedLike(breed) andThen refineName(breed) _).distinct
 
   private def breedPrimitivesMatching(breed: DeclBreed, tokenType: TokenType): SpecMatcher =
     breedPrimsMatching(tokenType, breed, !matchesBreedName(_))

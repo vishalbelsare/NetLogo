@@ -137,7 +137,7 @@ import java.io.Serializable;
 // on the code, I strongly suggest looking at MersenneTwister.java first.
 // -- Sean
 
-public final strictfp class MersenneTwisterFast
+public final class MersenneTwisterFast
     extends java.util.Random
     implements Serializable, Cloneable {
 
@@ -147,7 +147,6 @@ public final strictfp class MersenneTwisterFast
   private static final int MATRIX_A = 0x9908b0df;   //    private static final * constant vector a
   private static final int UPPER_MASK = 0x80000000; // most significant w-r bits
   private static final int LOWER_MASK = 0x7fffffff; // least significant r bits
-
 
   // Tempering parameters
   private static final int TEMPERING_MASK_B = 0x9d2c5680;
@@ -703,7 +702,8 @@ public final strictfp class MersenneTwisterFast
     z ^= (z << 15) & TEMPERING_MASK_C;      // TEMPERING_SHIFT_T(z)
     z ^= (z >>> 18);                        // TEMPERING_SHIFT_L(z)
 
-    return (((long) y) << 32) + z;
+    // See "Hoo, boy!" below. --Jason B. (5/4/25)
+    return (((long) y) << 32) | (((long) z) & 0x00000000ffffffffL);
   }
 
 
@@ -772,9 +772,18 @@ public final strictfp class MersenneTwisterFast
       z ^= (z << 15) & TEMPERING_MASK_C;      // TEMPERING_SHIFT_T(z)
       z ^= (z >>> 18);                        // TEMPERING_SHIFT_L(z)
 
-      bits = (((((long) y) << 32) + z) >>> 1);
+      // Hoo, boy!  Alright, so... there's a bug here in Sean Luke's original code.
+      // He did `((((long) y) << 32) + z)`.  This does not actually produce the result
+      // of concatenating the `y` and `z`'s bits together into a 64-bit number.  If you
+      // want an example of where it goes wrong, just try it with `y` as a positive number
+      // and `z` as a negative number.  One or more of `y`'s right-most bits will get flipped.
+      // To achieve the desired effect, you need to extend `z` to a `long`, and then truncate
+      // its upper (two's complement) bits, finally joining `y` and `z` with a bitwise OR.
+      // --Jason B. (5/4/25)
+      bits = ((((long) y) << 32) | (((long) z) & 0x00000000ffffffffL)) >>> 1;
       val = bits % n;
     } while (bits - val + (n - 1) < 0);
+
     return val;
   }
 
@@ -1090,6 +1099,7 @@ public final strictfp class MersenneTwisterFast
       bits = (y >>> 1);
       val = bits % n;
     } while (bits - val + (n - 1) < 0);
+
     return val;
   }
 

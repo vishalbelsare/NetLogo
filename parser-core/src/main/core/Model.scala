@@ -10,16 +10,17 @@ import scala.reflect.ClassTag
 case class Model(code: String = "",
   widgets: Seq[Widget] = List(View()),
   info: String = "",
-  version: String = "NetLogo 6.2",
-  turtleShapes: Seq[VectorShape] = Model.defaultShapes,
+  version: String = "NetLogo 7.0.0-beta1",
+  turtleShapes: Seq[VectorShape] = Model.defaultTurtleShapes,
   linkShapes: Seq[LinkShape] = Model.defaultLinkShapes,
-  optionalSections: Seq[OptionalSection[_]] = Seq()) {
+  optionalSections: Seq[OptionalSection[_]] = Seq(),
+  resources: Seq[ExternalResource] = Seq()) {
 
   def interfaceGlobals: Seq[String] = widgets.collect{case x:DeclaresGlobal => x}.map(_.varName)
   def constraints: Map[String, ConstraintSpecification] = widgets.collect{case x:DeclaresConstraint => (x.varName, x.constraint)}.toMap
   def interfaceGlobalCommands: Seq[String] = widgets.collect{case x:DeclaresGlobalCommand => x}.map(_.command)
 
-  if(widgets.collectFirst{case (w: View) => w}.isEmpty)
+  if(widgets.collectFirst{case (w: ViewLike) => w}.isEmpty)
     throw new Model.InvalidModelError("Every model must have at least a view...")
 
   def view: View = widgets.collectFirst{case (w: View) => w}.get
@@ -43,13 +44,20 @@ case class Model(code: String = "",
 }
 
 object Model {
-  lazy val defaultShapes: List[VectorShape] =
-    parseVectorShapes(Resource.lines("/system/defaultShapes.txt").toSeq).toList
-  lazy val defaultLinkShapes: List[LinkShape] =
-    parseLinkShapes(Resource.lines("/system/defaultLinkShapes.txt").toSeq).toList
+  val defaultCode = ""
+  lazy val defaultTurtleShapes: Seq[VectorShape] =
+    parseVectorShapes(Resource.lines("/system/defaultTurtleShapes.txt").toSeq)
+  lazy val libraryTurtleShapes: Seq[VectorShape] =
+    parseVectorShapes(Resource.lines("/system/libraryTurtleShapes.txt").toSeq)
+  lazy val defaultLinkShapes: Seq[LinkShape] =
+    parseLinkShapes(Resource.lines("/system/defaultLinkShapes.txt").toSeq)
+  lazy val defaultView =
+    View(368, 10, 434, 434, WorldDimensions(-16, 16, -16, 16, 13.0), 10, UpdateMode.Continuous, true, Some("ticks"), 30)
   class InvalidModelError(message: String) extends RuntimeException(message)
 }
 
 class OptionalSection[A <: AnyRef](val key: String, value: Option[A], val default: A) {
   def get: Option[A] = value
 }
+
+class Section[A <: AnyRef](key: String, value: A) extends OptionalSection[A](key, Some(value), value)

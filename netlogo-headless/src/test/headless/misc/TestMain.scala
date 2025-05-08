@@ -56,7 +56,7 @@ class TestMain extends AnyFunSuite {
 
   test("no experiment specified") {
     val (out, err) = capture {
-      Main.main(Array("--model", "foobarbaz.nlogo"))
+      Main.main(Array("--model", "foobarbaz.nlogox"))
     }
     val expected =
       "you must specify either --setup-file or --experiment (or both)\n"
@@ -71,14 +71,14 @@ class TestMain extends AnyFunSuite {
     val (out, err) = capture {
       Main.main(Array(
         "--threads", "1",   // avoid out-of-order output
-        "--model", "models/test/lab/FireWithExperiments.nlogo",
+        "--model", "models/test/lab/FireWithExperiments.nlogox",
         "--setup-file", "test/lab/protocols.xml",
         "--experiment", "runNumber",
         "--table", "-"))   // stdout
     }
     val expected =
-      """|"BehaviorSpace results (VERSION)"
-         |"models/test/lab/FireWithExperiments.nlogo"
+      """|"BehaviorSpace results (VERSION)","Table version EXPORTER_VERSION"
+         |"models/test/lab/FireWithExperiments.nlogox"
          |"runNumber"
          |"min-pxcor","max-pxcor","min-pycor","max-pycor"
          |"-100","100","-100","100"
@@ -95,7 +95,8 @@ class TestMain extends AnyFunSuite {
          |""".stripMargin
     assertResult("")(err)
     // version number varies, date and time varies, compare carefully!
-    assertResult(expected.replaceFirst("VERSION", api.Version.version))(
+    assertResult(expected.replaceFirst("VERSION", api.Version.version)
+                          .replaceFirst("EXPORTER_VERSION", api.LabExporterVersion.version))(
       out.replaceAll(
         """"\d\d/\d\d/\d\d\d\d \d\d:\d\d:\d\d:\d\d\d .\d\d\d\d"\n""",
         ""))

@@ -11,7 +11,7 @@ class _resizeworld extends Command {
 
 
 
-  override def perform(context: Context) {
+  override def perform(context: Context): Unit = {
 
     val newMinX = argEvalIntValue(context, 0)
     val newMaxX = argEvalIntValue(context, 1)
@@ -35,12 +35,12 @@ class _resizeworld extends Command {
         oldMinY != newMinY || oldMaxY != newMaxY ||
         oldMinZ != newMinZ || oldMaxZ != newMaxZ) {
       workspace.setDimensions(
-        new org.nlogo.api.WorldDimensions3D(newMinX, newMaxX,
-                                            newMinY, newMaxY,
-                                            newMinZ, newMaxZ))
+        new org.nlogo.core.WorldDimensions3D(newMinX, newMaxX,
+                                             newMinY, newMaxY,
+                                             newMinZ, newMaxZ))
       workspace.waitFor(
         new org.nlogo.api.CommandRunnable {
-          override def run() { workspace.resizeView() }})
+          override def run(): Unit = { workspace.resizeView() }})
     }
     context.ip = next
   }

@@ -30,13 +30,18 @@ import org.nlogo.api.RendererInterface;
 import org.nlogo.api.ReporterRunnable;
 import org.nlogo.api.SimpleJobOwner;
 import org.nlogo.shape.ShapeConverter;
+import org.nlogo.swing.OptionPane;
 import org.nlogo.nvm.Procedure;
 import org.nlogo.nvm.Workspace;
 
 import java.util.HashMap;
 import java.util.ArrayList;
+import java.util.List;
+import javax.swing.plaf.OptionPaneUI;
 
-public abstract strictfp class GUIWorkspace // can't be both abstract and strictfp
+import scala.jdk.javaapi.CollectionConverters;
+
+public abstract class GUIWorkspace
     extends GUIWorkspaceScala
     implements
     org.nlogo.window.Event.LinkChild,
@@ -317,10 +322,9 @@ public abstract strictfp class GUIWorkspace // can't be both abstract and strict
    */
   @Override
   public boolean warningMessage(String message) {
-    String[] options = {I18N.guiJ().get("common.buttons.continue"), I18N.guiJ().get("common.buttons.cancel")};
-    return 0 == org.nlogo.swing.OptionDialog.showMessage(
-        getFrame(), I18N.guiJ().get("common.messages.warning"),
-        I18N.guiJ().get("common.messages.warning") + ":" + message, options);
+    return new OptionPane(getFrame(), I18N.guiJ().get("common.messages.warning"), message,
+                          OptionPane.Options$.MODULE$.OkCancel(),
+                          OptionPane.Icons$.MODULE$.Warning()).getSelectedIndex() == 0;
   }
 
   public void resizeView() {
@@ -486,7 +490,6 @@ public abstract strictfp class GUIWorkspace // can't be both abstract and strict
       viewWidget.setVisible(dualView);
     }
     view.renderPerspective = enabled;
-    viewWidget.settings().refreshViewProperties(!enabled);
     new org.nlogo.window.Events.Enable2DEvent(enabled).raise(this);
   }
 
@@ -894,7 +897,7 @@ public abstract strictfp class GUIWorkspace // can't be both abstract and strict
       }
     } catch (SliderConstraint.ConstraintExceptionHolder ex) {
       for (SliderConstraint.SliderConstraintException cce :
-             scala.collection.JavaConversions.asJavaIterable(ex.getErrors())) {
+             CollectionConverters.asJava(ex.getErrors())) {
         e.slider.error((Object) cce.spec().fieldName(), (java.lang.Exception) cce);
       }
     }
@@ -943,7 +946,7 @@ public abstract strictfp class GUIWorkspace // can't be both abstract and strict
   }
 
   @Override
-  protected void sendOutput(final org.nlogo.agent.OutputObject oo,
+  public void sendOutput(final org.nlogo.agent.OutputObject oo,
                             final boolean toOutputArea) {
     final org.nlogo.window.Events.OutputEvent event =
         new org.nlogo.window.Events.OutputEvent

@@ -8,26 +8,38 @@ import org.jhotdraw.framework.HandleEnumeration;
 import org.jhotdraw.standard.HandleEnumerator;
 import org.jhotdraw.standard.NullHandle;
 import org.jhotdraw.standard.RelativeLocator;
-import org.nlogo.api.Property;
+import org.nlogo.api.CompilerServices;
+import org.nlogo.editor.Colorizer;
+import org.nlogo.window.Editable;
+import org.nlogo.window.EditPanel;
+
 import java.util.List;
 import java.util.ArrayList;
 
 import org.nlogo.api.Options;
-import scala.collection.JavaConverters;
 
-public strictfp class ConverterFigure extends DiamondFigure
+public class ConverterFigure extends DiamondFigure
     implements
     ModelElementFigure,
     org.jhotdraw.util.Storable,
-    org.nlogo.api.Editable {
+    Editable {
   private org.nlogo.sdm.Converter converter;
+
+  private transient CompilerServices compiler;
+  private transient Colorizer colorizer;
 
   public ConverterFigure() {
     setAttribute
         (FigureAttributeConstant.FILL_COLOR,
-            org.nlogo.window.InterfaceColors.SLIDER_BACKGROUND);
+            org.nlogo.theme.InterfaceColors.converterBackground());
     converter = new org.nlogo.sdm.Converter();
     converter.setSelected("Select");
+  }
+
+  // if these go in the constructor it messes up the old deserialization code (Isaac B 3/31/25)
+  public void setCompilerAndColorizer(CompilerServices compiler, Colorizer colorizer) {
+    this.compiler = compiler;
+    this.colorizer = colorizer;
   }
 
   public org.nlogo.sdm.ModelElement getModelElement() {
@@ -41,8 +53,8 @@ public strictfp class ConverterFigure extends DiamondFigure
   public void error(Object o, Exception e) {
   }
 
-  public Exception error(Object o) {
-    return null;
+  public scala.Option<Exception> error(Object o) {
+    return scala.Option.apply(null);
   }
 
   public int sourceOffset() {
@@ -111,8 +123,8 @@ public strictfp class ConverterFigure extends DiamondFigure
     return scala.Option.apply(null);
   }
 
-  public List<Property> propertySet() {
-    return Properties.converter();
+  public EditPanel editPanel() {
+    return new ConverterEditPanel(this, compiler, colorizer);
   }
 
   public String classDisplayName() {

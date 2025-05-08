@@ -4,10 +4,11 @@ package org.nlogo.lab.gui
 
 import org.scalatest.funsuite.AnyFunSuite
 
-import org.nlogo.api.{ FileIO, DummyCompilerServices, NetLogoLegacyDialect, NetLogoThreeDDialect, Version }
+import org.nlogo.api.{ DummyCompilerServices, FileIO, NetLogoLegacyDialect, NetLogoThreeDDialect, Version }
+import org.nlogo.core.{ Femto, LiteralParser }
 import org.nlogo.fileformat.NLogoLabFormat
 import org.nlogo.nvm.PresentationCompilerInterface
-import org.nlogo.core.{ Femto, LiteralParser }
+import org.nlogo.window.EditorColorizer
 
 class ProtocolEditableTests extends AnyFunSuite {
   val compiler = Femto.get[PresentationCompilerInterface]("org.nlogo.compile.Compiler", if (Version.is3D) NetLogoThreeDDialect else NetLogoLegacyDialect)
@@ -24,24 +25,12 @@ class ProtocolEditableTests extends AnyFunSuite {
       override def readFromString(s: String): AnyRef =
         compiler.readFromString(s)
     }
-    val protocolLines = FileIO.fileToString("test/lab/protocols.xml").lines.toArray
+    val protocolLines = FileIO.fileToString("test/lab/protocols.xml").linesIterator.toArray
     val protocols = new NLogoLabFormat(literalParser).load(protocolLines, None).get
     protocols.foreach { protocol =>
-      val editedProtocol = new ProtocolEditable(protocol, null, workspace, new AnyRef).get.get
+      val editedProtocol = new ProtocolEditable(protocol, null, workspace, new EditorColorizer(workspace), new AnyRef,
+                                                Seq()).get.get
       assert(protocol == editedProtocol)
-    }
-  }
-
-  test("protocol error on overflow") {
-    val workspace = new DummyCompilerServices {
-      override def readFromString(s: String): AnyRef =
-        compiler.readFromString(s)
-    }
-    val protocolLines = FileIO.fileToString("test/lab/protocolsFailure.xml").lines.toArray
-    val protocols = new NLogoLabFormat(literalParser).load(protocolLines, None).get
-    protocols.foreach { protocol =>
-      val validSetting = new ProtocolEditable(protocol, null, workspace, new AnyRef).invalidSettings
-      assert(List(("Variable","Increment list exceeds the number of possible runs [ 0.0 1.0 100.0 ]")) == validSetting)
     }
   }
 }

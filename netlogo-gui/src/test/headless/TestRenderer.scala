@@ -6,8 +6,8 @@ import org.nlogo.shape.VectorShape
 import org.nlogo.shape.TestHelpers._
 import org.nlogo.api.Perspective
 import MockGraphics._
-import org.nlogo.util.WorldType
-import org.nlogo.util.WorldType._
+import org.nlogo.api.WorldType
+import org.nlogo.api.WorldType._
 
 import scala.language.implicitConversions
 
@@ -63,7 +63,7 @@ class TestRenderer extends AbstractTestRenderer {
 
   testUsingWorkspace("More links", radius=16){ workspace: HeadlessWorkspace =>
     workspace.command("create-nodes 2 [ ht setxy ((who - 1) * 5) 0 ] ask node 0 [ create-link-with node 1 ]")
-    val node = workspace.world.turtles.iterator.next
+    val node = workspace.world.turtles.iterator.next()
     val g = new MockGraphics(this)
     workspace.renderer.paint(g,
       SimpleViewSettings(patchSize=61.285714285714285, viewOffsetX=13,viewOffsetY= -13, renderPerspective=true, perspective=Perspective.Follow(node, 5)))
@@ -88,7 +88,7 @@ class TestRenderer extends AbstractTestRenderer {
     workspace.command("create-turtles 1 [ ht setxy -6 0 ] " +
                                "create-turtles 1 [ ht setxy 6 0 ] " +
                                "ask turtle 0 [ create-link-with turtle 1 ]")
-    val turtle = workspace.world.turtles.iterator.next
+    val turtle = workspace.world.turtles.iterator.next()
     val g = new MockGraphics(this)
     workspace.renderer.paint(g, SimpleViewSettings(patchSize=10, viewOffsetX=3,viewOffsetY= -3,
       renderPerspective=true, perspective=Perspective.Follow(turtle, 5)))
@@ -148,7 +148,7 @@ class TestColorRendering extends AbstractTestRenderer {
   }
 
   class RichWorkspace(workspace: HeadlessWorkspace){
-    def setShapes(shapes: VectorShape*) {
+    def setShapes(shapes: VectorShape*): Unit = {
       // remove all shapes from the world
       for (shape <- workspace.world.turtleShapeList.shapes)
         workspace.world.turtleShapes.removeShape(shape)
@@ -156,7 +156,7 @@ class TestColorRendering extends AbstractTestRenderer {
       shapes.foreach(workspace.world.turtleShapes.add)
     }
     // test that the entire world is a particular color.
-    def testColors(r: Int, g: Int, b: Int, a: Int = 255) {
+    def testColors(r: Int, g: Int, b: Int, a: Int = 255): Unit = {
       val image = workspace.exportView
       // why cut off the borders here?
       // a turtle of size 15 almost fills the screen, but leaves some black border. remove it.
@@ -168,7 +168,7 @@ class TestColorRendering extends AbstractTestRenderer {
       }
     }
     // for sanity only, dump the world to an image in order to look at it.
-    def dumpWorldToImage(){
+    def dumpWorldToImage(): Unit ={
       workspace.command("export-view \"test.png\"")
     }
   }
@@ -211,7 +211,7 @@ class TestRendererForPatchLabels extends AbstractTestRenderer{
   case class Test(p:Patch, labelSize: LabelSize, drawnAt:LabelDrawnAt) extends BaseTest{
     def command = "ask patch "+p.x+" "+p.y+" [set plabel 123]"
     def expectedResults = drawnAt.expectedResults(labelSize)
-    override def setup(g:MockGraphics){ g.allowingLabels(labelSize) }
+    override def setup(g:MockGraphics): Unit ={ g.allowingLabels(labelSize) }
   }
 }
 
@@ -333,7 +333,7 @@ class TestRendererForTurtleLabels extends AbstractTestRenderer{
     def command =
       "crt 1[ set shape \"circle\" setxy " + t.at._1 + " " + t.at._2 + " set size " + t.size + " set label 123]"
     def expectedResults = turtleDrawnAt.expectedResults(t.size) ::: labelDrawnAt.expectedResults(labelSize)
-    override def setup(g:MockGraphics){ g.allowingLabels(labelSize) }
+    override def setup(g:MockGraphics): Unit ={ g.allowingLabels(labelSize) }
   }
 }
 
@@ -364,7 +364,10 @@ class TestRendererPatchLabelsBehaveSameAsTurtleLabels extends AbstractTestRender
       workspace.command("ask patches [ set plabel 123 sprout 1 [ set label 123 ]]")
       val g = new MockGraphics(this){ allowingLabels(LabelSize(10,10)) }
       workspace.renderer.paint(g, SimpleViewSettings(patchSize = 13))
-      g.labels.sorted.grouped(2).toList.foreach{ case Seq(a,b) => assert(a===b) }
+      g.labels.sorted.grouped(2).toList.foreach {
+        case Seq(a, b) => assert(a === b)
+        case _ =>
+      }
     }
   }
 }
@@ -389,8 +392,8 @@ abstract class AbstractTestRenderer(worldType: WorldType = Torus) extends TestUs
     run()
     def command: String
     def expectedResults: List[Operation]
-    def setup(g:MockGraphics) { }
-    def run() {
+    def setup(g:MockGraphics): Unit = { }
+    def run(): Unit = {
       mockTestUsingWorkspace(this.toString, radius = 16, worldType = AbstractTestRenderer.this.worldType) { workspace =>
         val g = new MockGraphics(AbstractTestRenderer.this)
         setup(g)
@@ -403,7 +406,7 @@ abstract class AbstractTestRenderer(worldType: WorldType = Torus) extends TestUs
     }
   }
 
-  def testOperations(g: MockGraphics, expecteds: List[Operation]) {
+  def testOperations(g: MockGraphics, expecteds: List[Operation]): Unit = {
 //    info("expected: " + expecteds.mkString("\n"))
 //    info("actual: " + g.operations.mkString("\n"))
     assert(expecteds.mkString("\n") === g.toString)

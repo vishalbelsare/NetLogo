@@ -40,6 +40,7 @@ object Binding {
       newNext match {
         case EmptyBinding => this
         case boundLet: BoundLet => boundLet.withNext(this)
+        case _ => throw new IllegalStateException
       }
     def concat(other: ChildBinding): ChildBinding =
       other

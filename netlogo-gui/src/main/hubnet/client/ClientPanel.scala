@@ -2,7 +2,7 @@
 
 package org.nlogo.hubnet.client
 
-import java.awt.AWTEvent
+import java.awt.{ AWTEvent, BorderLayout }
 import java.io.{IOException, PrintWriter}
 import java.net.{Socket, ConnectException, UnknownHostException, NoRouteToHostException}
 import java.util.concurrent.atomic.AtomicBoolean
@@ -17,7 +17,8 @@ import org.nlogo.hubnet.mirroring.{ OverrideList, HubNetLinkStamp, HubNetPlotPoi
 import org.nlogo.hubnet.protocol._
 import org.nlogo.awt.EventQueue.invokeLater
 import org.nlogo.awt.Hierarchy.getFrame
-import org.nlogo.swing.OptionDialog
+import org.nlogo.swing.{ OptionPane, Transparent }
+import org.nlogo.theme.ThemeSync
 import org.nlogo.window.{ PlotWidgetExport, MonitorWidget, InterfaceGlobalWidget, Widget, ButtonWidget, PlotWidget, NetLogoExecutionContext }
 import org.nlogo.window.Events.{ AddJobEvent, AddSliderConstraintEvent, AfterLoadEvent, ExportPlotEvent, InterfaceGlobalEvent, LoadWidgetsEvent }
 
@@ -29,30 +30,26 @@ import scala.concurrent.Future
 // moved, so we use events.  - ST 8/24/03
 class ClientPanel(editorFactory:org.nlogo.window.EditorFactory,
                   errorHandler:ErrorHandler,
-                  compiler:CompilerServices) extends JPanel with
+                  compiler:CompilerServices) extends JPanel(new BorderLayout) with Transparent with
         AddJobEvent.Handler with
         ExportPlotEvent.Handler with
         InterfaceGlobalEvent.Handler with
-        AddSliderConstraintEvent.Handler {
+        AddSliderConstraintEvent.Handler with
+        ThemeSync {
 
   var clientGUI:ClientGUI = null
   var viewWidget:ClientView = null
   private val plotManager = new PlotManager(new DummyLogoThunkFactory(), new MersenneTwisterFast())
 
-  locally {
-    setBackground(java.awt.Color.white)
-    setLayout(new java.awt.BorderLayout())
-  }
+  def setDisplayOn(on: Boolean): Unit = { if (viewWidget != null) viewWidget.setDisplayOn(on) }
 
-  def setDisplayOn(on: Boolean) { if (viewWidget != null) viewWidget.setDisplayOn(on) }
-
-  def sendMouseMessage(mouseXCor: Double, mouseYCor: Double, down: Boolean) {
+  def sendMouseMessage(mouseXCor: Double, mouseYCor: Double, down: Boolean): Unit = {
     org.nlogo.awt.EventQueue.mustBeEventDispatchThread()
     val coords = LogoList(mouseXCor.asInstanceOf[AnyRef], mouseYCor.asInstanceOf[AnyRef])
     sendDataAndWait(new ActivityCommand(if (down) "View" else "Mouse Up", coords))
   }
 
-  def handlePlotUpdate(msg: PlotInterface) {
+  def handlePlotUpdate(msg: PlotInterface): Unit = {
     for (pw <- clientGUI.getInterfaceComponents.collect {case pw: PlotWidget => pw}) {
       if (pw.plot.name == msg.name) {
         pw.plot.clear()
@@ -64,7 +61,7 @@ class ClientPanel(editorFactory:org.nlogo.window.EditorFactory,
   }
 
   // TODO: couldnt we use case class copy here or something?
-  private def updatePlot(plot1: Plot, plot2: Plot) {
+  private def updatePlot(plot1: Plot, plot2: Plot): Unit = {
     plot2.currentPen = plot2.getPen(plot1.currentPen.get.name)
     plot2.state = plot1.state
     for (pen1 <- plot1.pens) {
@@ -81,14 +78,14 @@ class ClientPanel(editorFactory:org.nlogo.window.EditorFactory,
   }
 
   /// Interface Event Handlers
-  def handle(e: org.nlogo.window.Events.AddJobEvent) {
+  def handle(e: org.nlogo.window.Events.AddJobEvent): Unit = {
     org.nlogo.awt.EventQueue.mustBeEventDispatchThread()
     val button = e.owner.asInstanceOf[ButtonWidget]
     sendDataAndWait(new ActivityCommand(button.displayName, button.foreverOn.asInstanceOf[AnyRef]))
     button.popUpStoppingButton()
   }
 
-  def handle(e: org.nlogo.window.Events.ExportPlotEvent) {
+  def handle(e: org.nlogo.window.Events.ExportPlotEvent): Unit = {
     e.plotExport match {
       case PlotWidgetExport.ExportAllPlots =>
         throw new UnsupportedOperationException("can't export all plots yet.")
@@ -97,7 +94,7 @@ class ClientPanel(editorFactory:org.nlogo.window.EditorFactory,
           Future.successful(e.exportFilename)
            .foreach({ filename =>
              try new AbstractExporter(filename) {
-               override def export(writer: PrintWriter) {
+               override def `export`(writer: PrintWriter): Unit = {
                  new CorePlotExporter(plot, Dump.csv).export(writer)
                }
              }.export("plot", "HubNet Client", "")
@@ -109,18 +106,18 @@ class ClientPanel(editorFactory:org.nlogo.window.EditorFactory,
     }
   }
 
-  def handle(e: org.nlogo.window.Events.InterfaceGlobalEvent) {
+  def handle(e: org.nlogo.window.Events.InterfaceGlobalEvent): Unit = {
     org.nlogo.awt.EventQueue.mustBeEventDispatchThread()
-    sendDataAndWait(new ActivityCommand(e.widget.name, e.widget.valueObject))
+    sendDataAndWait(new ActivityCommand(e.widget.name, e.widget.valueObject()))
   }
 
-  def handle(e: org.nlogo.window.Events.AddSliderConstraintEvent) {
+  def handle(e: org.nlogo.window.Events.AddSliderConstraintEvent): Unit = {
     e.slider.setSliderConstraint(
       new ConstantSliderConstraint(e.minSpec.toDouble, e.maxSpec.toDouble, e.incSpec.toDouble){ defaultValue = e.value })
   }
 
   /// Message Handlers
-  private def handleWidgetControlMessage(value: AnyRef, widgetName: String) {
+  private def handleWidgetControlMessage(value: AnyRef, widgetName: String): Unit = {
     org.nlogo.awt.EventQueue.mustBeEventDispatchThread()
     if (widgetName == "VIEW") value match {
       case t: HubNetTurtleStamp => viewWidget.renderer.stamp(t)
@@ -137,19 +134,19 @@ class ClientPanel(editorFactory:org.nlogo.window.EditorFactory,
     }
     // `foreach` is the reasonable choice here; a Plot for a Monitor will share the same
     // name as the Monitor and can intercept the search if we use `find`! -- JAB (5/9/12)
-    clientGUI.getInterfaceComponents filter { case w: Widget => w.displayName == widgetName } foreach {
+    clientGUI.getInterfaceComponents collect { case w: Widget if w.displayName == widgetName => w } foreach {
       case i: InterfaceGlobalWidget => i.valueObject(value)
       case m: MonitorWidget         => m.value(value)
       case _                        => // Ignore
     }
   }
 
-  private def findWidget(name:String) = {
-    clientGUI.getInterfaceComponents.find { case w: Widget => w.displayName == name }
+  private def findWidget(name: String): Widget = {
+    clientGUI.getInterfaceComponents.collect { case w: Widget if w.displayName == name => w }.headOption.orNull
   }
 
   // this is the master method for handling plot messages. it should probably be redone.
-  private def handlePlotControlMessage(value: Any, plotName:String) {
+  private def handlePlotControlMessage(value: Any, plotName:String): Unit = {
     org.nlogo.awt.EventQueue.mustBeEventDispatchThread()
     val plotWidget = findWidget(plotName).asInstanceOf[Option[PlotWidget]].get // horrible.
     value match {
@@ -190,9 +187,17 @@ class ClientPanel(editorFactory:org.nlogo.window.EditorFactory,
             plotWidget.makeDirty()
             plotWidget.repaintIfNeeded()
           case 'n' =>
-            plotWidget.plot.state = plotWidget.plot.state.copy(autoPlotOn = true)
+            plotWidget.plot.state = plotWidget.plot.state.copy(autoPlotX = true, autoPlotY = true)
           case 'f' =>
-            plotWidget.plot.state = plotWidget.plot.state.copy(autoPlotOn = false)
+            plotWidget.plot.state = plotWidget.plot.state.copy(autoPlotX = false, autoPlotY = false)
+          case 'x' =>
+            plotWidget.plot.state = plotWidget.plot.state.copy(autoPlotX = true)
+          case 'z' =>
+            plotWidget.plot.state = plotWidget.plot.state.copy(autoPlotX = false)
+          case 'y' =>
+            plotWidget.plot.state = plotWidget.plot.state.copy(autoPlotY = true)
+          case 'w' =>
+            plotWidget.plot.state = plotWidget.plot.state.copy(autoPlotY = false)
           case _ => throw new IllegalStateException()
         } catch {case ex: RuntimeException => org.nlogo.api.Exceptions.handle(ex)}
       }
@@ -218,6 +223,7 @@ class ClientPanel(editorFactory:org.nlogo.window.EditorFactory,
           plotWidget.makeDirty()
           plotWidget.repaintIfNeeded()
       }
+      case _ => throw new Exception(s"Unexpected message: $value")
     }
   }
 
@@ -225,7 +231,7 @@ class ClientPanel(editorFactory:org.nlogo.window.EditorFactory,
    * Completes the login process. Called when a handshake message is received
    * from the server.
    */
-  def completeLogin(handshake: HandshakeFromServer) {
+  def completeLogin(handshake: HandshakeFromServer): Unit = {
     errorHandler.completeLogin()
     activityName = handshake.activityName
     if (clientGUI != null) remove(clientGUI)
@@ -254,7 +260,7 @@ class ClientPanel(editorFactory:org.nlogo.window.EditorFactory,
     })
   }
 
-  def handleProtocolMessage(message: org.nlogo.hubnet.protocol.Message) {
+  def handleProtocolMessage(message: org.nlogo.hubnet.protocol.Message): Unit = {
     message match {
       case h: HandshakeFromServer => completeLogin(h)
       case LoginFailure(content) => handleLoginFailure(content)
@@ -270,10 +276,12 @@ class ClientPanel(editorFactory:org.nlogo.window.EditorFactory,
       case Text(content, messageType) => messageType match {
         case Text.MessageType.TEXT => clientGUI.addMessage(content.toString)
         case Text.MessageType.USER =>
-          OptionDialog.showMessage(getFrame(this), "User Message", content.toString,
-            Array(I18N.gui.get("common.buttons.ok"), I18N.gui.get("common.buttons.halt")))
+          new OptionPane(getFrame(this), I18N.gui.get("common.messages.userMessage"), content.toString,
+                         Seq(I18N.gui.get("common.buttons.ok"), I18N.gui.get("common.buttons.halt")),
+                         OptionPane.Icons.Info)
         case Text.MessageType.CLEAR => clientGUI.clearMessages()
       }
+      case _ => throw new Exception(s"Unexpected message: $message")
     }
   }
 
@@ -323,19 +331,19 @@ class ClientPanel(editorFactory:org.nlogo.window.EditorFactory,
     }
   }
 
-  def handleLoginFailure(errorMessage: String) {
+  def handleLoginFailure(errorMessage: String): Unit = {
     org.nlogo.awt.EventQueue.mustBeEventDispatchThread()
     listener.disconnect(errorMessage)
     errorHandler.handleLoginFailure(errorMessage)
   }
 
-  def disconnect(reason:String) {
+  def disconnect(reason:String): Unit = {
     org.nlogo.awt.EventQueue.mustBeEventDispatchThread()
     if (listener != null) listener.disconnect(reason)
     else                  handleDisconnect(reason)
   }
 
-  def logout() {
+  def logout(): Unit = {
     org.nlogo.awt.EventQueue.mustBeEventDispatchThread()
     if (connected.compareAndSet(true, false)) {
       listener.stopWriting()
@@ -349,20 +357,19 @@ class ClientPanel(editorFactory:org.nlogo.window.EditorFactory,
   // see section 15.9.5.1 of the Java Language Specification,
   // "Anonymous Constructors") - ST 8/15/02
 
-  @throws(classOf[java.io.IOException])
   private class Listener(userName: String, socket: Socket)
           extends AbstractConnection("Listener: " + userName, Streamable(socket)) {
     var clientId = userName
     // kill the writingThread since we don't need it because
     // we only do synchronous I/O via waitForSendData() -- CB 09/28/04
     stopWriting()
-    override def receiveData(data:AnyRef) {
+    override def receiveData(data:AnyRef): Unit = {
       getToolkit.getSystemEventQueue.postEvent(new ClientAWTEvent(ClientPanel.this, data.asInstanceOf[AnyRef], true))
     }
-    override def handleEx(e:Exception, sendingEx: Boolean) {
+    override def handleEx(e:Exception, sendingEx: Boolean): Unit = {
       getToolkit.getSystemEventQueue.postEvent(new ClientAWTExceptionEvent(ClientPanel.this, e, sendingEx))
     }
-    override def disconnect(reason:String) {
+    override def disconnect(reason:String): Unit = {
       super.disconnect(reason)
       handleDisconnect(reason)
     }
@@ -380,7 +387,7 @@ class ClientPanel(editorFactory:org.nlogo.window.EditorFactory,
   // EVENT HANDLING
 
   // TODO: all casting here is terrible.
-  override def processEvent(e: AWTEvent) {
+  override def processEvent(e: AWTEvent): Unit = {
     if (e.isInstanceOf[ClientAWTEvent] && e.getSource == this) {
       val clientEvent = e.asInstanceOf[ClientAWTEvent]
       try if (clientEvent.isInstanceOf[ClientAWTExceptionEvent])
@@ -392,7 +399,7 @@ class ClientPanel(editorFactory:org.nlogo.window.EditorFactory,
   }
 
 
-  private def handleEx(e: Exception, sendingEx: Boolean) {
+  private def handleEx(e: Exception, sendingEx: Boolean): Unit = {
     org.nlogo.awt.EventQueue.mustBeEventDispatchThread()
     e.printStackTrace()
     // if it is not an exception in sending, we still might be
@@ -404,7 +411,7 @@ class ClientPanel(editorFactory:org.nlogo.window.EditorFactory,
   /**
    * Sends data and waits until the data is sent.
    */
-  def sendDataAndWait(obj: AnyRef) {
+  def sendDataAndWait(obj: AnyRef): Unit = {
     org.nlogo.awt.EventQueue.mustBeEventDispatchThread()
     if (listener != null) {
       try listener.waitForSendData(obj)
@@ -417,7 +424,7 @@ class ClientPanel(editorFactory:org.nlogo.window.EditorFactory,
     } else System.err.println("Attempted to send data on a shutdown listener, ignoring.")
   }
 
-  private def receiveData(a: Any) {
+  private def receiveData(a: Any): Unit = {
     org.nlogo.awt.EventQueue.mustBeEventDispatchThread()
     a match {
       case m: Message => handleProtocolMessage(m)
@@ -428,6 +435,12 @@ class ClientPanel(editorFactory:org.nlogo.window.EditorFactory,
                 " you are using does not match the version of the " +
                 "server. Please use the HubNet Client that comes with " + info)
       }
+      case _ => throw new Exception(s"Unexpected data: $a")
     }
+  }
+
+  override def syncTheme(): Unit = {
+    if (clientGUI != null)
+      clientGUI.syncTheme()
   }
 }

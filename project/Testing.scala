@@ -14,7 +14,6 @@ object Testing {
   lazy val testCommandsClass   = settingKey[String]("class used to run command tests")
   lazy val testExtensionsClass = settingKey[String]("class used to run extensions tests")
   lazy val testModelsClass     = settingKey[String]("class used to run model tests")
-  lazy val testChecksumsClass  = settingKey[String]("class used to run checksum tests")
 
   lazy val tr = inputKey[Unit]("run reporter tests")
   lazy val tc = inputKey[Unit]("run command tests")
@@ -22,28 +21,28 @@ object Testing {
   lazy val tm = inputKey[Unit]("run model tests")
   lazy val ts = inputKey[Unit]("run checksum tests")
 
-  lazy val testTempDirectory = settingKey[File]("Temp directory for tests to write files to")
+  lazy val testTempDirectory = settingKey[File]("Temp directory for tests to write files to").withRank(KeyRanks.Invisible)
 
   private val testKeys = Seq(tr, tc, te, tm, ts)
 
   lazy val suiteSettings = Seq(
-    (fast in Test) := {
-      (testOnly in Test).toTask(" -- -l org.nlogo.util.SlowTestTag -l org.nlogo.util.ExtensionTestTag -l org.nlogo.headless.LanguageTestTag").value
+    (Test / fast) := {
+      (Test / testOnly).toTask(" -- -l org.nlogo.util.SlowTestTag -l org.nlogo.util.ExtensionTestTag -l org.nlogo.headless.LanguageTestTag").value
     },
-    (medium in Test) := {
-      (testOnly in Test).toTask(" -- -n org.nlogo.headless.LanguageTestTag -l org.nlogo.util.ExtensionTestTag").value
+    (Test / medium) := {
+      (Test / testOnly).toTask(" -- -n org.nlogo.headless.LanguageTestTag -l org.nlogo.util.ExtensionTestTag").value
     },
-    (language in Test) := {
-      (testOnly in Test).toTask(" -- -n org.nlogo.headless.LanguageTestTag").value
+    (Test / language) := {
+      (Test / testOnly).toTask(" -- -n org.nlogo.headless.LanguageTestTag").value
     },
-    (crawl in Test) := {
-      (testOnly in Test).toTask(" -- -n org.nlogo.util.SlowTestTag").value
+    (Test / crawl) := {
+      (Test / testOnly).toTask(" -- -n org.nlogo.util.SlowTestTag").value
     },
-    (extensionTests in Test) := {
-      (testOnly in Test).toTask(" -- -n org.nlogo.util.ExtensionTestTag").value
+    (Test / extensionTests) := {
+      (Test / testOnly).toTask(" -- -n org.nlogo.util.ExtensionTestTag").value
     },
-    (slow in Test) := {
-      (testOnly in Test).toTask(" -- -n org.nlogo.util.SlowTestTag -l org.nlogo.headless.LanguageTestTag -l org.nlogo.util.ExtensionTestTag").value
+    (Test / slow) := {
+      (Test / testOnly).toTask(" -- -n org.nlogo.util.SlowTestTag -l org.nlogo.headless.LanguageTestTag -l org.nlogo.util.ExtensionTestTag").value
     })
 
   def useLanguageTestPrefix(prefix: String) =
@@ -88,7 +87,7 @@ object Testing {
       val scalaTestArgs =
         if (args.isEmpty) ""
         else args.mkString(" -- -z \"", " ", "\"")
-      (testOnly in Test).toTask(s" $name$scalaTestArgs")
+      (Test / testOnly).toTask(s" $name$scalaTestArgs")
     }
 
   def keyValueTest(className: SettingKey[String], key: String): Def.Initialize[InputTask[Unit]] =
@@ -100,6 +99,6 @@ object Testing {
           ""
         else
           s""" -- "-D$key=${args.mkString(" ")}""""
-      (testOnly in Test).toTask(s" $name$scalaTestArgs")
+      (Test / testOnly).toTask(s" $name$scalaTestArgs")
     }
 }

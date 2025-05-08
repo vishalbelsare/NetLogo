@@ -5,11 +5,12 @@ import org.nlogo.workspace
 import workspace.WorldLoader
 import org.nlogo.plot.PlotLoader
 import org.nlogo.agent.{BooleanConstraint, ChooserConstraint, CompilationManagement, InputBoxConstraint, NumericConstraint}
-import org.nlogo.api.{PreviewCommands, ValueConstraint, Version}
+import org.nlogo.api.{ PreviewCommands, SourceOwner, ValueConstraint, Version }
 import org.nlogo.core.{ Button, CompilerException, ConstraintSpecification,
   LogoList, Model, Monitor, Program, Shape },
   ConstraintSpecification._,
   Shape.{ LinkShape => CoreLinkShape, VectorShape => CoreVectorShape }
+import org.nlogo.api.PlotCompilationErrorAction
 
 import org.nlogo.shape.{ShapeConverter, LinkShape, VectorShape}
 
@@ -26,7 +27,7 @@ class HeadlessModelOpener(ws: HeadlessWorkspace) {
       case c => c.toString
     }
 
-  def openFromModel(model: Model, shouldAutoInstallLibs: Boolean = false) {
+  def openFromModel(model: Model, shouldAutoInstallLibs: Boolean = false): Unit = {
     require(!ws.modelOpened, "HeadlessWorkspace can only open one model")
     ws.setOpenModel(model)
 
@@ -40,13 +41,17 @@ class HeadlessModelOpener(ws: HeadlessWorkspace) {
     for(plot <- model.plots)
       PlotLoader.loadPlot(plot, ws.plotManager.newPlot(""))
 
+    // load system dynamics model (if present)
+    ws.aggregateManager.load(model, ws)
+
     // read procedures, compile them.
     val results = {
+      val additionalSources: Seq[SourceOwner] = if (ws.aggregateManager.isLoaded) Seq(ws.aggregateManager) else Seq()
       val code = model.code
       ws.compiler.compileProgram(
-        code, Program.empty.copy(interfaceGlobals = model.interfaceGlobals),
+        code, additionalSources, Program.empty().copy(interfaceGlobals = model.interfaceGlobals),
         ws.getExtensionManager, ws.getLibraryManager, ws.compilationEnvironment,
-        shouldAutoInstallLibs, ws.flags)
+        shouldAutoInstallLibs)
     }
     ws.procedures = results.proceduresMap
     ws.clearRunCache()
@@ -66,11 +71,11 @@ class HeadlessModelOpener(ws: HeadlessWorkspace) {
         model.widgets.collect { case b: Button => b },
         model.widgets.collect { case m: Monitor => m })
     else
-      finish(model.constraints, results.program, model.interfaceGlobalCommands.mkString("\n"))
-  }
+      finish(model.constraints, results.program, model.interfaceGlobalCommands.mkString("\n"), ws.getPlotCompilationErrorAction())
+    }
 
 
-  private def parseShapes(turtleShapes: Seq[CoreVectorShape], linkShapes: Seq[CoreLinkShape]) {
+  private def parseShapes(turtleShapes: Seq[CoreVectorShape], linkShapes: Seq[CoreLinkShape]): Unit = {
     ws.world.turtleShapes.replaceShapes(
       turtleShapes.map(ShapeConverter.baseVectorShapeToVectorShape))
     if (turtleShapes.isEmpty)
@@ -83,11 +88,21 @@ class HeadlessModelOpener(ws: HeadlessWorkspace) {
       ws.world.linkShapes.add(LinkShape.getDefaultLinkShape)
   }
 
-  private def finish(constraints: Map[String, ConstraintSpecification], program: Program, interfaceGlobalCommands: String) {
+/**
+ *  @param plotCompilationErrorAction  action to take if a plot compilation error occurs
+ */
+private def finish(constraints: Map[String, ConstraintSpecification], program: Program,
+                      interfaceGlobalCommands: String, plotCompilationErrorAction: PlotCompilationErrorAction): Unit = {
     ws.world.realloc()
 
     val errors = ws.plotManager.compileAllPlots()
-    if(errors.nonEmpty) throw errors(0)
+    if (errors.nonEmpty) {
+      plotCompilationErrorAction match {
+        case PlotCompilationErrorAction.Throw => throw errors(0)
+        case PlotCompilationErrorAction.Output => errors.foreach { println }
+        case PlotCompilationErrorAction.Ignore =>
+      }
+    }
 
     for ((vname, spec) <- constraints) {
       val con: ValueConstraint = spec match {
@@ -99,6 +114,7 @@ class HeadlessModelOpener(ws: HeadlessWorkspace) {
         case BooleanConstraintSpecification(default) => new BooleanConstraint(default)
         case StringInputConstraintSpecification(typeName, default) => new InputBoxConstraint(typeName, default)
         case NumericInputConstraintSpecification(typeName, default) => new InputBoxConstraint(typeName, default)
+        case _ => throw new IllegalStateException
       }
       ws.world.observer.setConstraint(ws.world.observerOwnsIndexOf(vname.toUpperCase), con)
     }
@@ -106,7 +122,7 @@ class HeadlessModelOpener(ws: HeadlessWorkspace) {
     ws.command(interfaceGlobalCommands)
   }
 
-  private def testCompileWidgets(program: Program, buttons: Seq[Button], monitors: Seq[Monitor]) {
+  private def testCompileWidgets(program: Program, buttons: Seq[Button], monitors: Seq[Monitor]): Unit = {
     val errors = ws.plotManager.compileAllPlots()
     if(errors.nonEmpty) throw errors(0)
 

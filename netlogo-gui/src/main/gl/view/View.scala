@@ -5,34 +5,43 @@ package org.nlogo.gl.view
 import com.jogamp.opengl.GLProfile
 import com.jogamp.opengl.awt.GLCanvas
 
-import org.nlogo.gl.render.Renderer
-import java.awt.image.BufferedImage
+import java.awt.Frame
 import java.awt.event.{ KeyEvent, KeyAdapter, MouseEvent }
+import java.awt.image.BufferedImage
+
+import org.nlogo.api.Version
+import org.nlogo.gl.render.Renderer
+import org.nlogo.swing.{ NetLogoIcon, Utils }
+import org.nlogo.theme.ThemeSync
+import org.nlogo.window.Event.LinkChild
 
 abstract class View(title: String, val viewManager: ViewManager, var renderer: Renderer)
-extends java.awt.Frame(title)
-with org.nlogo.window.Event.LinkChild {
+  extends Frame(title) with LinkChild with ThemeSync with NetLogoIcon {
 
   var canvas: GLCanvas = null
   val picker = new Picker(this)
 
-  if (org.nlogo.api.Version.is3D)
+  if (Version.is3D) {
     if (renderer == null) {
       renderer = new org.nlogo.gl.render.Renderer3D(
         viewManager.world, viewManager.graphicsSettings,
-        viewManager.workspace, viewManager)
+        viewManager.workspace, viewManager, Utils.getUIScale)
     } else {
       renderer.cleanUp()
       renderer = new org.nlogo.gl.render.Renderer3D(renderer)
     }
-  else if (renderer == null) {
-    renderer = new Renderer(
-      viewManager.world, viewManager.graphicsSettings,
-      viewManager.workspace, viewManager)
   }
+
   else {
-    renderer.cleanUp()
-    renderer = new org.nlogo.gl.render.Renderer(renderer)
+    if (renderer == null) {
+      renderer = new Renderer(
+        viewManager.world, viewManager.graphicsSettings,
+        viewManager.workspace, viewManager, Utils.getUIScale)
+    }
+    else {
+      renderer.cleanUp()
+      renderer = new org.nlogo.gl.render.Renderer(renderer)
+    }
   }
 
   val inputHandler = new MouseMotionHandler(this)
@@ -41,9 +50,9 @@ with org.nlogo.window.Event.LinkChild {
   add(canvas, java.awt.BorderLayout.CENTER)
   canvas.setCursor(new java.awt.Cursor(java.awt.Cursor.CROSSHAIR_CURSOR))
 
-  def updatePerspectiveLabel() { }
+  def updatePerspectiveLabel(): Unit = { }
 
-  def createCanvas(antiAliasing: Boolean) {
+  def createCanvas(antiAliasing: Boolean): Unit = {
     val capabilities = new com.jogamp.opengl.GLCapabilities(GLProfile.get(GLProfile.GL2))
     capabilities.setSampleBuffers(antiAliasing)
     capabilities.setNumSamples(4)
@@ -57,7 +66,7 @@ with org.nlogo.window.Event.LinkChild {
   }
 
   class KeyInputHandler extends KeyAdapter {
-    override def keyPressed(e: KeyEvent) {
+    override def keyPressed(e: KeyEvent): Unit = {
       if (e.getKeyCode == KeyEvent.VK_ESCAPE) {
         viewManager.setFullscreen(false)
       }
@@ -66,35 +75,31 @@ with org.nlogo.window.Event.LinkChild {
 
   override def getLinkParent = viewManager
 
-  def updateRenderer() {
+  def updateRenderer(): Unit = {
     renderer.update()
   }
 
-  def setVisible() {
+  def setVisible(): Unit = {
     super.setVisible(true)
     toFront()
     canvas.requestFocus()
   }
 
-  def display() {
+  def display(): Unit = {
     canvas.display()
   }
 
-  def invalidateTurtleShape(shape: String) {
+  def invalidateTurtleShape(shape: String): Unit = {
     renderer.invalidateTurtleShape(shape)
   }
 
-  def invalidateLinkShape(shape: String) {
+  def invalidateLinkShape(shape: String): Unit = {
     renderer.invalidateLinkShape(shape)
   }
 
-  def signalViewUpdate() {
-    canvas.repaint()
-  }
-
-  def resetPerspective() {
+  def resetPerspective(): Unit = {
     viewManager.world.observer.resetPerspective()
-    signalViewUpdate()
+    display()
     updatePerspectiveLabel()
   }
 
@@ -118,7 +123,7 @@ with org.nlogo.window.Event.LinkChild {
     true
   }
 
-  def doPopup(e: MouseEvent) {
+  def doPopup(e: MouseEvent): Unit = {
     renderer.queuePick(e.getPoint, picker)
     e.consume()
   }

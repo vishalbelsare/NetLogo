@@ -11,37 +11,47 @@ object Depend {
 
   lazy val dependTask =
     depend := {
-      val _ = (compile in Test).value
+      val _ = (Test / compile).value
       val s = streams.value
-      val classes = (classDirectory in Compile).value.toString
-      val testClasses = (classDirectory in Test).value.toString
+      val classes = (Compile / classDirectory).value.toString
+      val testClasses = (Test / classDirectory).value.toString
       val ddfFile = baseDirectory.value / "tmp" / "depend.ddf"
       IO.write(ddfFile, ddfContents)
-      import classycle.dependency.DependencyChecker
-      def main() = TrapExit(
-        DependencyChecker.main(Array("-dependencies=@" + ddfFile.getPath,
-                                     classes)),
-        s.log)
-      def test() = TrapExit(
-        DependencyChecker.main(Array("-dependencies=@" + ddfFile.getPath,
-                                     testClasses)),
-        s.log)
-      main() match {
-        case 0 => test() match { case 0 => ; case fail => sys.error(fail.toString) }
-        case fail => sys.error(fail.toString)
+      import classycle.Analyser
+      import classycle.dependency.{ DefaultResultRenderer, DependencyChecker }
+      import java.io.{ PrintWriter, StringWriter }
+      import java.lang.Object
+      import java.util.HashMap
+      import scala.io.Source
+      // if the output goes straight to System.out, it sometimes doesn't print everything,
+      // so you can't tell what went wrong (Isaac B 2/25/25)
+      val writer = new StringWriter
+      def main(): Boolean = {
+        new DependencyChecker(new Analyser(Array(classes)), Source.fromFile(ddfFile).getLines.mkString("\n"),
+                              new HashMap[Object, Object],
+                              new DefaultResultRenderer()).check(new PrintWriter(writer))
       }
+      def test(): Boolean = {
+        new DependencyChecker(new Analyser(Array(testClasses)), Source.fromFile(ddfFile).getLines.mkString("\n"),
+                              new HashMap[Object, Object],
+                              new DefaultResultRenderer()).check(new PrintWriter(writer))
+      }
+      val result = main()
+      if (writer.toString.nonEmpty)
+        println(writer.toString)
+      assert(result)
     }
 
   private def ddfContents: String = {
     val buf = new StringBuilder
-    def println(s: String) { buf ++= s + "\n" }
+    def println(s: String): Unit = { buf ++= s + "\n" }
 
     // this needs to be manually kept in sync with dist/depend.graffle
     val packageDefs = Map(
       "" -> Nil,
       "agent" -> List("api", "log"),
       "api" -> List("core", "core/model", "core/prim", "util"),
-      "app" -> List("app/codetab", "app/common", "app/infotab", "app/interfacetab", "app/tools", "log"),
+      "app" -> List("app/codetab", "app/common", "app/infotab", "app/interfacetab", "app/tools", "headless", "log"),
       "app/codetab" -> List("app/common"),
       "app/infotab" -> List("app/common"),
       "app/interfacetab" -> List("app/common", "app/tools", "log"),
@@ -59,7 +69,7 @@ object Depend {
       "core/prim" -> List("core"),
       "core/model" -> List("core"),
       "drawing" -> List("api"),
-      "editor" -> List("core"),
+      "editor" -> List("core", "swing"),
       "generate" -> List("prim", "prim/dead", "prim/threed"),
       "generate" -> List("prim"), // for headless
       "gl/render" -> List("shape"),
@@ -67,7 +77,7 @@ object Depend {
       "headless" -> List("core/model", "drawing", "fileformat", "shape", "workspace", "headless/test"),
       "headless/hubnet" -> List("headless", "hubnet/protocol"),
       "headless/test" -> List("api", "core"),
-      "hubnet/client" -> List("hubnet/connection", "hubnet/mirroring", "hubnet/protocol", "render", "fileformat", "widget"),
+      "hubnet/client" -> List("hubnet/connection", "hubnet/mirroring", "hubnet/protocol", "render", "fileformat", "window"),
       "hubnet/connection" -> List("api"),
       "hubnet/mirroring" -> List("api"),
       "hubnet/protocol" -> List("api"),
@@ -92,16 +102,15 @@ object Depend {
       "prim/hubnet" -> List("nvm"),
       "prim/plot" -> List("nvm", "plot"),
       "prim/threed" -> List("nvm"),
-      "properties" -> List("window"),
       "render" -> List("shape"),
       "fileformat" -> List("api", "core", "core/model"),
       "sdm" -> List("api", "fileformat"),
       "sdm/gui" -> List("sdm", "window"),
-      "shape" -> List("api"),
+      "shape" -> List("api", "theme"),
       "shape/editor" -> List("shape", "swing"),
-      "swing" -> List("awt", "core"),
+      "swing" -> List("awt", "core", "theme"),
       "util" -> Nil,
-      "widget" -> List("window"),
+      "theme" -> List("api"),
       "window" -> List("core/model", "editor", "fileformat", "log", "shape", "swing", "workspace"),
       "workspace" -> List("fileformat", "nvm", "plot"))
     case class Package(val dir: String, var depends: Set[Package]) {
@@ -110,7 +119,7 @@ object Depend {
     val allPackages: Set[Package] = Set() ++ packageDefs.keys.map(Package(_,Set()))
     for(p <- allPackages)
       p.depends = allPackages.filter(p2 => packageDefs(p.dir).contains(p2.dir))
-    def generate(p: Package) {
+    def generate(p: Package): Unit = {
       val name = p.dir.replaceAll("/",".")
       println(s"[$name] = org.nlogo.$name.* excluding org.nlogo.$name.*.*")
       println(s"[$name+] = [$name]" + p.depends.map(p2 => "[" + p2.dir.replaceAll("/",".") + "+]").mkString(" "," ",""))
@@ -118,7 +127,7 @@ object Depend {
       println(s"check [$name] independentOf [$name-]")
       println("")
     }
-    def generateFooter() {
+    def generateFooter(): Unit = {
       println("""
 ### HubNet client dependencies
 

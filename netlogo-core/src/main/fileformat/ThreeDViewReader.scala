@@ -2,8 +2,7 @@
 
 package org.nlogo.fileformat
 
-import org.nlogo.api.WorldDimensions3D
-import org.nlogo.core.{ UpdateMode, View }
+import org.nlogo.core.{ UpdateMode, View, WorldDimensions3D }
 import org.nlogo.core.model.WidgetReader
 
 import org.parboiled2._
@@ -37,7 +36,7 @@ object ThreeDViewReader extends WidgetReader with BaseWidgetParser with ConstWid
     def dimensionTransform[B <: WorldDimensions3D](f: WorldDimensions3D => WorldDimensions3D)(v: View): View = {
       v.dimensions match {
         case w: WorldDimensions3D => v.copy(dimensions = f(w))
-        case _ => throw new Exception("Error parsing 3D view!")
+        case _ => throw new IllegalStateException
       }
     }
 
@@ -87,7 +86,7 @@ object ThreeDViewReader extends WidgetReader with BaseWidgetParser with ConstWid
 
     def ViewDimensions: Rule1[View => View] = rule {
       4.times(IntValue ~ NewLine) ~> ((dims: Seq[Int]) =>
-          ((v: View) => v.copy(left = dims(0), top = dims(1), right = dims(2), bottom = dims(3))))
+          ((v: View) => v.copy(x = dims(0), y = dims(1), width = dims(2) - dims(0), height = dims(3) - dims(1))))
     }
 
     def WrappingInXAndY: Rule1[View => View] = rule {
@@ -123,10 +122,10 @@ object ThreeDViewReader extends WidgetReader with BaseWidgetParser with ConstWid
     val dimensions = t.dimensions.asInstanceOf[WorldDimensions3D]
     Seq(
       "GRAPHICS-WINDOW",
-      t.left.toString,
-      t.top.toString,
-      t.right.toString,
-      t.bottom.toString,
+      t.x.toString,
+      t.y.toString,
+      (t.x + t.width).toString,
+      (t.y + t.height).toString,
       "-1",
       "-1",
       dimensions.patchSize.toString,
@@ -149,6 +148,6 @@ object ThreeDViewReader extends WidgetReader with BaseWidgetParser with ConstWid
       t.updateMode.save.toString,
       if (t.showTickCounter) "1" else "0",
       t.tickCounterLabel.getOrElse("NIL"),
-      t.frameRate).mkString("", "\n", "\n")
+      t.frameRate.toString).mkString("", "\n", "\n")
   }
 }

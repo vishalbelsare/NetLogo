@@ -2,8 +2,7 @@
 
 package org.nlogo.lab
 
-import org.nlogo.api.LabProtocol
-import org.nlogo.api.LogoException
+import org.nlogo.api.{LogoException, LabProtocol, LabPostProcessorInputFormat}
 import org.nlogo.nvm.{EngineException,LabInterface,Workspace}
 
 // This is used when running headless. - ST 3/3/09
@@ -11,10 +10,10 @@ import org.nlogo.nvm.{EngineException,LabInterface,Workspace}
 class Lab extends LabInterface {
   def newWorker(protocol: LabProtocol) =
     new Worker(protocol)
-  def run(settings: LabInterface.Settings, protocol: LabProtocol, fn: ()=>Workspace) {
+  def run(settings: LabInterface.Settings, protocol: LabProtocol, fn: ()=>Workspace, finish: () => Unit = () => {}): Unit = {
     import settings._
     // pool of workspaces, same size as thread pool
-    val workspaces = (1 to threads).map(_ => fn.apply).toList
+    val workspaces = (1 to threads).map(_ => fn.apply()).toList
     val queue = new collection.mutable.Queue[Workspace]
     workspaces.foreach(queue.enqueue(_))
     try {
@@ -25,12 +24,30 @@ class Lab extends LabInterface {
         worker.addTableWriter(modelPath, dims.getOrElse(modelDims), _))
       spreadsheetWriter.foreach(
         worker.addSpreadsheetWriter(modelPath, dims.getOrElse(modelDims), _))
+      statsWriter.foreach(x =>
+        worker.addStatsWriter(modelPath, dims.getOrElse(modelDims), x._1,
+          {
+            if (tableWriter != None) LabPostProcessorInputFormat.Table(x._2)
+            else LabPostProcessorInputFormat.Spreadsheet(x._2)
+          }
+        )
+      )
+      if (tableWriter.isDefined) {
+        listsWriter.foreach(x =>
+          worker.addListsWriter(modelPath, dims.getOrElse(modelDims), x._1,
+          LabPostProcessorInputFormat.Table(x._2)))
+      }
+      else {
+        listsWriter.foreach(x =>
+          worker.addListsWriter(modelPath, dims.getOrElse(modelDims), x._1,
+          LabPostProcessorInputFormat.Spreadsheet(x._2)))
+      }
       worker.addListener(
         new LabInterface.ProgressListener {
-          override def runCompleted(w: Workspace, runNumber: Int, step: Int) {
+          override def runCompleted(w: Workspace, runNumber: Int, step: Int): Unit = {
             queue.synchronized { queue.enqueue(w) }
           }
-          override def runtimeError(w: Workspace, runNumber: Int, t: Throwable) {
+          override def runtimeError(w: Workspace, runNumber: Int, t: Throwable): Unit = {
             if (!suppressErrors)
               t match {
                 case ee: EngineException =>
@@ -46,7 +63,7 @@ class Lab extends LabInterface {
               }
           } } )
       def nextWorkspace = queue.synchronized { queue.dequeue() }
-      worker.run(workspaces.head, nextWorkspace _, threads)
+      worker.run(workspaces.head, () => nextWorkspace, threads, finish)
     }
     finally { workspaces.foreach(_.dispose()) }
   }

@@ -6,7 +6,7 @@ import org.nlogo.core.{ AgentKind, SourceWrapping }
 import org.nlogo.api.{JobOwner, ReporterLogoThunk, CommandLogoThunk}
 import org.nlogo.agent.{Agent, AgentSet}
 import org.nlogo.nvm.{ ExclusiveJob, Activation, CompilerFlags,
-                       Context, ImportHandler, Procedure, Reporter }
+                       Context, ImportHandler, Procedure }
 
 import scala.util.Try
 
@@ -16,7 +16,7 @@ class Evaluator(workspace: AbstractWorkspace) {
                        source: String,
                        agentSet: AgentSet = workspace.world.observers,
                        waitForCompletion: Boolean = true,
-                       flags: CompilerFlags = workspace.flags) {
+                       flags: CompilerFlags = workspace.flags): Unit = {
     val procedure = invokeCompiler(source, None, true, agentSet.kind, flags)
     workspace.jobManager.addJob(
       workspace.jobManager.makeConcurrentJob(owner, agentSet, workspace, procedure),
@@ -58,24 +58,22 @@ class Evaluator(workspace: AbstractWorkspace) {
 
   ///
 
-  def withContext(context: Context)(f: => Unit) {
+  def withContext(context: Context)(f: => Unit): Unit = {
     val oldContext = ProcedureRunner.context
     ProcedureRunner.context = context
     try f
     finally ProcedureRunner.context = oldContext
   }
 
-  object ProcedureRunner {
-    private[Evaluator] var context: Context = null
-    def hasContext = context != null
-    def report(reporter: Reporter, a: Agent = workspace.world.observer) =
-      context.evaluateReporter(a, reporter)
-    def run(p: Procedure): Try[Boolean] = {
+  private object ProcedureRunner {
+    var context: Context = null
+
+    def run(p: Procedure, owner: JobOwner): Try[Boolean] = {
       val oldActivation = context.activation
       val newActivation = new Activation(p, context.activation, 1)
       val oldRandom = context.job.random
       context.activation = newActivation
-      context.job.random = workspace.world.mainRNG.clone
+      context.job.random = owner.random
       val procedureResult = Try {
         context.runExclusiveJob(workspace.world.observers, 0)
         !workspace.completedActivations.getOrElse(newActivation, false)
@@ -84,6 +82,7 @@ class Evaluator(workspace: AbstractWorkspace) {
       context.job.random = oldRandom
       procedureResult
     }
+
   }
 
   // At present (October 2012) this is only used in the slider constraint code, which has been known
@@ -126,7 +125,7 @@ class Evaluator(workspace: AbstractWorkspace) {
       val fullSource = source + "\n__thunk-did-finish"
       val proc = invokeCompiler(fullSource, Some(owner.displayName), true, agent.kind)
       new MyLogoThunk(fullSource, agent, owner, true, proc) with CommandLogoThunk {
-        def call(): Try[Boolean] = ProcedureRunner.run(procedure)
+        def call(): Try[Boolean] = ProcedureRunner.run(procedure, owner)
       }
     }
 

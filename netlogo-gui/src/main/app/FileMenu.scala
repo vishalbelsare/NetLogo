@@ -10,14 +10,15 @@ import org.nlogo.swing.{ Menu => SwingMenu, UserAction }
 object FileMenu {
   val ExportImportGroup = "ExportImportGroup"
 
-  def sortOrder = Seq(UserAction.FileOpenGroup, UserAction.FileSaveGroup, UserAction.FileShareGroup, ExportImportGroup)
+  def sortOrder = Seq(UserAction.FileOpenGroup, UserAction.FileSaveGroup, UserAction.FileShareGroup,
+                      UserAction.FileResourcesGroup, ExportImportGroup)
 }
 
 import FileMenu._
 
 class FileMenu extends SwingMenu(I18N.gui.get("menu.file"), SwingMenu.model(sortOrder)) {
 
-  implicit val i18nPrefix = I18N.Prefix("menu.file")
+  implicit val i18nPrefix: org.nlogo.core.I18N.Prefix = I18N.Prefix("menu.file")
 
   setMnemonic('F')
 

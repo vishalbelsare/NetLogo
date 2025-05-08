@@ -3,7 +3,7 @@
 package org.nlogo.hubnet.server
 
 import org.nlogo.api.ConfigurableModelLoader
-import org.nlogo.fileformat.{ defaultConverter, NLogoFormat, NLogoHubNetFormat }
+import org.nlogo.fileformat.{ FileFormat, NLogoFormat, NLogoHubNetFormat }
 import org.nlogo.hubnet.connection.HubNetException
 import org.nlogo.workspace.DummyAbstractWorkspace
 import org.scalatest.funsuite.AnyFunSuite
@@ -61,13 +61,13 @@ class HubNetManagerTests extends AnyFunSuite {
     testValidTag(m, cm)(validTag=false, useSend=true, clientsExist=false)
   }
 
-  def hubnetTest(name: String)(f: (HubNetManager, MockConnectionManager) => Unit) {
+  def hubnetTest(name: String)(f: (HubNetManager, MockConnectionManager) => Unit): Unit = {
     test(name){
       val workspace = new DummyAbstractWorkspace
       val loader = new ConfigurableModelLoader()
         .addFormat[Array[String], NLogoFormat](new NLogoFormat)
         .addSerializer[Array[String], NLogoFormat](new NLogoHubNetFormat(workspace))
-      val manager = new HeadlessHubNetManager(workspace, loader, defaultConverter) {
+      val manager = new HeadlessHubNetManager(workspace, loader, FileFormat.defaultConverter) {
         override val connectionManager = new MockConnectionManager(this, workspace)
       }
       manager.reset()
@@ -76,13 +76,13 @@ class HubNetManagerTests extends AnyFunSuite {
     }
   }
   def testBroadcastValidTag(manager: HubNetManager, connectionManager: MockConnectionManager)
-                           (validTag: Boolean, useSend: Boolean) {
+                           (validTag: Boolean, useSend: Boolean): Unit = {
     // broadcasts always attempt to send the message to all the clients,
     // so clientExist should be true for all broadcasts
     testValidTag(manager, connectionManager)(validTag, useSend, true)
   }
   def testValidTag(manager: HubNetManager, connectionManager: MockConnectionManager)
-                  (validTag: Boolean, useSend: Boolean, clientsExist: Boolean) {
+                  (validTag: Boolean, useSend: Boolean, clientsExist: Boolean): Unit = {
     connectionManager.validTag=validTag
     try {
       if(useSend) manager.send(if(clientsExist) List("foo") else List(), "fish", "bar")

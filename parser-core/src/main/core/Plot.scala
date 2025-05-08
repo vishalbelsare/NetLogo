@@ -3,11 +3,12 @@
 package org.nlogo.core
 
 case class Plot(display: Option[String],
-  left: Int = 0, top: Int = 0, right: Int = 5, bottom: Int = 5,
+  x: Int = 0, y: Int = 0, width: Int = 5, height: Int = 5,
+  oldSize: Boolean = false,
   xAxis: Option[String] = None, yAxis: Option[String] = None,
   xmin: Double = 0, xmax: Double = 0,
   ymin: Double = 0, ymax: Double = 0,
-  autoPlotOn: Boolean = true, legendOn: Boolean = false,
+  autoPlotX: Boolean = true, autoPlotY: Boolean = true, legendOn: Boolean = false,
   setupCode: String = "", updateCode: String = "",
   pens: List[Pen] = Nil) extends Widget {
     override def convertSource(conversion: String => String): Plot =

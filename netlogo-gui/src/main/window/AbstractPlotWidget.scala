@@ -2,18 +2,15 @@
 
 package org.nlogo.window
 
-import javax.swing.JLabel
-import java.awt.{ Dimension, Font, Graphics, Insets, GridBagConstraints, GridBagLayout }
-
-import org.nlogo.api.Editable
-import org.nlogo.core.I18N
-import org.nlogo.core.{ Pen => CorePen, Plot => CorePlot }
-import org.nlogo.plot.{PlotManagerInterface, PlotLoader, PlotPen, Plot}
-import org.nlogo.swing.VTextIcon
-
-import java.awt.GridBagConstraints.REMAINDER
+import java.awt.{ Color, Dimension, Font, Graphics, GridBagConstraints, GridBagLayout, Insets }
 import java.awt.image.BufferedImage
-import org.nlogo.window.Events.{WidgetRemovedEvent, AfterLoadEvent}
+import javax.swing.{ JLabel, JPanel, SwingConstants }
+
+import org.nlogo.core.{ I18N, Pen => CorePen, Plot => CorePlot, Widget => CoreWidget }
+import org.nlogo.plot.{ PlotManagerInterface, PlotLoader, PlotPen, Plot }
+import org.nlogo.swing.{ RoundedBorderPanel, VTextIcon }
+import org.nlogo.theme.{ InterfaceColors, ThemeSync }
+import org.nlogo.window.Events.{ WidgetRemovedEvent, AfterLoadEvent, WidgetErrorEvent }
 
 abstract class AbstractPlotWidget(val plot:Plot, val plotManager: PlotManagerInterface)
         extends Widget with Editable with Plot.DirtyListener with
@@ -21,118 +18,138 @@ abstract class AbstractPlotWidget(val plot:Plot, val plotManager: PlotManagerInt
                 org.nlogo.window.Events.WidgetRemovedEvent.Handler with
                 org.nlogo.window.Events.CompiledEvent.Handler {
 
-  type WidgetModel = CorePlot
-
   import AbstractPlotWidget._
+
+  private class CanvasPanel(canvas: PlotCanvas) extends JPanel with RoundedBorderPanel with ThemeSync {
+    setLayout(new GridBagLayout)
+
+    locally {
+      val c = new GridBagConstraints
+
+      c.weightx = 1
+      c.weighty = 1
+      c.fill = GridBagConstraints.BOTH
+      c.insets = new Insets(zoom(3), zoom(3), zoom(3), zoom(3))
+
+      add(canvas, c)
+    }
+
+    override def paintComponent(g: Graphics): Unit = {
+      setDiameter(zoom(6))
+
+      super.paintComponent(g)
+    }
+
+    override def syncTheme(): Unit = {
+      setBackgroundColor(Color.WHITE)
+      setBorderColor(InterfaceColors.plotBorder())
+    }
+  }
 
   private var fullyConstructed = false
   plot.dirtyListener = Some(this)
   val canvas = new PlotCanvas(plot)
-  private val legend = new PlotLegend(plot, this)
-  private val nameLabel = new JLabel("", javax.swing.SwingConstants.CENTER)
-  private val xAxis = new XAxisLabels()
-  private val yAxis = new YAxisLabels()
+  private val canvasPanel = new CanvasPanel(canvas)
+  private val legend = new PlotLegend(this, boldName)
+  private val nameLabel = new JLabel(I18N.gui.get("edit.plot.previewName"))
+  private val xAxis = new XAxisLabels(this)
+  private val yAxis = new YAxisLabels(this)
 
-  locally {
-    displayName = plot.name
+  if (boldName)
+    nameLabel.setFont(nameLabel.getFont.deriveFont(Font.BOLD))
 
-    setBorder(widgetBorder)
-    setOpaque(true)
-    // this is needed because the PlotLegend is going to use us to
-    // get a font - ST 9/2/04
-    // since the PlotLegend is added and removed from the widget
-    // when it is shown or hidden, the usual way of just letting Zoomer
-    // zoom the font size won't work, hence the fontSource stuff in
-    // PlotLegend - ST 2/22/06
-    org.nlogo.awt.Fonts.adjustDefaultFont(this)
+  displayName = plot.name
 
-    setBackground(InterfaceColors.PLOT_BACKGROUND)
-    plot.clear() // set current values to defaults
+  plot.clear() // set current values to defaults
 
-    val gridbag = new java.awt.GridBagLayout()
-    setLayout(gridbag)
+  setLayout(new GridBagLayout)
 
-    val c = new java.awt.GridBagConstraints()
-    c.gridwidth = 1
-    c.gridheight = 1
-    c.weightx = 0.0
-    c.weighty = 0.0
-    c.fill = java.awt.GridBagConstraints.NONE
+  initGUI()
+
+  override def initGUI(): Unit = {
+    removeAll()
+
+    val c = new GridBagConstraints
 
     //ROW1
     //-----------------------------------------
-    c.insets = new java.awt.Insets(0, 1, 1, 1)
+    c.insets = {
+      if (_oldSize) {
+        new Insets(zoom(3), zoom(6), zoom(6), zoom(6))
+      } else {
+        new Insets(zoom(8), zoom(10), zoom(8), zoom(10))
+      }
+    }
 
-    c.gridx = 1
+    c.gridx = 0
     c.gridy = 0
-    c.gridwidth = 1
-    c.anchor = java.awt.GridBagConstraints.CENTER
-    c.fill = java.awt.GridBagConstraints.HORIZONTAL
-    gridbag.setConstraints(nameLabel, c)
-    add(nameLabel)
-    org.nlogo.awt.Fonts.adjustDefaultFont(nameLabel)
-    nameLabel.setFont(nameLabel.getFont().deriveFont(java.awt.Font.BOLD))
+    c.gridwidth = GridBagConstraints.REMAINDER
+    c.anchor = GridBagConstraints.CENTER
+
+    add(nameLabel, c)
+
     nameLabel.setText(plot.name)
 
     //ROW2
     //-----------------------------------------
-    c.insets = new java.awt.Insets(0, 1, 0, 1)
+    c.insets = new Insets(0, zoom(3), zoom(3), zoom(3))
 
-    c.gridx = java.awt.GridBagConstraints.RELATIVE
+    c.gridx = GridBagConstraints.RELATIVE
     c.gridy = 1
     c.gridwidth = 1
-    c.gridheight = java.awt.GridBagConstraints.RELATIVE
+    c.gridheight = 1
     c.weighty = 3.0
-    c.anchor = java.awt.GridBagConstraints.WEST
-    c.fill = java.awt.GridBagConstraints.VERTICAL
-    gridbag.setConstraints(yAxis, c)
-    add(yAxis);
+    c.anchor = GridBagConstraints.WEST
+    c.fill = GridBagConstraints.VERTICAL
 
-    c.gridwidth = java.awt.GridBagConstraints.RELATIVE
+    add(yAxis, c)
+
+    c.gridwidth = GridBagConstraints.RELATIVE
     c.weightx = 3.0
-    c.anchor = java.awt.GridBagConstraints.CENTER
-    c.fill = java.awt.GridBagConstraints.BOTH
-    gridbag.setConstraints(canvas, c)
-    add(canvas)
+    c.anchor = GridBagConstraints.CENTER
+    c.fill = GridBagConstraints.BOTH
 
-    c.gridwidth = REMAINDER
-    c.weightx = 0.0
-    c.anchor = java.awt.GridBagConstraints.NORTH
-    c.fill = java.awt.GridBagConstraints.NONE
-    c.insets = new java.awt.Insets(0, 3, 0, 1)
-    gridbag.setConstraints(legend, c)
-    add(legend)
+    add(canvasPanel, c)
 
     //ROW3
     //-----------------------------------------
-    c.insets = new java.awt.Insets(0, 0, 0, 0)
+    c.insets = new Insets(0, zoom(3), zoom(3), zoom(3))
     c.gridy = 2
 
-    val filler2 = new javax.swing.JLabel()
+    c.weightx = 0.0
+    c.weighty = 0.0
+    c.gridwidth = 1
+    c.anchor = GridBagConstraints.WEST
+    c.fill = GridBagConstraints.NONE
+
+    add(new JLabel, c)
+
+    c.gridwidth = GridBagConstraints.RELATIVE
+    c.anchor = GridBagConstraints.CENTER
+    c.fill = GridBagConstraints.HORIZONTAL
+
+    add(xAxis, c)
+
     c.weightx = 0.0
     c.weighty = 0.0
     c.gridwidth = 1
     c.gridheight = 1
-    c.anchor = java.awt.GridBagConstraints.WEST
-    c.fill = java.awt.GridBagConstraints.NONE
-    gridbag.setConstraints(filler2, c)
-    add(filler2)
+    c.anchor = GridBagConstraints.EAST
+    c.fill = GridBagConstraints.NONE
 
-    c.gridwidth = java.awt.GridBagConstraints.RELATIVE
-    c.anchor = java.awt.GridBagConstraints.CENTER
-    c.fill = java.awt.GridBagConstraints.HORIZONTAL
-    gridbag.setConstraints(xAxis, c)
-    add(xAxis)
+    add(new JLabel, c)
 
-    val filler3 = new javax.swing.JLabel()
-    c.weightx = 0.0
-    c.weighty = 0.0
-    c.gridwidth = 1
-    c.gridheight = 1
-    c.anchor = java.awt.GridBagConstraints.EAST
-    c.fill = java.awt.GridBagConstraints.NONE
-    gridbag.setConstraints(filler3, c)
-    add(filler3)
+    //ROW4
+    //-----------------------------------------
+
+    c.gridx = 0
+    c.gridy = 3
+    c.gridwidth = GridBagConstraints.REMAINDER
+    c.weightx = 1
+    c.anchor = GridBagConstraints.CENTER
+    c.insets = new Insets(zoom(2), zoom(10), zoom(8), zoom(10))
+
+    add(legend, c)
 
     // make sure to update the gui components in case
     // something changed underneath ev 8/26/08
@@ -140,12 +157,16 @@ abstract class AbstractPlotWidget(val plot:Plot, val plotManager: PlotManagerInt
   }
 
   override def paintComponent(g: Graphics) = {
+    setBackgroundColor(InterfaceColors.plotBackground())
+
+    recolor()
+
     super.paintComponent(g)
     nameLabel.setToolTipText(
       if (nameLabel.getPreferredSize.width > nameLabel.getSize().width) plotName else null)
   }
 
-  def refreshGUI() {
+  def refreshGUI(): Unit = {
     def getLabel(d:Double) = if(d.toString.endsWith(".0")) d.toString.dropRight(2) else d.toString
     xAxis.setMin(getLabel(plot.xMin))
     xAxis.setMax(getLabel(plot.xMax))
@@ -159,36 +180,34 @@ abstract class AbstractPlotWidget(val plot:Plot, val plotManager: PlotManagerInt
 
   /// satisfy the usual obligations of top-level widgets
   override def classDisplayName = I18N.gui.get("tabs.run.widgets.plot")
-  override def needsPreferredWidthFudgeFactor = false
-  override def zoomSubcomponents = true
-  def makeDirty(){
+  def makeDirty(): Unit ={
     // yuck! plot calls makeDirty when its being constructed.
     // but canvas isnt created yet.
     if(fullyConstructed) canvas.makeDirty()
   }
   override def helpLink = Some("programming.html#plotting")
-  def propertySet = Properties.plot
+
   def showLegend = legend.open
-  def showLegend(open: Boolean){ legend.open=open }
+  def setShowLegend(open: Boolean): Unit = { legend.open = open }
 
   def runtimeError: Option[Exception] = plot.runtimeError
-  def runtimeError(e: Option[Exception]): Unit = {
+  def setRuntimeError(e: Option[Exception]): Unit = {
     plot.runtimeError = e
   }
 
   /// some stuff relating to plot pen editing
   def editPlotPens: List[PlotPen] = plot.pens
-  def editPlotPens(pens: List[PlotPen]){
+  def setEditPlotPens(pens: List[PlotPen]): Unit = {
     if(! (plot.pens eq pens)) plot.pens = pens
   }
 
   ///
-  def togglePenList(){ legend.toggle }
-  def clear(){ plot.clear; legend.refresh }
+  def togglePenList(): Unit ={ legend.toggle() }
+  def clear(): Unit ={ plot.clear(); legend.refresh() }
 
   /// these exist to support editing
   def plotName = plot.name
-  def plotName(name: String){
+  def setPlotName(name: String): Unit = {
     plot.name(name)
     displayName = plot.name
     nameLabel.setText(name)
@@ -196,45 +215,51 @@ abstract class AbstractPlotWidget(val plot:Plot, val plotManager: PlotManagerInt
 
   private var _xAxisLabel: String = ""
   def xLabel = xAxis.getLabel
-  def xLabel(label: String){
+  def setXLabel(label: String): Unit = {
     _xAxisLabel = label
     xAxis.setLabel(_xAxisLabel)
   }
 
   private var _yAxisLabel: String = ""
   def yLabel = yAxis.getLabel
-  def yLabel(label: String){
+  def setYLabel(label: String): Unit = {
     _yAxisLabel = label
     yAxis.setLabel(_yAxisLabel)
   }
 
   def setupCode = plot.setupCode
-  def setupCode(setupCode: String){ plot.setupCode=setupCode }
+  def setSetupCode(setupCode: String): Unit = { plot.setupCode=setupCode }
 
   def updateCode = plot.updateCode
-  def updateCode(updateCode: String){ plot.updateCode=updateCode }
+  def setUpdateCode(updateCode: String): Unit = { plot.updateCode=updateCode }
 
   def defaultXMin = plot.defaultXMin
-  def defaultXMin(defaultXMin: Double){ plot.defaultXMin=defaultXMin }
+  def setDefaultXMin(defaultXMin: Double): Unit = { plot.defaultXMin=defaultXMin }
 
   def defaultYMin = plot.defaultYMin
-  def defaultYMin(defaultYMin: Double){ plot.defaultYMin=defaultYMin }
+  def setDefaultYMin(defaultYMin: Double): Unit = { plot.defaultYMin=defaultYMin }
 
   def defaultXMax = plot.defaultXMax
-  def defaultXMax(defaultXMax: Double){ plot.defaultXMax=defaultXMax }
+  def setDefaultXMax(defaultXMax: Double): Unit = { plot.defaultXMax=defaultXMax }
 
   def defaultYMax = plot.defaultYMax
-  def defaultYMax(defaultYMax: Double){ plot.defaultYMax=defaultYMax }
+  def setDefaultYMax(defaultYMax: Double): Unit = { plot.defaultYMax=defaultYMax }
 
-  def defaultAutoPlotOn = plot.defaultAutoPlotOn
-  def defaultAutoPlotOn(defaultAutoPlotOn: Boolean){ plot.defaultAutoPlotOn=defaultAutoPlotOn }
+  def defaultAutoPlotX = plot.defaultAutoPlotX
+  def setDefaultAutoPlotX(defaultAutoPlotX: Boolean): Unit = { plot.defaultAutoPlotX = defaultAutoPlotX }
+
+  def defaultAutoPlotY = plot.defaultAutoPlotY
+  def setDefaultAutoPlotY(defaultAutoPlotY: Boolean): Unit = { plot.defaultAutoPlotY = defaultAutoPlotY }
 
   /// sizing
   override def getMinimumSize = AbstractPlotWidget.MIN_SIZE
-  override def getPreferredSize(font: Font) = AbstractPlotWidget.PREF_SIZE
-  override def getMaximumSize: Dimension = null
+  override def getPreferredSize = AbstractPlotWidget.PREF_SIZE
 
-  def savePens(s: StringBuilder){
+  override def syncTheme(): Unit = {
+    canvasPanel.syncTheme()
+  }
+
+  def savePens(s: StringBuilder): Unit ={
     import org.nlogo.api.StringUtils.escapeString
     for (pen <- plot.pens; if (!pen.temporary)) {
       s.append("\"" + escapeString(pen.name) + "\" " +
@@ -243,19 +268,24 @@ abstract class AbstractPlotWidget(val plot:Plot, val plotManager: PlotManagerInt
     }
   }
 
-  override def load(corePlot: WidgetModel): Object = {
-    setSize(corePlot.right - corePlot.left, corePlot.bottom - corePlot.top)
-    xLabel(corePlot.xAxis.optionToPotentiallyEmptyString)
-    yLabel(corePlot.yAxis.optionToPotentiallyEmptyString)
-    legend.open = corePlot.legendOn
-    PlotLoader.loadPlot(corePlot, plot)
-    plotName(plot.name)
-    clear()
-    this
+  override def load(model: CoreWidget): Unit = {
+    model match {
+      case corePlot: CorePlot =>
+        oldSize(corePlot.oldSize)
+        setSize(corePlot.width, corePlot.height)
+        setXLabel(corePlot.xAxis.optionToPotentiallyEmptyString)
+        setYLabel(corePlot.yAxis.optionToPotentiallyEmptyString)
+        legend.open = corePlot.legendOn
+        PlotLoader.loadPlot(corePlot, plot)
+        setPlotName(plot.name)
+        clear()
+
+      case _ =>
+    }
   }
 
-  override def model: WidgetModel = {
-    val b = getBoundsTuple
+  override def model: CoreWidget = {
+    val b = getUnzoomedBounds
 
     val displayName = plotName.potentiallyEmptyStringToOption
     val savedXLabel = xLabel.potentiallyEmptyStringToOption
@@ -268,11 +298,12 @@ abstract class AbstractPlotWidget(val plot:Plot, val plotManager: PlotManagerInt
           pen.setupCode, pen.updateCode)
 
     CorePlot(displayName,
-      left = b._1, top = b._2, right = b._3, bottom = b._4,
+      x = b.x, y = b.y, width = b.width, height = b.height,
+      oldSize = _oldSize,
       xAxis = savedXLabel, yAxis = savedYLabel,
       xmin = plot.defaultXMin, xmax = plot.defaultXMax,
       ymin = plot.defaultYMin, ymax = plot.defaultYMax,
-      autoPlotOn = plot.defaultAutoPlotOn, legendOn = legend.open,
+      autoPlotX = plot.defaultAutoPlotX, autoPlotY = plot.defaultAutoPlotY, legendOn = legend.open,
       setupCode = plot.setupCode, updateCode = plot.updateCode,
       pens = pens.toList)
   }
@@ -284,18 +315,25 @@ abstract class AbstractPlotWidget(val plot:Plot, val plotManager: PlotManagerInt
     image
   }
 
-  protected def recolor() {
-    nameLabel.setForeground(if(anyErrors) java.awt.Color.RED else java.awt.Color.BLACK)
+  protected def recolor(): Unit = {
+    nameLabel.setForeground(if (anyErrors) InterfaceColors.widgetTextError() else InterfaceColors.widgetText())
+
+    if (error("setupCode").isDefined)
+      new WidgetErrorEvent(this, error("setupCode")).raise(this)
+    else if (error("updateCode").isDefined)
+      new WidgetErrorEvent(this, error("updateCode")).raise(this)
+    else
+      new WidgetErrorEvent(this, None).raise(this)
   }
 
-  def handle(e: AfterLoadEvent){
+  def handle(e: AfterLoadEvent): Unit ={
     plotManager.compilePlot(plot)
     recolor()
   }
 
-  def handle(e: WidgetRemovedEvent){ if(e.widget == this){ plotManager.forgetPlot(plot) } }
+  def handle(e: WidgetRemovedEvent): Unit ={ if(e.widget == this){ plotManager.forgetPlot(plot) } }
 
-  def handle(e:org.nlogo.window.Events.CompiledEvent){
+  def handle(e:org.nlogo.window.Events.CompiledEvent): Unit ={
     if(e.sourceOwner.isInstanceOf[ProceduresInterface]){
       plotManager.compilePlot(plot)
       recolor()
@@ -305,30 +343,38 @@ abstract class AbstractPlotWidget(val plot:Plot, val plotManager: PlotManagerInt
   // error handling
   def anyErrors: Boolean = plotManager.hasErrors(plot)
   def removeAllErrors() = throw new UnsupportedOperationException
-  def error(key: Object): Exception = (key match {
-    case "setupCode" => plotManager.getPlotSetupError(plot)
-    case "updateCode" => plotManager.getPlotUpdateError(plot)
-  }).orNull
+  def error(key: Object): Option[Exception] = {
+    if (key == I18N.gui.get("edit.plot.setupCode")) {
+      plotManager.getPlotSetupError(plot)
+    } else if (key == I18N.gui.get("edit.plot.updateCode")) {
+      plotManager.getPlotUpdateError(plot)
+    } else {
+      None
+    }
+  }
 
-  def error(key: Object, e: Exception) { throw new UnsupportedOperationException }
+  def error(key: Object, e: Exception): Unit = { throw new UnsupportedOperationException }
 
-  override def invalidSettings: Seq[(String, String)] = {
+  override def errorString: Option[String] = {
     val hasDuplicatedName =
       findWidgetContainer.allWidgets.collect {
         case p: CorePlot if p.display.map(_.toUpperCase).getOrElse("") == plotName.toUpperCase => p
       }.length > 1
-    if (hasDuplicatedName) Seq("plotName" -> I18N.gui.getN("edit.plot.name.duplicate", plotName.toUpperCase))
-    else                   Seq.empty[(String, String)]
+    if (hasDuplicatedName) {
+      Some(I18N.gui.getN("edit.plot.name.duplicate", plotName.toUpperCase))
+    } else {
+      None
+    }
   }
 
-  override def editFinished: Boolean = {
-    super.editFinished
+  override def editFinished(): Boolean = {
+    super.editFinished()
     plotManager.compilePlot(plot)
     nameLabel.setText(plot.name)
     xAxis.setLabel(_xAxisLabel)
     yAxis.setLabel(_yAxisLabel)
     recolor()
-    legend.refresh
+    clear()
     true
   }
 
@@ -340,16 +386,21 @@ object AbstractPlotWidget {
   val MIN_SIZE = new Dimension(160, 120)
   val PREF_SIZE = new Dimension(200, 150)
 
-  class XAxisLabels extends javax.swing.JPanel {
+  class XAxisLabels(plot: AbstractPlotWidget) extends javax.swing.JPanel {
     private val min: JLabel = new JLabel()
-    private val label: JLabel = new JLabel("", javax.swing.SwingConstants.CENTER)
+    private val label: JLabel = new JLabel("", SwingConstants.CENTER)
     private val max: JLabel = new JLabel()
 
-    setBackground(InterfaceColors.PLOT_BACKGROUND)
+    if (plot.boldName) {
+      min.setFont(min.getFont.deriveFont(Font.BOLD))
+      label.setFont(label.getFont.deriveFont(Font.BOLD))
+      max.setFont(max.getFont.deriveFont(Font.BOLD))
+    }
+
     val gridbag: GridBagLayout = new GridBagLayout
     setLayout(gridbag)
     val c: GridBagConstraints = new GridBagConstraints
-    c.insets = new Insets(0, 0, 0, 3)
+    c.insets = new Insets(0, 0, 0, plot.zoom(3))
     c.gridheight = 1
     c.weighty = 0.0
     c.fill = java.awt.GridBagConstraints.NONE
@@ -364,20 +415,24 @@ object AbstractPlotWidget {
     c.fill = java.awt.GridBagConstraints.HORIZONTAL
     gridbag.setConstraints(label, c)
     add(label)
-    c.gridwidth = REMAINDER
+    c.gridwidth = GridBagConstraints.REMAINDER
     c.weightx = 0.0
     c.anchor = java.awt.GridBagConstraints.EAST
     c.fill = java.awt.GridBagConstraints.NONE
     gridbag.setConstraints(max, c)
     add(max)
-    org.nlogo.awt.Fonts.adjustDefaultFont(min)
-    org.nlogo.awt.Fonts.adjustDefaultFont(label)
-    org.nlogo.awt.Fonts.adjustDefaultFont(max)
 
     override def paintComponent(g: Graphics) = {
-      super.paintComponent(g)
+      setBackground(InterfaceColors.plotBackground())
+
+      min.setForeground(InterfaceColors.widgetText())
+      label.setForeground(InterfaceColors.widgetText())
+      max.setForeground(InterfaceColors.widgetText())
+
       label.setToolTipText(
         if (label.getPreferredSize.width > label.getSize().width) getLabel else null)
+
+      super.paintComponent(g)
     }
 
     def setLabel(text: String) = label.setText(text)
@@ -386,20 +441,25 @@ object AbstractPlotWidget {
     def getLabel = label.getText
   }
 
-  class YAxisLabels extends javax.swing.JPanel {
+  class YAxisLabels(plot: AbstractPlotWidget) extends javax.swing.JPanel {
     private val label: JLabel = new JLabel()
     private var labelText: String = ""
     private val max: JLabel = new JLabel()
     private val labelIcon: VTextIcon = new VTextIcon(label, "", org.nlogo.swing.VTextIcon.ROTATE_LEFT)
     private val min: JLabel = new JLabel()
 
-    setBackground(InterfaceColors.PLOT_BACKGROUND)
+    if (plot.boldName) {
+      min.setFont(min.getFont.deriveFont(Font.BOLD))
+      label.setFont(label.getFont.deriveFont(Font.BOLD))
+      max.setFont(max.getFont.deriveFont(Font.BOLD))
+    }
+
     label.setIcon(labelIcon)
     val gridbag: GridBagLayout = new GridBagLayout
     setLayout(gridbag)
     val c: GridBagConstraints = new GridBagConstraints
-    c.insets = new Insets(3, 0, 0, 0)
-    c.gridwidth = REMAINDER
+    c.insets = new Insets(plot.zoom(3), 0, 0, 0)
+    c.gridwidth = GridBagConstraints.REMAINDER
     c.gridheight = 1
     c.weightx = 1.0
     c.weighty = 0.0
@@ -411,25 +471,31 @@ object AbstractPlotWidget {
     c.fill = java.awt.GridBagConstraints.VERTICAL
     gridbag.setConstraints(label, c)
     add(label)
-    c.gridheight = REMAINDER
+    c.gridheight = GridBagConstraints.REMAINDER
     c.weighty = 0.0
     c.fill = java.awt.GridBagConstraints.NONE
     gridbag.setConstraints(min, c)
     add(min)
-    org.nlogo.awt.Fonts.adjustDefaultFont(min)
-    org.nlogo.awt.Fonts.adjustDefaultFont(label)
-    org.nlogo.awt.Fonts.adjustDefaultFont(max)
 
     override def paintComponent(g: Graphics) = {
+      setBackground(InterfaceColors.plotBackground())
+
+      min.setForeground(InterfaceColors.widgetText())
+      label.setForeground(InterfaceColors.widgetText())
+      max.setForeground(InterfaceColors.widgetText())
+
+      if (label.getPreferredSize.width > label.getWidth)
+        label.setToolTipText(label.getText)
+      else
+        label.setToolTipText(null)
+
       super.paintComponent(g)
-      label.setToolTipText(
-        if (label.getPreferredSize.height > label.getSize().height) getLabel else null)
     }
 
-    def setMin(text: String) {min.setText(text)}
+    def setMin(text: String): Unit = {min.setText(text)}
     def setMax(text: String): Unit = {max.setText(text)}
     def getLabel = labelText
-    def setLabel(text: String) {
+    def setLabel(text: String): Unit = {
       labelText = text
       labelIcon.setLabel(labelText)
       label.repaint()

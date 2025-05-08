@@ -4,12 +4,13 @@ package org.nlogo.workspace
 
 import org.nlogo.api.{ ExtensionManager => APIEM, ExtensionException }
 import org.nlogo.core.TokenType
-import ExtensionManager.ExtensionLoader
 
 import org.scalatest.BeforeAndAfter
 import org.scalatest.funsuite.AnyFunSuite
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters.{ IterableHasAsScala, SeqHasAsJava }
+
+import ExtensionManager.ExtensionLoader
 
 class ExtensionManagerTests extends AnyFunSuite with BeforeAndAfter {
   before {
@@ -147,7 +148,7 @@ class ExtensionManagerTests extends AnyFunSuite with BeforeAndAfter {
   test("dumpExtensions prints a table with all loaded extensions") {
     new WithLoadedArrayExtension {
       val arrayJar = new java.io.File("extensions/array/array.jar")
-      val modified = 1000 * Math.round(arrayJar.lastModified() / 1000)
+      val modified = 1000 * Math.round(arrayJar.lastModified().toFloat / 1000)
       val path = arrayJar.toURI.toURL.toString
       assert(loadedManager.dumpExtensions ==
         s"""|EXTENSION${tab}LOADED${tab}MODIFIED${tab}JARPATH
@@ -158,7 +159,7 @@ class ExtensionManagerTests extends AnyFunSuite with BeforeAndAfter {
   }
 
   test("dumpExtensionPrimitives prints an empty table when no extensions are loaded") {
-    assert(emptyManager.dumpExtensionPrimitives ==
+    assert(emptyManager.dumpExtensionPrimitives() ==
       s"""|EXTENSION${tab}PRIMITIVE${tab}TYPE
           |---------${tab}---------${tab}----
           |""".stripMargin)
@@ -166,14 +167,14 @@ class ExtensionManagerTests extends AnyFunSuite with BeforeAndAfter {
 
   test("dumpExtensionPrimitives prints a table with all loaded primitives") {
     new WithLoadedArrayExtension {
-      assert(loadedManager.dumpExtensionPrimitives ==
+      assert(loadedManager.dumpExtensionPrimitives() ==
         s"""|EXTENSION${tab}PRIMITIVE${tab}TYPE
             |---------${tab}---------${tab}----
-            |array${tab}TO-LIST${tab}Reporter
-            |array${tab}SET${tab}Command
             |array${tab}ITEM${tab}Reporter
-            |array${tab}LENGTH${tab}Reporter
+            |array${tab}SET${tab}Command
             |array${tab}FROM-LIST${tab}Reporter
+            |array${tab}LENGTH${tab}Reporter
+            |array${tab}TO-LIST${tab}Reporter
             |""".stripMargin)
     }
   }

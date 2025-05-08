@@ -2,13 +2,16 @@
 
 package org.nlogo.parse
 
-import org.nlogo.core,
-  core.{ prim, FrontEndProcedure, Fail, I18N, SourceLocation, Syntax, Token, TokenType },
-    prim.Lambda,
-    Fail.{ cAssert, exception },
-    Syntax.compatible
+import SymbolType.LocalVariable
+
+import org.nlogo.core
+import org.nlogo.core.{ FrontEndProcedure, I18N, SourceLocation, Syntax, Token, TokenType }
+import org.nlogo.core.Fail.{ cAssert, exception }
+import org.nlogo.core.Syntax.compatible
+import org.nlogo.core.prim.Lambda
 
 import scala.annotation.tailrec
+import scala.collection.BufferedIterator
 import collection.mutable.Buffer
 
 /**
@@ -39,9 +42,107 @@ object ExpressionParser {
     val b = Buffer[core.Statement]()
     var activeScope = scope
     while (tokens.head.tpe != terminator) {
-      val (stmt, s) = f(tokens, activeScope)
-      activeScope = s
-      b += stmt
+      f(tokens, activeScope) match {
+        case (stmt, s) if stmt.command.isInstanceOf[core.prim._multilet] =>
+          // This creates synthetic `let v1 _multiassignitem` statements, again to allow the rest of compilation to proceed
+          // as normal.  The `_multiassignitem` gets the value from the list stored by the opening `_multilet`.
+          def recurseLets(command: core.prim._abstractlet): Unit = {
+            command match {
+              case let @ core.prim._let(Some(l), _) =>
+                val item  = new core.prim._multiassignitem()
+
+                item.token = l.token
+
+                val expression   = new core.ReporterApp(item, Seq(), l.token.sourceLocation)
+                // the `_letname()` here does absolutely nothing, but it allows future steps to run as though this is a normal `let`.
+                val letName      = new core.ReporterApp(new core.prim._letname(), l.token.sourceLocation)
+                val letArgs      = Seq(letName, expression)
+                val letStatement = new core.Statement(let, letArgs, l.token.sourceLocation)
+
+                b += letStatement
+
+              case let @ core.prim._multilet(lets) =>
+                val enter = new core.prim._multiassignnest("LET", lets.size)
+
+                enter.token = let.token
+
+                b += new core.Statement(enter, let.token.sourceLocation)
+
+                lets.foreach(recurseLets)
+
+              case _ =>
+            }
+          }
+
+          activeScope = s
+          b += stmt
+
+          // The `_multilet` has the job of storing the list value and checking it at runtime to make sure it's long
+          // enough for all the given variable names.
+          stmt.command.asInstanceOf[core.prim._multilet].lets.foreach(recurseLets)
+
+        case (stmt, s) if stmt.command.isInstanceOf[core.prim._multiset] =>
+          def recurseSets(command: core.prim._abstractset): Unit = {
+            command match {
+              case set @ core.prim._set() =>
+                val setVar = set.token.value match {
+                  case uv: core.prim._unknownidentifier =>
+                    val varName = set.token.text.toUpperCase
+                    val tpe = s.get(varName).getOrElse(exception(s"There is no variable called ${varName}.", set.token.sourceLocation))
+                    val variable = tpe match {
+                      // normally this happens in `LetVariableScope` but that time has passed I guess?
+                      case LocalVariable(let) =>
+                        val v = new core.prim._letvariable(let)
+                        v.token = set.token
+                        v
+
+                      case _ =>
+                        uv
+                    }
+
+                    new core.ReporterApp(variable, Seq(), set.token.sourceLocation)
+
+                  case r: core.Reporter =>
+                    new core.ReporterApp(r, Seq(), set.token.sourceLocation)
+
+                  case _ =>
+                    exception(s"Command found in multi-set where a variable name was expected: ${set.token.text.toUpperCase}.", set.token.sourceLocation)
+
+                }
+
+                val item       = new core.prim._multiassignitem()
+
+                item.token     = set.token
+
+                val expression = new core.ReporterApp(item, Seq(), set.token.sourceLocation)
+                val setArgs    = Seq(setVar, expression)
+
+                b += new core.Statement(set, setArgs, set.token.sourceLocation)
+
+              case set @ core.prim._multiset(sets) =>
+                val enter = new core.prim._multiassignnest("SET", sets.size)
+
+                enter.token = set.token
+
+                b += new core.Statement(enter, set.token.sourceLocation)
+
+                sets.foreach(recurseSets)
+
+              case c =>
+                throw new IllegalStateException
+            }
+          }
+
+          activeScope = s
+          b += stmt
+
+          stmt.command.asInstanceOf[core.prim._multiset].sets.foreach(recurseSets)
+
+        case (stmt, s) =>
+          activeScope = s
+          b += stmt
+
+      }
     }
     b.toSeq
   }
@@ -53,25 +154,35 @@ object ExpressionParser {
    */
   private def parseStatement(tokens: BufferedIterator[Token], variadic: Boolean, scope: SymbolTable): (core.Statement, SymbolTable) = {
     val token = tokens.head
+
     token.tpe match {
       case TokenType.OpenParen =>
         val ((stmt, newScope), loc) = parseParenthesized(tokens, parseStatement(_, true, scope), token.filename)
         (stmt.changeLocation(loc), newScope)
+
       case TokenType.Command =>
         tokens.next()
         val coreCommand = token.value.asInstanceOf[core.Command]
-        val nameToken = if (tokens.head.tpe != TokenType.Eof) Some(tokens.head) else None
-        val (stmt, newScope) =
-          LetScope(coreCommand, nameToken, scope).map {
-            case (letCommand, newScope) =>
-              (new core.Statement(letCommand, token.sourceLocation), newScope)
-          }.getOrElse((new core.Statement(coreCommand, token.sourceLocation), scope))
-        val arguments = parsePotentiallyVariadicArgumentList(coreCommand.syntax, variadic, stmt, tokens, newScope)
+        val (command, newScope) = coreCommand match {
+          case l: core.prim._let =>
+            LetScope(l, tokens, scope)
+
+          case s: core.prim._set =>
+            (SplitSet(s, tokens), scope)
+
+          case _ =>
+            (coreCommand, scope)
+
+        }
+        val stmt = new core.Statement(command, token.sourceLocation)
+        val arguments = parsePotentiallyVariadicArgumentList(stmt.instruction.syntax, variadic, stmt, tokens, newScope)
         (stmt.withArguments(arguments), newScope)
+
       case _ =>
         token.value match {
           case (_: core.prim._symbol | _: core.prim._unknownidentifier) if ! scope.contains(token.text.toUpperCase) =>
             exception(I18N.errors.getN("compiler.LetVariable.notDefined", token.text.toUpperCase), token)
+
           case _ => exception(ExpectedCommand, token)
         }
     }
@@ -122,7 +233,7 @@ object ExpressionParser {
     val types = syntax.right
     while (formal1 < types.length && !compatible(Syntax.RepeatableType, types(formal1))) {
       if (formal1 == types.length - 1 && untypedArgs.size == types.length - 1 && compatible(Syntax.OptionalType, types(formal1)))
-        return scala.collection.immutable.Seq[core.Expression](typedArgs: _*)
+        return typedArgs.toSeq
       cAssert(untypedArgs.size > actual1, missingInput(syntax, displayName, true), location)
       typedArgs.update(actual1, resolveType(types(formal1), untypedArgs(actual1), displayName, scope))
       formal1 += 1
@@ -144,7 +255,7 @@ object ExpressionParser {
         actual1 += 1
       }
     }
-    scala.collection.immutable.Seq[core.Expression](typedArgs: _*)
+    typedArgs.toSeq
   }
 
   /**
@@ -163,7 +274,8 @@ object ExpressionParser {
     val args = Buffer[core.Expression]()
 
     for (i <- 0 until syntax.rightDefault) {
-      args += parseArgExpression(syntax, tokens, sourceLocation, displayName, right(i min (right.size - 1)), scope) } // null = app
+      args += parseArgExpression(syntax, tokens, sourceLocation, displayName, right(i min (right.size - 1)), scope)
+    } // null = app
 
     if (takesOptionalCommandBlock) {
       val newExp =
@@ -230,7 +342,12 @@ object ExpressionParser {
       parseExpressionInternal(tokens, false, syntax.precedence, goalType, scope)
     catch {
       case _: MissingPrefixException | _: UnexpectedTokenException =>
-        exception(missingInput(syntax, displayName, true), sourceLocation)
+        tokens.head.tpe match {
+          case TokenType.CloseParen => exception("Unexpected closing parenthesis.", tokens.head.sourceLocation)
+          case TokenType.CloseBracket => exception("Unexpected closing bracket.", tokens.head.sourceLocation)
+          case TokenType.CloseBrace => exception("Unexpected closing brace.", tokens.head.sourceLocation)
+          case _ => exception(missingInput(syntax, displayName, true), sourceLocation)
+        }
     }
   }
 
@@ -273,15 +390,15 @@ object ExpressionParser {
       case block: DelayedBlock => parseDelayedBlock(block, goalType, scope)
       case _ => originalArg
     }
-    cAssert(compatible(goalType, arg.reportedType), {
+    cAssert(compatible(goalType, arg.reportedType()), {
       // remove reference type from message unless it's part of the goalType, confusing to see
       // "expected a variable or a number"
       val displayedReportedType =
         if ((goalType & Syntax.ReferenceType) == 0 &&
-          ((arg.reportedType & ~Syntax.ReferenceType) != 0))
-          arg.reportedType & ~Syntax.ReferenceType
+          ((arg.reportedType() & ~Syntax.ReferenceType) != 0))
+          arg.reportedType() & ~Syntax.ReferenceType
         else
-          arg.reportedType
+          arg.reportedType()
       s"$instruction expected this input to be ${core.TypeNames.aName(goalType)}, but got ${core.TypeNames.aName(displayedReportedType)} instead"
     },
     arg)
@@ -644,7 +761,7 @@ object ExpressionParser {
     // checking here to make sure that at the very least, parenthesis and brackets are matched up
     // without being mixed and matched.  FD 8/19/2015
     @tailrec
-    def check(remaining: Seq[Token], stack: Seq[Token] = Seq()) {
+    def check(remaining: Seq[Token], stack: Seq[Token] = Seq()): Unit = {
       if(remaining.isEmpty) {
         if(!stack.isEmpty) {
           if(stack.head.tpe == TokenType.OpenParen) {
@@ -678,6 +795,7 @@ object ExpressionParser {
     val tokens = block match {
       case alb: ArrowLambdaBlock => alb.allTokens
       case adl: AmbiguousDelayedBlock => adl.tokens
+      case b => throw new IllegalStateException
     }
 
     check(tokens.dropRight(2)) // Drops two because of the EOF

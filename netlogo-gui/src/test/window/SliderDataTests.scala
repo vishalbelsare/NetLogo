@@ -6,7 +6,7 @@ import org.scalatest.propspec.AnyPropSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import org.scalacheck.{ Arbitrary, Gen }
 
-import org.nlogo.api.{ LogoException, MultiErrorHandler, ReporterLogoThunk }
+import org.nlogo.api.{ LogoException, ReporterLogoThunk }
 import org.nlogo.agent.{ ConstantSliderConstraint, DynamicSliderConstraint }
 
 import scala.util.{ Failure, Success, Try }
@@ -56,7 +56,7 @@ class SliderDataTests extends AnyPropSpec with ScalaCheckPropertyChecks {
     forAll(genPosOddInt) { (r) =>
       whenever (r >= 0 && (r % 2 == 1)) {
         // use 1.r
-        val min      = (1 + "." + r).toDouble
+        val min      = s"1.$r".toDouble
         val result   = new SliderData(dummyErrorHandler, minimum = min).precision
         val expected = r.toString.length
         assertResult(expected)(result)
@@ -74,7 +74,7 @@ class SliderDataTests extends AnyPropSpec with ScalaCheckPropertyChecks {
   }
 
   property("sanity precision tests") {
-    def testPrecision(d: Double, expected: Int) {
+    def testPrecision(d: Double, expected: Int): Unit = {
       assertResult(expected)(
         new SliderData(dummyErrorHandler, minimum = d).precision)
     }
@@ -89,7 +89,7 @@ class SliderDataTests extends AnyPropSpec with ScalaCheckPropertyChecks {
     testPrecision(1.234E2, 1) // 123.4
     testPrecision(1.2340000, 3) // 1.234
 
-    def testPrecision2(minimum: Double, increment: Double, expected: Int) {
+    def testPrecision2(minimum: Double, increment: Double, expected: Int): Unit = {
       assertResult(expected)(
         new SliderData(dummyErrorHandler, minimum = minimum, increment = increment).precision)
     }

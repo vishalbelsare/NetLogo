@@ -21,12 +21,12 @@ object ChecksumsAndPreviews {
          "GasLabNew", "GasLabOld", "GridWalk", "Heatbugs", "Ising", "Life", "PrefAttach",
          "Team", "Termites", "VirusNet", "Wealth", "Wolf", "ImportWorld")
 
-  def main(argv: Array[String]) {
+  def main(argv: Array[String]): Unit = {
     Main.setHeadlessProperty()
     def paths(fn: String => Boolean, includeBenchmarks: Boolean) = {
       val allLibrary = ModelsLibrary.getModelPaths(true, false).toList
       val library = if (includeBenchmarks)
-        allBenchmarks.map("models/test/benchmarks/" + _ + " Benchmark.nlogo") ::: allLibrary
+        allBenchmarks.map("models/test/benchmarks/" + _ + " Benchmark.nlogox") ::: allLibrary
       else
         allLibrary
 
@@ -42,13 +42,13 @@ object ChecksumsAndPreviews {
     }
 
     def readVariants(): Map[String, Seq[String]] = {
-      val lines = Source.fromFile("test/checksum-variants.txt").getLines
+      val lines = Source.fromFile("test/checksum-variants.txt").getLines()
         .map((s: String) => s.trim.split("#")(0))
         .filter((s: String) => !s.startsWith("#") && !s.isEmpty)
       if (!lines.hasNext) {
         return Map()
       }
-      val firstModelLine = lines.next
+      val firstModelLine = lines.next()
       if (!firstModelLine.startsWith("*")) {
         throw new IllegalStateException(s"variants file must start with a '*' model entry: $lines")
       }
@@ -76,9 +76,9 @@ object ChecksumsAndPreviews {
     // is already taken - ST 6/28/12
     argv match {
       case Array("--checksum", path) =>
-        if (Checksums.okPath(path)) Checksums.update(List(path), readVariants)
+        if (Checksums.okPath(path)) Checksums.update(List(path), readVariants())
       case Array("--checksums") =>
-        Checksums.update(paths(Checksums.okPath, includeBenchmarks = !Version.is3D), readVariants)
+        Checksums.update(paths(Checksums.okPath, includeBenchmarks = !Version.is3D), readVariants())
       case Array("--preview", path) =>
         Previews.remake(path)
       case Array("--previews") =>
@@ -87,6 +87,8 @@ object ChecksumsAndPreviews {
         ChecksumExports.export(List(path))
       case Array("--checksum-exports") =>
         ChecksumExports.export(paths(Checksums.okPath, includeBenchmarks = !Version.is3D))
+      case _ =>
+        throw new Exception(s"Unexpected input arguments: $argv")
     }
     println("done")
   }
@@ -96,12 +98,17 @@ object ChecksumsAndPreviews {
     def needsManualPreview(previewCommands: String) =
       previewCommands contains "need-to-manually-make-preview-for-this-model"
 
+    // NW is only included temporarily until extension compiles correctly - AAB 7-2022
     def okPath(path: String) =
-      List("HUBNET", "/GOGO/", "/CODE EXAMPLES/SOUND/", "GIS GRADIENT EXAMPLE")
+      List("HUBNET", "/GOGO/", "/CODE EXAMPLES/SOUND/", "GIS GRADIENT EXAMPLE", "/NW/")
         .forall(!path.toUpperCase.containsSlice(_))
 
-    def remake(path: String) {
-      val previewPath = path.replaceFirst("\\.nlogo$", ".png")
+    def remake(path: String): Unit = {
+      if (path.contains("Calorimetry")) {
+        println("skipping: " + path + "\n (non-bundled extension usage)")
+        return
+      }
+      val previewPath = path.replaceFirst(".nlogox", ".png")
       try {
         val runner = PreviewCommandsRunner.fromModelPath(new WorkspaceFactory, path)
         println("making preview for: " + path)
@@ -151,7 +158,7 @@ object ChecksumsAndPreviews {
       }
     }
 
-    def update(paths: List[String], variants: Map[String, Seq[String]]) {
+    def update(paths: List[String], variants: Map[String, Seq[String]]): Unit = {
       // prevent annoying JAI message on Linux when using JAI extension
       // (old.nabble.com/get-rid-of-%22Could-not-find-mediaLib-accelerator-wrapper-classes%22-td11025745.html)
       System.setProperty("com.sun.media.jai.disableMediaLib", "true")
@@ -194,7 +201,7 @@ object ChecksumsAndPreviews {
       None
     }
 
-    def updateOneHelper(m: ChecksumMap, model: String, variant: String, workspace: HeadlessWorkspace) {
+    def updateOneHelper(m: ChecksumMap, model: String, variant: String, workspace: HeadlessWorkspace): Unit = {
       val key = Checksums.variantKey(model, variant)
       Checksummer.initModelForChecksumming(workspace, variant)
       val newCheckSum = Checksummer.calculateWorldChecksum(workspace)
@@ -215,7 +222,7 @@ object ChecksumsAndPreviews {
 
     def load(): ChecksumMap = {
       val m = new ChecksumMap
-      for (line <- Source.fromFile(ChecksumsFilePath).getLines.map(_.trim))
+      for (line <- Source.fromFile(ChecksumsFilePath).getLines().map(_.trim))
         if (!line.startsWith("#") && !line.isEmpty) {
           val strs = line.split(java.util.regex.Pattern.quote(separator))
           if (strs.size != 5)
@@ -226,7 +233,7 @@ object ChecksumsAndPreviews {
       m
     }
 
-    def write(m: ChecksumMap, path: String) {
+    def write(m: ChecksumMap, path: String): Unit = {
       val fw = new FileWriter(path)
       m.values.foreach(entry => fw.write(entry.toString + '\n'))
       fw.close()
@@ -249,14 +256,14 @@ object ChecksumsAndPreviews {
   // For when you need to know what the checksummed world exports are
   object ChecksumExports {
 
-    def export(paths: List[String]): Unit = {
+    def `export`(paths: List[String]): Unit = {
       paths.foreach(exportOne)
     }
 
     def exportOne(path: String): Unit = {
       val workspace = HeadlessWorkspace.newInstance
       try {
-        import scala.collection.JavaConverters._
+        import scala.jdk.CollectionConverters.IteratorHasAsScala
         workspace.open(path)
         Checksummer.initModelForChecksumming(workspace, "")
         val modelPath = Paths.get(path)
@@ -267,7 +274,7 @@ object ChecksumsAndPreviews {
           Paths.get("tmp/checksum-exports")
             .resolve(
               modelPath.subpath(modelIndex, pathCount - 2)
-                .resolve(modelName.replaceAllLiterally(".nlogo", ".csv")))
+                .resolve(modelName.replace(".nlogox", ".csv")))
 
         Files.createDirectories(exportPath.getParent)
         workspace.exportWorld(exportPath.toString)

@@ -2,24 +2,18 @@
 
 package org.nlogo.app.codetab
 
-import java.awt.{ Component, FileDialog }
-import java.awt.event.ActionEvent
+import java.awt.FileDialog
 import java.io.{ File, IOException }
-import javax.swing.{ Action, AbstractAction }
+import javax.swing.Action
 
 import org.nlogo.api.FileIO
-import org.nlogo.app.common.{ Actions, Dialogs, Events => AppEvents, ExceptionCatchingAction, TabsInterface },
-  Actions.Ellipsis
-import org.nlogo.awt.UserCancelException
+import org.nlogo.app.common.{ Dialogs, Events => AppEvents, TabsInterface }
 import org.nlogo.core.I18N
 import org.nlogo.ide.FocusedOnlyAction
-import org.nlogo.swing.{ FileDialog => SwingFileDialog, ToolBarActionButton, UserAction },
-  UserAction.MenuAction
+import org.nlogo.swing.{ FileDialog => SwingFileDialog }
 import org.nlogo.window.{ Events => WindowEvents, ExternalFileInterface }
 import org.nlogo.workspace.{ AbstractWorkspace, ModelTracker }
 
-import scala.io.Codec
-import scala.util.control.Exception.ignoring
 import scala.util.matching.Regex
 
 object TemporaryCodeTab {
@@ -31,12 +25,11 @@ class TemporaryCodeTab(workspace: AbstractWorkspace with ModelTracker,
   private var _filename:          TabsInterface.Filename,
   externalFileManager:            ExternalFileManager,
   conversionAction:               TemporaryCodeTab => Action,
-  smartIndent:                    Boolean)
-  extends CodeTab(workspace, tabs)
-  with AppEvents.IndenterChangedEvent.Handler {
+  separateCodeWindow:             Boolean)
+  extends CodeTab(workspace, tabs) {
 
   var closing = false
-  var saveNeeded = false
+  var saveNeeded = false // Has the buffer changed since the file was saved?
 
   def filename: Either[String, String] = _filename
 
@@ -44,75 +37,80 @@ class TemporaryCodeTab(workspace: AbstractWorkspace with ModelTracker,
     val oldFilename = _filename
     _filename = newName
     if (oldFilename.isRight && oldFilename != newName) {
-      externalFileManager.nameChanged(oldFilename.right.get, newName.right.get)
+      externalFileManager.nameChanged(oldFilename.getOrElse(null), newName.getOrElse(null))
     } else if (oldFilename.isLeft) {
       externalFileManager.add(this)
     }
   }
 
-  filename.right foreach { path =>
-    try {
-      innerSource = FileIO.fileToString(path)(Codec.UTF8).replaceAll("\r\n", "\n")
-      dirty = false
-      saveNeeded = false
-      externalFileManager.add(this)
-    } catch {
-      case _: IOException => innerSource = ""
-    }
-  }
-  setIndenter(smartIndent)
-  lineNumbersVisible = tabs.lineNumbersVisible
+  def reload: Boolean = {
+    var loaded: Boolean = false
 
-  override val activeMenuActions = {
-    def saveAction(saveAs: Boolean) = {
-      new ExceptionCatchingAction(if (saveAs) I18N.gui.get("menu.file.saveAs") + Ellipsis else I18N.gui.get("menu.file.save"), TemporaryCodeTab.this)
-      with MenuAction {
-        category    = UserAction.FileCategory
-        group       = UserAction.FileSaveGroup
-        accelerator = UserAction.KeyBindings.keystroke('S', withMenu = true, withShift = saveAs)
-        rank = 0
-
-        @throws(classOf[UserCancelException])
-        override def action(): Unit = {
-          save(saveAs)
-        }
+    filename foreach { path =>
+      try {
+        innerSource = FileIO.fileToString(path).replaceAll("\r\n", "\n")
+        dirty = false // Has the buffer changed since it was compiled?
+        saveNeeded = false
+        loaded = true
+      } catch {
+        case _: IOException => innerSource = ""
       }
     }
-    Seq(saveAction(false), saveAction(true), undoAction, redoAction) ++
+
+    loaded
+  }
+
+  // We're actually loading _filename for the first time here.
+  if (reload) {
+    externalFileManager.add(this)
+  }
+
+  setSeparate(separateCodeWindow)
+  lineNumbersVisible = tabs.lineNumbersVisible
+  setIndenter(tabs.smartTabbingEnabled)
+
+  override val activeMenuActions = {
+    Seq(undoAction, redoAction) ++
       editorConfiguration.contextActions.filter(_.isInstanceOf[FocusedOnlyAction]) ++
       filename.fold(_ => Seq(), name => Seq(conversionAction(this)))
   }
-
-  override def getAdditionalToolBarComponents: Seq[Component] = Seq(new ToolBarActionButton(CloseAction))
 
   override def dirty_=(d: Boolean) = {
     super.dirty_=(d)
     if (d) {
       saveNeeded = true
-      tabs.setDirtyMonitorCodeWindow
+
       new WindowEvents.DirtyEvent(Some(filename.merge)).raise(this)
     }
   }
 
-  def filenameForDisplay = (filename.right map TemporaryCodeTab.stripPath).merge
+  def filenameForDisplay = (filename map TemporaryCodeTab.stripPath).merge
 
   def save(saveAs: Boolean) = {
     if (saveAs || filename.isLeft)
       filename = Right(userChooseSavePath())
-    FileIO.writeFile(filename.right.get, text.getText)
+    FileIO.writeFile(filename.getOrElse(null), text.getText)
     saveNeeded = false
-    tabs.setDirtyMonitorCodeWindow
+    compileIfDirty()
+    dirty = false
+
     new WindowEvents.ExternalFileSavedEvent(filename.merge).raise(this)
   }
 
-  def close() {
-    ignoring(classOf[UserCancelException]) {
-      if(dirty && Dialogs.userWantsToSaveFirst(filenameForDisplay, this))
+  override def close(): Unit = {
+    if (saveNeeded) {
+      if (Dialogs.userWantsToSaveFirst(filenameForDisplay, this)) {
+        // The user is saving the file with its current name
         save(false)
-      externalFileManager.remove(this)
-      closing = true
-      tabs.closeExternalFile(filename)
+      }
     }
+    closing = true
+    tabs.closeExternalFile(_filename)
+  }
+
+  def compileIfDirty(): Unit = {
+    if (dirty)
+      compile()
   }
 
   override def handle(e: WindowEvents.CompiledEvent) = {
@@ -120,7 +118,7 @@ class TemporaryCodeTab(workspace: AbstractWorkspace with ModelTracker,
 
     dirty = false
     e.sourceOwner match {
-      case file: ExternalFileInterface if file.getFileName == filename.right.get => setErrorLabel()
+      case file: ExternalFileInterface if file.getFileName == filename.getOrElse(null) => setErrorLabel()
       // if the Code tab compiles then get rid of the error ev 7/26/07
       case tab: CodeTab if e.error == null                                       => setErrorLabel()
       case _ =>
@@ -129,17 +127,11 @@ class TemporaryCodeTab(workspace: AbstractWorkspace with ModelTracker,
 
   override def handle(e: AppEvents.SwitchedTabsEvent) = if (!closing) super.handle(e)
 
-  final def handle(e: AppEvents.IndenterChangedEvent) = setIndenter(e.isSmart)
-
   private def userChooseSavePath(): String = {
     def appendIfNecessary(str: String, suffix: String) = if (str.endsWith(suffix)) str else str + suffix
 
     val newFileName = appendIfNecessary(filenameForDisplay, ".nls")
     val path = SwingFileDialog.showFiles(this, I18N.gui.get("file.save.external"), FileDialog.SAVE, newFileName)
     appendIfNecessary(path, ".nls")
-  }
-
-  private object CloseAction extends AbstractAction(I18N.gui.get("tabs.external.close")) {
-    override def actionPerformed(e: ActionEvent) = close()
   }
 }

@@ -3,7 +3,7 @@
 package org.nlogo.hubnet.client
 
 import java.io.IOException
-import java.net.{DatagramPacket, InetAddress, MulticastSocket, SocketTimeoutException}
+import java.net.{DatagramPacket, InetAddress, InetSocketAddress, MulticastSocket, NetworkInterface, SocketTimeoutException}
 import java.util.Arrays
 import org.nlogo.hubnet.protocol.DiscoveryMessage
 
@@ -34,7 +34,7 @@ class DiscoveryListener(@volatile var interfaceAddress: Option[InetAddress]) ext
    * Sets the specified announcement listener to receive messages from this discovery listener.
    * @param listener the announcement listener
    */
-  def setAnnouncementListener(listener: AnnouncementListener) {
+  def setAnnouncementListener(listener: AnnouncementListener): Unit = {
     synchronized {this.listener = listener}
   }
 
@@ -43,20 +43,20 @@ class DiscoveryListener(@volatile var interfaceAddress: Option[InetAddress]) ext
    * no longer receives messages from this discovery listener.
    * @param listener the announcement listener
    */
-  def removeAnnouncementListener(listener: AnnouncementListener) {
+  def removeAnnouncementListener(listener: AnnouncementListener): Unit = {
     synchronized {if (listener == this.listener) this.listener = null}
   }
 
   /**
    * Stops the discovery listener from listening for messages on the multicast group.
    */
-  def stopListening() {shouldKeepListening = false}
+  def stopListening(): Unit = {shouldKeepListening = false}
 
   /**
    * Notifies the registered announcement listener that a
    * message has been received.
    */
-  private def notifyListeners(m: DiscoveryMessage) {
+  private def notifyListeners(m: DiscoveryMessage): Unit = {
     if (listener != null) listener.synchronized {listener.announcementReceived(m)}
   }
 
@@ -64,7 +64,7 @@ class DiscoveryListener(@volatile var interfaceAddress: Option[InetAddress]) ext
    * Joins a multicast group and listens for packets
    * until <code> stopListening() </code> is called.
    */
-  override def run() {
+  override def run(): Unit = {
     // arbitrary, but possibly larger than many MTUs, but this doesn't
     // really matter on the client, unless zero termination matters...
     val receiptBuffer = Array.ofDim[Byte](1024)
@@ -75,11 +75,13 @@ class DiscoveryListener(@volatile var interfaceAddress: Option[InetAddress]) ext
         // the -1 should, hopefully, force zero termination upon truncation of large packets...
         val packet = new DatagramPacket(receiptBuffer, receiptBuffer.length - 1)
         val group = InetAddress.getByName(SERVER_DISCOVERY_MULTICAST_GROUP)
+        val socketGroup = new InetSocketAddress(group, SERVER_DISCOVERY_MULTICAST_PORT)
+        val netIf = NetworkInterface.getByInetAddress(address)
         try {
           multicastSocket = new MulticastSocket(SERVER_DISCOVERY_MULTICAST_PORT)
           multicastSocket.setSoTimeout(3000)
-          multicastSocket.setInterface(address)
-          multicastSocket.joinGroup(group)
+          multicastSocket.setNetworkInterface(netIf)
+          multicastSocket.joinGroup(socketGroup,netIf)
           multicastSocket.receive(packet)
           notifyListeners(DiscoveryMessage.deserialize(packet.getAddress.getHostName, packet.getData))
         }
@@ -96,7 +98,7 @@ class DiscoveryListener(@volatile var interfaceAddress: Option[InetAddress]) ext
         }
         finally {
           if (multicastSocket != null) {
-            multicastSocket.leaveGroup(group)
+            multicastSocket.leaveGroup(socketGroup, netIf)
             multicastSocket.close()
           }
         }

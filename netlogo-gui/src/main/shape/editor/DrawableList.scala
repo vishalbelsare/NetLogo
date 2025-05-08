@@ -2,31 +2,41 @@
 
 package org.nlogo.shape.editor
 
-import org.nlogo.core.{ I18N, Shape, ShapeList, ShapeListTracker }
+import javax.swing.{ DefaultListModel, JList }
 
-import javax.swing.JOptionPane
+import org.nlogo.core.{ I18N, Shape, ShapeList, ShapeListTracker }
+import org.nlogo.swing.OptionPane
 
 import scala.reflect.ClassTag
 
-class DrawableList[A <: Shape](shapeTracker: ShapeListTracker, rows: Int, height: Int, parent: java.awt.Component)(implicit ct: ClassTag[A])
-  extends javax.swing.JList[A]
-  with EditorDialog.VectorShapeContainer {
+class DrawableList[A <: Shape](shapeTracker: ShapeListTracker, rows: Int, height: Int, parent: java.awt.Component)
+  (implicit ct: ClassTag[A]) extends JList[A] with EditorDialog.VectorShapeContainer {
 
   def shapeList = shapeTracker.shapeList
 
-  val listModel = new javax.swing.DefaultListModel[A]()
+  val listModel = new DefaultListModel[A]
 
   setVisibleRowCount(rows)
   setModel(listModel)
   setFixedCellHeight(height)
   setCellRenderer(new ShapeCellRenderer())
 
-  //  Make sure the list of available shapes is up to date
-  def update(): Unit = {
+  //  Make sure the list of available shapes is up to date, filtering by name if provided
+  def update(name: Option[String] = None): Unit = {
     listModel.clear()
-    shapeList.shapes.foreach {
-      case s: A => listModel.addElement(s)
+
+    name match {
+      case Some(str) =>
+        shapeList.shapes.foreach {
+          case s: A if s.name.toLowerCase.contains(str.toLowerCase) => listModel.addElement(s)
+          case _ =>
+        }
+
       case _ =>
+        shapeList.shapes.foreach {
+          case s: A => listModel.addElement(s)
+          case _ =>
+        }
     }
   }
 
@@ -94,8 +104,8 @@ class DrawableList[A <: Shape](shapeTracker: ShapeListTracker, rows: Int, height
         None
 
     message.map { msg =>
-      JOptionPane.showConfirmDialog(parent, msg,
-        I18N.gui.get("tools.shapesEditor.delete"), JOptionPane.YES_NO_OPTION) == JOptionPane.YES_OPTION
+      new OptionPane(parent, I18N.gui.get("tools.shapesEditor.delete"), msg, OptionPane.Options.YesNo,
+                     OptionPane.Icons.Question).getSelectedIndex == 0
     }.getOrElse(false)
   }
 

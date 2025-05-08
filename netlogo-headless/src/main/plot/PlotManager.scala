@@ -4,14 +4,14 @@ package org.nlogo.plot
 
 import org.nlogo.core.CompilerException
 
-import org.nlogo.api.{ ActionBroker, CommandLogoThunk, LogoThunkFactory, PlotAction }
+import org.nlogo.api.{ ActionBroker, CommandLogoThunk, LogoThunkFactory, PlotAction, MersenneTwisterFast }
 
 import scala.collection.mutable
 import scala.util.{ Failure, Success, Try }
 
 // handles compilation and execution of plot code
 // among a couple of other little tasks.
-class PlotManager(factory: LogoThunkFactory)
+class PlotManager(factory: LogoThunkFactory, random: MersenneTwisterFast)
   extends PlotManagerInterface
   with PlotActionRunner
   with ActionBroker[PlotAction] {
@@ -25,7 +25,7 @@ class PlotManager(factory: LogoThunkFactory)
   // the currently selected plot.
   // needed for backwards comp with pre 5.0 plotting style.
   var currentPlot: Option[Plot] = None
-  override def setCurrentPlot(name: String) {
+  override def setCurrentPlot(name: String): Unit = {
     currentPlot = maybeGetPlot(name)
   }
 
@@ -53,14 +53,14 @@ class PlotManager(factory: LogoThunkFactory)
     maybeGetPlot(plotName).flatMap(_.getPen(penName))
 
   // used for letting the user choose which plot to export
-  def getPlotNames = _plots.map(_.name)
-  def nextName = Stream.from(1).map("plot " + _).find(maybeGetPlot(_).isEmpty).get
+  def getPlotNames: Seq[String] = _plots.map(_.name).toSeq
+  def nextName: String = LazyList.from(1).map("plot " + _).find(maybeGetPlot(_).isEmpty).get
 
-  def forgetPlot(goner: Plot) {
+  def forgetPlot(goner: Plot): Unit = {
     if (currentPlot == Some(goner)) currentPlot = None
     _plots -= goner
   }
-  def forgetAll() {
+  def forgetAll(): Unit = {
     _plots.clear()
     currentPlot = None
     // not strictly necessary to clear the thunk maps since the references
@@ -69,7 +69,7 @@ class PlotManager(factory: LogoThunkFactory)
     penThunks.clear()
     plotThunks.clear()
   }
-  def clearAll() {
+  def clearAll(): Unit = {
     _plots.foreach(_.clear())
   }
 
@@ -95,7 +95,7 @@ class PlotManager(factory: LogoThunkFactory)
 
     // compile the given code, and return Right if ok, Left if bad.
     def compile(code: String, procName: String) =
-      try Right(factory.makeCommandThunk(code, procName))
+      try Right(factory.makeCommandThunk(code, procName, random))
       catch { case ce: CompilerException => Left(ce) }
 
     def procName(setup:Boolean, pen:Option[PlotPen] = None) = {
@@ -125,10 +125,10 @@ class PlotManager(factory: LogoThunkFactory)
   // code to run code in plots
   //
 
-  def setupPlots() { runCode(Setup) }
-  def updatePlots() { runCode(Update) }
+  def setupPlots(): Unit = { runCode(Setup) }
+  def updatePlots(): Unit = { runCode(Update) }
 
-  private def runCode(codeType: CodeType) {
+  private def runCode(codeType: CodeType): Unit = {
     // save the currently selected plot
     val oldCurrentPlot = currentPlot
     for (plot <- _plots) {

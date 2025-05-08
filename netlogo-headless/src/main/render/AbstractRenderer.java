@@ -51,13 +51,12 @@ ST 8/19/05
 import org.nlogo.api.GraphicsInterface;
 import org.nlogo.api.Perspective;
 import org.nlogo.api.PerspectiveJ;
-import org.nlogo.core.ShapeList;
-import org.nlogo.core.ShapeListTracker;
 import org.nlogo.api.TrailDrawerInterface;
 import org.nlogo.api.ViewSettings;
-import static scala.collection.JavaConversions.asScalaBuffer;
+import org.nlogo.core.ShapeList;
+import org.nlogo.core.ShapeListTracker;
 
-public abstract strictfp class AbstractRenderer
+public abstract class AbstractRenderer
     implements org.nlogo.api.RendererInterface {
 
   public final org.nlogo.api.World world;

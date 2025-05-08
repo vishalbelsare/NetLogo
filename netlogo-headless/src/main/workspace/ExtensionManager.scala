@@ -14,7 +14,7 @@ import java.lang.{ ClassLoader, Iterable => JIterable }
 import java.io.{ IOException, PrintWriter }
 import java.util.{ List => JList }
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters.{ IterableHasAsJava, IteratorHasAsScala }
 
 /**
  * Some simple notes on loading and unloading extensions:
@@ -200,7 +200,7 @@ class ExtensionManager(val workspace: ExtendableWorkspace, loader: ExtensionLoad
 
   def clearAll(): Unit =
     for (jar <- jars.values) {
-      jar.classManager.clearAll
+      jar.classManager.clearAll()
     }
 
   @throws(classOf[CompilerException])
@@ -223,7 +223,10 @@ class ExtensionManager(val workspace: ExtendableWorkspace, loader: ExtensionLoad
   def replaceIdentifier(name: String): Primitive = {
     val (primName, isRelevantJar) =
       if (name.contains(':')) {
-        val Array(prefix, pname) = name.split(":")
+        val (prefix, pname) = name.split(":") match {
+          case Array(pr, pn) => (pr, pn)
+          case _ => throw new IllegalStateException
+        }
         (pname, { (jc: JarContainer) => prefix.toUpperCase == jc.normalizedName })
       } else
         (name,  { (jc: JarContainer) => jc.primManager.autoImportPrimitives })
@@ -245,10 +248,10 @@ class ExtensionManager(val workspace: ExtendableWorkspace, loader: ExtensionLoad
   /**
    * Returns a String describing all the loaded extensions.
    */
-  def dumpExtensionPrimitives: String = tabulate(
+  def dumpExtensionPrimitives(): String = tabulate(
     Seq("EXTENSION", "PRIMITIVE", "TYPE"),
     { jarContainer =>
-      jarContainer.primManager.getPrimitiveNames.asScala.map { n =>
+      jarContainer.primManager.getPrimitiveNames().asScala.map { n =>
         val p = jarContainer.primManager.getPrimitive(n)
         Seq(jarContainer.extensionName, n, if (p.isInstanceOf[Reporter]) "Reporter" else "Command")
       }.toSeq
@@ -286,21 +289,21 @@ class ExtensionManager(val workspace: ExtendableWorkspace, loader: ExtensionLoad
       if (extensionVer.isEmpty)
         workspace.warningMessage(
           """|Could not determine version of NetLogo extension.
-             |NetLogo can try to load the extension, but it might not work.""".stripMargin.lines.mkString(" "))
+             |NetLogo can try to load the extension, but it might not work.""".stripMargin.linesIterator.mkString(" "))
       else if (currentVer != extensionVer.get)
         workspace.warningMessage(
           s"""|You are attempting to open a NetLogo extension file that was created
               |for a different version of the NetLogo Extension API.
               |(This NetLogo uses Extension API $currentVer;
               |the extension uses NetLogo Extension API ${extensionVer.get}.)
-              |NetLogo can try to load the extension, but it might not work.""".stripMargin.lines.mkString(" "))
+              |NetLogo can try to load the extension, but it might not work.""".stripMargin.linesIterator.mkString(" "))
       else
         true
     if (! shouldContinue)
       throw new ExtensionManagerException(UserHalted)
   }
 
-  def exportWorld(writer: PrintWriter) {
+  def exportWorld(writer: PrintWriter): Unit = {
     writer.println(Dump.csv.encode("EXTENSIONS"))
     writer.println()
     for (container <- jars.values.toList.sortWith((c1, c2) => c1.extensionName < c2.extensionName)) {
@@ -314,7 +317,7 @@ class ExtensionManager(val workspace: ExtendableWorkspace, loader: ExtensionLoad
   }
 
   @throws(classOf[org.nlogo.api.ExtensionException])
-  def importExtensionData(name: String, data: JList[Array[String]], handler: ImportErrorHandler) {
+  def importExtensionData(name: String, data: JList[Array[String]], handler: ImportErrorHandler): Unit = {
     val jar = getJarContainerByIdentifier(name).getOrElse(
       throw new ExtensionException(s"there is no extension named $name in this model"))
     jar.classManager.importWorld(data, this, handler)

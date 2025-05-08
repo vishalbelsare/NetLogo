@@ -14,9 +14,10 @@ import scala.collection.mutable.WeakHashMap
 import
   org.nlogo.{ agent, api, core, nvm, plot },
   agent.{ AbstractExporter, Agent, AgentSet, World },
-  api.{PlotInterface, CommandLogoThunk, Dump, Exceptions, ExtensionManager => APIEM, JobOwner,
-    LibraryManager, LogoException, MersenneTwisterFast, ModelType, PreviewCommands, ReporterLogoThunk, SimpleJobOwner},
-  core.{ CompilationEnvironment, AgentKind, CompilerException, Femto, File, FileMode, LiteralParser},
+  api.{ PlotInterface, CommandLogoThunk, Dump, Exceptions, ExtensionManager => APIEM, ExternalResourceManager,
+    ExportPlotWarningAction, JobOwner, LabProtocol, LibraryManager, LogoException, MersenneTwisterFast, ModelType,
+    PreviewCommands, ReporterLogoThunk, SimpleJobOwner },
+  core.{ CompilationEnvironment, AgentKind, CompilerException, Femto, File, FileMode, I18N, LiteralParser},
   nvm.{ Activation, Command, Context, FileManager, ImportHandler,
     Instruction, Job, MutableLong, Procedure, RuntimePrimitiveException, Workspace },
     Procedure.{ NoProcedures, ProceduresMap },
@@ -36,17 +37,22 @@ object AbstractWorkspace {
     if (str == null)
       "Untitled"
     else {
-      var result = str
-      var suffixIndex = str.lastIndexOf(".nlogo")
-      if (suffixIndex > 0 && suffixIndex == result.size - 6)
-        result = result.substring(0, result.size - 6)
-      suffixIndex = result.lastIndexOf(".nlogo3d")
-      if (suffixIndex > 0 && suffixIndex == result.size - 8)
-        result = result.substring(0, str.size - 8)
-      result
+      val suffixIndex = str.lastIndexOf(".nlogo")
+
+      if (suffixIndex > 0) {
+        val suffix = str.substring(suffixIndex)
+
+        if (suffix == ".nlogo" || suffix == ".nlogo3d" || suffix == ".nlogox" || suffix == ".nlogox3d")
+          str.substring(0, suffixIndex)
+        else
+          str
+      }
+
+      else
+        str
     }
 
-  def setHeadlessProperty() {
+  def setHeadlessProperty(): Unit = {
     // force headless mode if it is not set.  This is necessary for the headless workspace to run
     // on most platforms when a display is not available. --CLB
     // note that since our check is for null, so the user can still force the property to false and
@@ -65,6 +71,26 @@ with Compiling with Profiling with Extensions with BehaviorSpace with Paths with
 with RunCache with Jobs with Warning with OutputArea with Importing
 with ExtendableWorkspace with ExtensionCompilationEnvironment with APIConformant {
   val fileManager: FileManager = new DefaultFileManager(this)
+
+  protected val resourceManager = new ExternalResourceManager
+
+  def getResourceManager: ExternalResourceManager =
+    resourceManager
+
+  private var _shouldUpdatePlots: Boolean = true
+  def shouldUpdatePlots(): Boolean = this._shouldUpdatePlots
+  def setShouldUpdatePlots(update: Boolean) = {
+    this._shouldUpdatePlots = update
+  }
+
+  def triedToExportPlot(): Boolean = false
+  def setTriedToExportPlot(triedToExport: Boolean) = ()
+
+  private var _exportPlotWarningAction: ExportPlotWarningAction = ExportPlotWarningAction.Output
+  def exportPlotWarningAction(): ExportPlotWarningAction = this._exportPlotWarningAction
+  def setExportPlotWarningAction(action: ExportPlotWarningAction) = {
+    this._exportPlotWarningAction = action
+  }
 
   private var _previewCommands: PreviewCommands = PreviewCommands.Default
   /**
@@ -85,27 +111,29 @@ with ExtendableWorkspace with ExtensionCompilationEnvironment with APIConformant
   // otherwise we don't get accurate runtime error locations
   // we pass in the Instruction so that we dont have to duplicate the exception logic in both locations.
   // JC 5/19/10
-  def tick(context: Context, originalInstruction: Instruction) {
+  def tick(context: Context, originalInstruction: Instruction): Unit = {
     if(world.tickCounter.ticks == -1)
       throw new RuntimePrimitiveException(context, originalInstruction,
         "The tick counter has not been started yet. Use RESET-TICKS.")
     world.tickCounter.tick()
-    updatePlots(context)
+    if (shouldUpdatePlots()) {
+      updatePlots(context)
+    }
     requestDisplayUpdate(true)
   }
 
-  def resetTicks(context: Context) {
+  def resetTicks(context: Context): Unit = {
     world.tickCounter.reset()
     setupPlots(context)
     updatePlots(context)
     requestDisplayUpdate(true)
   }
 
-  def clearTicks() {
+  def clearTicks(): Unit = {
     world.tickCounter.clear()
   }
 
-  def clearAll() {
+  def clearAll(): Unit = {
     world.clearAll()
     clearOutput()
     clearDrawing()
@@ -116,9 +144,10 @@ with ExtendableWorkspace with ExtensionCompilationEnvironment with APIConformant
   def seedRNGs(seed: Int): Unit = {
     mainRNG.setSeed(seed)
     auxRNG.setSeed(seed)
+    plotRNG.setSeed(seed)
   }
 
-  def openString(modelContents: String)
+  def openString(modelContents: String): Unit
 
   override def getCompilationEnvironment = {
     import java.net.MalformedURLException
@@ -147,7 +176,7 @@ with ExtendableWorkspace with ExtensionCompilationEnvironment with APIConformant
    * allowing resources to be freed.
    */
   @throws(classOf[InterruptedException])
-  def dispose() {
+  def dispose(): Unit = {
     jobManager.die()
     plotManager.forgetAll()
     getExtensionManager.reset()
@@ -156,7 +185,7 @@ with ExtendableWorkspace with ExtensionCompilationEnvironment with APIConformant
   override def mainRNG = world.mainRNG
   override def auxRNG = world.auxRNG
   override def lastLogoException: LogoException = null
-  override def clearLastLogoException() { }
+  override def clearLastLogoException(): Unit = { }
 
 }
 
@@ -180,7 +209,7 @@ object AbstractWorkspaceTraits {
   trait Procedures { this: AbstractWorkspace =>
     var procedures: ProceduresMap =
       NoProcedures
-    def init() {
+    def init(): Unit = {
       procedures.values.foreach(_.init(this))
     }
   }
@@ -188,11 +217,13 @@ object AbstractWorkspaceTraits {
 
   trait Plotting { this: AbstractWorkspace with Evaluating =>
 
-    val realPlotManager = new PlotManager(this)
+    val plotRNG = this.world.mainRNG.clone
+
+    val realPlotManager = new PlotManager(this, plotRNG)
     val plotManager     = realPlotManager
 
     // methods used when importing plots
-    def currentPlot(plot: String) {
+    def currentPlot(plot: String): Unit = {
       plotManager.currentPlot = plotManager.maybeGetPlot(plot)
     }
 
@@ -203,11 +234,11 @@ object AbstractWorkspaceTraits {
     // runtime.  So once we know the Context, we store it in a bit of mutable state
     // in Evaluator. - ST 3/2/10
 
-    def updatePlots(c: Context) {
+    def updatePlots(c: Context): Unit = {
       evaluator.withContext(c){ plotManager.updatePlots() }
     }
 
-    def setupPlots(c: Context) {
+    def setupPlots(c: Context): Unit = {
       evaluator.withContext(c){ plotManager.setupPlots() }
     }
 
@@ -215,13 +246,28 @@ object AbstractWorkspaceTraits {
 
   trait Exporting extends Plotting { this: AbstractWorkspace with Evaluating =>
 
-    def exportDrawingToCSV(writer:PrintWriter)
-    def exportOutputAreaToCSV(writer:PrintWriter)
+    def exportDrawingToCSV(writer:PrintWriter): Unit
+    def exportOutputAreaToCSV(writer:PrintWriter): Unit
+
+    def checkPlotUpdates(): Unit = {
+      import ExportPlotWarningAction._
+      exportPlotWarningAction() match {
+        case Warn => {
+          setExportPlotWarningAction(ExportPlotWarningAction.Ignore)
+          throw new Exception(I18N.shared.get("tools.behaviorSpace.runoptions.updateplotsandmonitors.error"))
+        }
+        case Output => {
+          setExportPlotWarningAction(ExportPlotWarningAction.Ignore)
+          println(I18N.shared.get("tools.behaviorSpace.runoptions.updateplotsandmonitors.error"))
+        }
+        case Ignore =>
+      }
+    }
 
     @throws(classOf[IOException])
-    def exportWorld(filename: String) {
+    def exportWorld(filename: String): Unit = {
       new AbstractExporter(filename) {
-        def export(writer: PrintWriter): Unit = {
+        def `export`(writer: PrintWriter): Unit = {
           exportWorldNoMeta(writer)
         }
       }.export("world", getModelFileName, "")
@@ -240,7 +286,7 @@ object AbstractWorkspaceTraits {
       getExtensionManager.exportWorld(writer)
     }
 
-    def exportPlotsToCSV(writer: PrintWriter) {
+    def exportPlotsToCSV(writer: PrintWriter): Unit = {
       writer.println(Dump.csv.encode("PLOTS"))
       writer.println(
         Dump.csv.encode(
@@ -252,9 +298,9 @@ object AbstractWorkspaceTraits {
     }
 
     @throws(classOf[IOException])
-    def exportPlot(plotName: String,filename: String) {
+    def exportPlot(plotName: String,filename: String): Unit = {
       new AbstractExporter(filename) {
-        override def export(writer: PrintWriter) {
+        override def `export`(writer: PrintWriter): Unit = {
           exportInterfaceGlobals(writer)
           new CorePlotExporter(plotManager.maybeGetPlot(plotName).orNull, Dump.csv).export(writer)
         }
@@ -262,9 +308,9 @@ object AbstractWorkspaceTraits {
     }
 
     @throws(classOf[IOException])
-    def exportAllPlots(filename: String) {
+    def exportAllPlots(filename: String): Unit = {
       new AbstractExporter(filename) {
-        override def export(writer: PrintWriter) {
+        override def `export`(writer: PrintWriter): Unit = {
           exportInterfaceGlobals(writer)
 
           plotManager.getPlotNames.foreach { name =>
@@ -275,7 +321,7 @@ object AbstractWorkspaceTraits {
       }.export("plots",getModelFileName,"")
     }
 
-    def exportInterfaceGlobals(writer: java.io.PrintWriter) {
+    def exportInterfaceGlobals(writer: java.io.PrintWriter): Unit = {
       writer.println(Dump.csv.header("MODEL SETTINGS"))
       val globals = world.program.interfaceGlobals
       writer.println(Dump.csv.variableNameRow(globals))
@@ -324,19 +370,19 @@ object AbstractWorkspaceTraits {
     def makeCommandThunk(source: String, jobOwnerName: String, rng: MersenneTwisterFast): CommandLogoThunk =
       evaluator.makeCommandThunk(source, world.observer,
         new SimpleJobOwner(jobOwnerName, rng, AgentKind.Observer))
-    def evaluateCommands(owner: JobOwner, source: String) {
+    def evaluateCommands(owner: JobOwner, source: String): Unit = {
       evaluator.evaluateCommands(owner, source)
     }
-    def evaluateCommands(owner: JobOwner, source: String, waitForCompletion: Boolean) {
+    def evaluateCommands(owner: JobOwner, source: String, waitForCompletion: Boolean): Unit = {
       evaluator.evaluateCommands(owner, source, world.observers, waitForCompletion)
     }
     def evaluateCommands(owner: JobOwner, source: String, agent: Agent,
-                         waitForCompletion: Boolean) {
+                         waitForCompletion: Boolean): Unit = {
       evaluator.evaluateCommands(owner, source,
         AgentSet.fromAgent(agent), waitForCompletion)
     }
     def evaluateCommands(owner: JobOwner, source: String, agents: AgentSet,
-                         waitForCompletion: Boolean) {
+                         waitForCompletion: Boolean): Unit = {
       evaluator.evaluateCommands(owner, source, agents, waitForCompletion)
     }
     def evaluateReporter(owner: JobOwner, source: String) =
@@ -362,9 +408,9 @@ object AbstractWorkspaceTraits {
   }
 
   trait Benchmarking { this: AbstractWorkspace =>
-    override def benchmark(minTime: Int, maxTime: Int) {
+    override def benchmark(minTime: Int, maxTime: Int): Unit = {
       new Thread("__bench") {
-        override def run() {
+        override def run(): Unit = {
           Benchmarker.benchmark(
             Benchmarking.this, minTime, maxTime)
         }}.start()
@@ -375,7 +421,7 @@ object AbstractWorkspaceTraits {
     private var _tracer: org.nlogo.nvm.Tracer = null
     override def profilingEnabled = _tracer != null
     override def profilingTracer = _tracer
-    def setProfilingTracer(tracer: org.nlogo.nvm.Tracer) {
+    def setProfilingTracer(tracer: org.nlogo.nvm.Tracer): Unit = {
       _tracer = tracer
     }
   }
@@ -389,7 +435,7 @@ object AbstractWorkspaceTraits {
     override def isExtensionName(name: String) =
       _extensionManager.isExtensionName(name)
     @throws(classOf[org.nlogo.api.ExtensionException])
-    override def importExtensionData(name: String, data: java.util.List[Array[String]], handler: org.nlogo.api.ImportErrorHandler) {
+    override def importExtensionData(name: String, data: java.util.List[Array[String]], handler: org.nlogo.api.ImportErrorHandler): Unit = {
       _extensionManager.importExtensionData(name, data, handler)
     }
 
@@ -408,9 +454,14 @@ object AbstractWorkspaceTraits {
 
   trait BehaviorSpace { this: api.Workspace =>
     private var _behaviorSpaceRunNumber = 0
+    private var _behaviorSpaceExperiments = List[LabProtocol]()
     override def behaviorSpaceRunNumber = _behaviorSpaceRunNumber
-    override def behaviorSpaceRunNumber(n: Int) {
+    override def behaviorSpaceRunNumber(n: Int): Unit = {
       _behaviorSpaceRunNumber = n
+    }
+    override def getBehaviorSpaceExperiments = _behaviorSpaceExperiments
+    override def setBehaviorSpaceExperiments(experiments: List[LabProtocol]): Unit = {
+      _behaviorSpaceExperiments = experiments
     }
   }
 
@@ -420,7 +471,7 @@ object AbstractWorkspaceTraits {
      * name of the currently loaded model. Will be null if this is a new
      * (unsaved) model. To get a version for display to the user, see
      * modelNameForDisplay(). This is NOT a full path name, however, it does
-     * end in ".nlogo".
+     * end in ".nlogox(3d)".
      */
     private var _modelFileName: String = null
 
@@ -438,7 +489,7 @@ object AbstractWorkspaceTraits {
      */
     private var _modelType: ModelType = ModelType.New
 
-    def setModelType(modelType: ModelType) {
+    def setModelType(modelType: ModelType): Unit = {
       _modelType = modelType
     }
 
@@ -479,7 +530,7 @@ object AbstractWorkspaceTraits {
     def modelNameForDisplay =
       AbstractWorkspace.makeModelNameForDisplay(_modelFileName)
 
-    def setModelPath(modelPath: String) {
+    def setModelPath(modelPath: String): Unit = {
       if (modelPath == null) {
         _modelFileName = null
         _modelDir = null
@@ -501,13 +552,13 @@ object AbstractWorkspaceTraits {
   // and "runresult" prims - ST 6/7/07
   trait RunCache { this: AbstractWorkspace =>
     private val runCache = new java.util.WeakHashMap[String, Procedure]
-    def clearRunCache() {
+    def clearRunCache(): Unit = {
       runCache.clear()
     }
     def compileForRun(source: String, context: Context, reporter: Boolean): Procedure = {
+      val taskType = if (reporter) { "reporter" } else { "command" }
       val key =
-        source + "@" + context.activation.procedure.args.size +
-          "@" + context.agentBit
+        s"$source@${context.activation.procedure.args.size}@${context.agentBit}-$taskType"
       Option(runCache.get(key)).getOrElse{
         val proc = evaluator.compileForRun(source, context, reporter)
         runCache.put(key, proc)
@@ -520,15 +571,15 @@ object AbstractWorkspaceTraits {
     val jobManager: nvm.JobManagerInterface =
       Femto.get("org.nlogo.job.JobManager",
         this, world, world)
-    def halt() {
+    def halt(): Unit = {
       jobManager.haltPrimary()
       world.displayOn(true)
     }
     /// methods that may be called from the job thread by prims
-    def joinForeverButtons(agent: Agent) {
+    def joinForeverButtons(agent: Agent): Unit = {
       jobManager.joinForeverButtons(agent)
     }
-    def addJobFromJobThread(job: Job) {
+    def addJobFromJobThread(job: Job): Unit = {
       jobManager.addJobFromJobThread(job)
     }
   }
@@ -550,13 +601,13 @@ object AbstractWorkspaceTraits {
 
   trait OutputArea { this: AbstractWorkspace =>
 
-    def clearOutput()
+    def clearOutput(): Unit
 
     // called from job thread - ST 10/1/03
-    def sendOutput(oo: agent.OutputObject, toOutputArea: Boolean)
+    def sendOutput(oo: agent.OutputObject, toOutputArea: Boolean): Unit
 
     /// importing
-    def setOutputAreaContents(text: String) {
+    def setOutputAreaContents(text: String): Unit = {
       try {
         clearOutput()
         if (text.nonEmpty)
@@ -565,7 +616,7 @@ object AbstractWorkspaceTraits {
       catch { case e: LogoException => Exceptions.handle(e) }
     }
 
-    def outputObject(obj: AnyRef, owner: AnyRef, addNewline: Boolean, readable: Boolean, destination: api.OutputDestination) {
+    def outputObject(obj: AnyRef, owner: AnyRef, addNewline: Boolean, readable: Boolean, destination: api.OutputDestination): Unit = {
       val caption = owner match {
         case _: agent.Agent =>
           Dump.logoObject(owner)
@@ -592,27 +643,27 @@ object AbstractWorkspaceTraits {
 
     abstract class FileImporter(val filename: String) {
       @throws(classOf[java.io.IOException])
-      def doImport(reader: File)
+      def doImport(reader: File): Unit
     }
 
     def importerErrorHandler: agent.ImporterJ.ErrorHandler
 
     @throws(classOf[java.io.IOException])
-    def importWorld(filename: String) {
+    def importWorld(filename: String): Unit = {
       // we need to clearAll before we import in case
       // extensions are hanging on to old data. ev 4/10/09
       clearAll()
       doImport(
         new BufferedReaderImporter(filename) {
           @throws(classOf[java.io.IOException])
-          override def doImport(reader: java.io.BufferedReader) {
+          override def doImport(reader: java.io.BufferedReader): Unit = {
               world.asInstanceOf[agent.World].importWorld(
                 importerErrorHandler, Importing.this, stringReader, reader)
           }})
     }
 
     @throws(classOf[java.io.IOException])
-    def importWorld(reader: java.io.Reader) {
+    def importWorld(reader: java.io.Reader): Unit = {
       // we need to clearAll before we import in case
       // extensions are hanging on to old data. ev 4/10/09
       clearAll()
@@ -634,17 +685,20 @@ object AbstractWorkspaceTraits {
     @throws(classOf[java.io.IOException])
     def importDrawingBase64(base64: String): Unit = {
       val MimeRegex = "data:(.*);base64".r
-      val Array(MimeRegex(contentType), byteString) = base64.split(",")
+      val (contentType, byteString) = base64.split(",") match {
+        case Array(MimeRegex(c), b) => (c, b)
+        case _ => throw new IllegalStateException
+      }
       val bytes = Base64.getDecoder.decode(byteString)
       importDrawing(new ByteArrayInputStream(bytes), Option(contentType))
     }
 
     @throws(classOf[java.io.IOException])
-    def importDrawing(filename: String) {
+    def importDrawing(filename: String): Unit = {
       doImport(
         new FileImporter(filename) {
           @throws(classOf[java.io.IOException])
-          override def doImport(file: File) {
+          override def doImport(file: File): Unit = {
             importDrawing(file)
           }
         })
@@ -659,7 +713,7 @@ object AbstractWorkspaceTraits {
     def importDrawing(is: InputStream, mimeTypeOpt: Option[String] = None): Unit
 
     @throws(classOf[java.io.IOException])
-    def doImport(importer: BufferedReaderImporter) {
+    def doImport(importer: BufferedReaderImporter): Unit = {
       val file = new api.LocalFile(importer.filename)
       try {
         file.open(FileMode.Read)
@@ -673,7 +727,7 @@ object AbstractWorkspaceTraits {
     }
 
     @throws(classOf[java.io.IOException])
-    def doImport(importer: FileImporter) {
+    def doImport(importer: FileImporter): Unit = {
       importer.doImport(
         new api.LocalFile(importer.filename))
     }

@@ -2,26 +2,24 @@
 
 package org.nlogo.window
 
-import java.util.{ ArrayList => ArrayJList, List => JList }
-
-import org.nlogo.core.{ CompilerException, I18N, UpdateMode, View => CoreView, WorldDimensions }
-import org.nlogo.api.{ Editable, Property, WorldPropertiesInterface }
+import org.nlogo.api.WorldPropertiesInterface
+import org.nlogo.core.{ CompilerException, UpdateMode, View => CoreView, Widget => CoreWidget, WorldDimensions }
 import org.nlogo.workspace.WorldLoaderInterface
 
-abstract class WorldViewSettings(protected val workspace: GUIWorkspace, protected val gWidget: ViewWidget, tickCounter: TickCounterLabel)
-    extends Editable
-    with WorldLoaderInterface
-    with WorldPropertiesInterface {
+trait WorldIntegerEditor {
+  def setEnabled(enabled: Boolean): Unit
+  def set(value: Int): Unit
+}
 
-  val dimensionProperties: JList[Property] = new ArrayJList[Property]()
-  val wrappingProperties: JList[Property] = new ArrayJList[Property]()
-  val viewProperties: JList[Property] = new ArrayJList[Property]()
-  val modelProperties: JList[Property] = new ArrayJList[Property]()
-  val cornerChoices: JList[OriginConfiguration] = new ArrayJList[OriginConfiguration]()
-  val edgeChoices: JList[OriginConfiguration] = new ArrayJList[OriginConfiguration]()
-  val originConfigurations: JList[OriginConfiguration] = new ArrayJList[OriginConfiguration]()
+abstract class WorldViewSettings(protected val workspace: GUIWorkspace, protected val gWidget: ViewWidget,
+                                 tickCounter: TickCounterLabel)
+  extends Editable with WorldLoaderInterface with WorldPropertiesInterface {
 
-  protected var _propertySet: JList[Property] = null
+  protected var originType: OriginType = OriginType.Center
+  protected var originConfig: Option[OriginConfiguration] = None
+
+  protected var originalType: OriginType = originType
+  protected var originalConfig: Option[OriginConfiguration] = originConfig
 
   protected var wrappingChanged: Boolean = false
   protected var edgesChanged: Boolean = false
@@ -42,147 +40,87 @@ abstract class WorldViewSettings(protected val workspace: GUIWorkspace, protecte
 
   protected var _error: Option[CompilerException] = None
 
-  addProperties()
-
   def classDisplayName: String = "Model Settings"
 
   def resizeWithProgress(showProgress: Boolean): Unit
 
-  def model: CoreView
+  def model: CoreWidget
 
-  def addWrappingProperties(): Unit
-  def addDimensionProperties(): Unit
+  val originTypes: Seq[OriginType] = Seq(OriginType.Center, OriginType.Corner, OriginType.Edge, OriginType.Custom)
 
-  protected def addProperties(): Unit = {
-    propertySet(new ArrayJList[Property]())
-    addDimensionProperties()
-    addWrappingProperties()
-    addViewProperties()
-    addModelProperties()
-    addCornerChoices()
-    addEdgeChoices()
-    addOriginConfigurations()
+  def cornerConfigs: Seq[OriginConfiguration]
+  def edgeConfigs: Seq[OriginConfiguration]
+
+  def getSelectedType: OriginType =
+    originType
+
+  def getSelectedConfig: Option[OriginConfiguration] =
+    originConfig
+
+  def setOriginType(originType: OriginType): Unit = {
+    this.originType = originType
+
+    originConfig = None
   }
 
-  def addViewProperties(): Unit = {
-    viewProperties.addAll(Properties.view2D)
+  def setOriginConfig(originConfig: Option[OriginConfiguration]): Unit = {
+    this.originConfig = originConfig
   }
 
-  def addModelProperties(): Unit = {
-    modelProperties.addAll(Properties.model)
+  // helper for determining origin info from loaded patch coordinates (Isaac B 3/12/25)
+  def setTypeAndConfig(): Unit = {
+    val (x, y, z) = getNorms
+
+    if (x == 0.5 && y == 0.5 && z == 0.5) {
+      originType = OriginType.Center
+      originConfig = None
+    } else {
+      val corner = cornerConfigs.find(config => config.x == x && config.y == y && config.z == z)
+
+      if (corner.isDefined) {
+        originType = OriginType.Corner
+        originConfig = corner
+      } else {
+        val edge = edgeConfigs.find(config => config.x == x && config.y == y && config.z == z)
+
+        if (edge.isDefined) {
+          originType = OriginType.Edge
+          originConfig = edge
+        } else {
+          originType = OriginType.Custom
+          originConfig = None
+        }
+      }
+    }
+
+    originalType = originType
+    originalConfig = originConfig
   }
 
-  def refreshViewProperties(threedView: Boolean): Unit = {
-    viewProperties.clear()
-    addViewProperties()
-    if (threedView)
-      viewProperties.addAll(Properties.view3D)
+  // calculate normalized origin coordinates, for use in setTypeAndConfig (Isaac B 3/12/25)
+  protected def getNorms: (Float, Float, Float)
+
+  def configureEditors(editors: Seq[WorldIntegerEditor]): Unit
+
+  def apply(): Unit = {
+    originalType = originType
+    originalConfig = originConfig
   }
 
-  def addCornerChoices(): Unit = {
-    cornerChoices.add(new OriginConfiguration(I18N.gui.get("edit.viewSettings.origin.location.corner.bottomLeft"),
-        Array(false, true, false, true),
-        Array(true, false, true, false)))
-    cornerChoices.add(new OriginConfiguration(I18N.gui.get("edit.viewSettings.origin.location.corner.topLeft"),
-        Array(false, true, true, false),
-        Array(true, false, false, true)))
-    cornerChoices.add(new OriginConfiguration(I18N.gui.get("edit.viewSettings.origin.location.corner.topRight"),
-        Array(true, false, true, false),
-        Array(false, true, false, true)))
-    cornerChoices.add(new OriginConfiguration(I18N.gui.get("edit.viewSettings.origin.location.corner.bottomRight"),
-        Array(true, false, false, true),
-        Array(false, true, true, false)))
+  def revert(): Unit = {
+    originType = originalType
+    originConfig = originalConfig
   }
 
-  def addEdgeChoices(): Unit = {
-    edgeChoices.add(new OriginConfiguration(I18N.gui.get("edit.viewSettings.origin.location.edge.bottom"),
-        Array(true, true, false, true),
-        Array(false, false, true, false)))
-    edgeChoices.add(new OriginConfiguration(I18N.gui.get("edit.viewSettings.origin.location.edge.top"),
-        Array(true, true, true, false),
-        Array(false, false, false, true)))
-    edgeChoices.add(new OriginConfiguration(I18N.gui.get("edit.viewSettings.origin.location.edge.right"),
-        Array(true, false, true, true),
-        Array(false, true, false, false)))
-    edgeChoices.add(new OriginConfiguration(I18N.gui.get("edit.viewSettings.origin.location.edge.left"),
-        Array(false, true, true, true),
-        Array(true, false, false, false)))
-  }
-
-  def addOriginConfigurations(): Unit = {
-    originConfigurations.add(new OriginConfiguration
-        (I18N.gui.get("edit.viewSettings.origin.location.center"),
-            Array(false, true, false, true),
-            Array(false, false, false, false)))
-    originConfigurations.add(new OriginConfiguration
-        (I18N.gui.get("edit.viewSettings.origin.location.corner"),
-            Array(true, true, true, true),
-            Array(false, false, false, false)))
-    originConfigurations.add(new OriginConfiguration
-        (I18N.gui.get("edit.viewSettings.origin.location.edge"),
-            Array(true, true, true, true),
-            Array(false, false, false, false)))
-    originConfigurations.add(new OriginConfiguration
-        (I18N.gui.get("edit.viewSettings.origin.location.custom"),
-            Array(true, true, true, true),
-            Array(false, false, false, false)))
-  }
-
-  def firstEditor: Int = 0
-
-  def lastEditor: Int = 3
-
-  def getSelectedLocation: Int = {
-    val minx = minPxcor
-    val maxx = maxPxcor
-    val miny = minPycor
-    val maxy = maxPycor
-
-    if (minx == (-maxx) && miny == (-maxy))
-      0
-    else if ((minx == 0 || maxx == 0) && (miny == 0 || maxy == 0))
-      1
-    else if (minx == 0 || maxx == 0 || miny == 0 || maxy == 0)
-      2
-    else
-      3
-  }
-
-  def getSelectedConfiguration: Int = {
-    val minx = minPxcor
-    val maxx = maxPxcor
-    val miny = minPycor
-    val maxy = maxPycor
-
-    if (minx == 0 && miny == 0)
-      0
-    else if (minx == 0 && maxy == 0)
-      1
-    else if (maxx == 0 && maxy == 0)
-      2
-    else if (maxx == 0 && miny == 0)
-      3
-    else if (minx == 0)
-      3
-    else if (maxx == 0)
-      2
-    else if (miny == 0)
-      0
-    else if (maxy == 0)
-      1
-    else
-      0
-  }
-
-  def load(view: CoreView): AnyRef = {
+  def load(view: CoreWidget): AnyRef = {
     workspace.world.displayOn(false)
-    workspace.loadWorld(view, this)
+    workspace.loadWorld(view.asInstanceOf[CoreView], this)
     // we can't clearAll here because the globals may not
     // be allocated yet ev 7/12/06
     // note that we clear turtles inside the load method so
     // it can happen before we set the topology ev 7/19/06
-    workspace.world.tickCounter.clear
-    workspace.world.clearPatches
+    workspace.world.tickCounter.clear()
+    workspace.world.clearPatches()
     workspace.world.displayOn(true)
     this
   }
@@ -212,11 +150,7 @@ abstract class WorldViewSettings(protected val workspace: GUIWorkspace, protecte
 
   def helpLink = Option.empty[String]
 
-  def propertySet: JList[Property] = _propertySet
-
-  def propertySet(propertySet: JList[Property]): Unit = {
-    _propertySet = propertySet
-  }
+  override def liveUpdate: Boolean = false
 
   def minPxcor(minPxcor: Int): Unit = {
     if (minPxcor <= 0) {
@@ -343,9 +277,9 @@ abstract class WorldViewSettings(protected val workspace: GUIWorkspace, protecte
     error(e)
   }
 
-  def error: Exception = _error.orNull
+  def error(): Option[Exception] = _error
 
-  def error(a: AnyRef): Exception = _error.orNull
+  def error(a: AnyRef): Option[Exception] = _error
 
   def setSize(x: Int, y: Int): Unit = {
     gWidget.setSize(x, y)
@@ -353,7 +287,7 @@ abstract class WorldViewSettings(protected val workspace: GUIWorkspace, protecte
 
   def getMinimumWidth: Int = gWidget.getMinimumSize.width
 
-  def insetWidth: Int = gWidget.insetWidth
+  def insetWidth(): Int = gWidget.insetWidth
 
   def computePatchSize(width: Int, numPatches: Int): Double =
     gWidget.computePatchSize(width, numPatches)

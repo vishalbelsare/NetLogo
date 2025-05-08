@@ -24,8 +24,8 @@ the stack traces, not the results.
  */
 
 import org.scalatest.funsuite.AnyFunSuite
-import org.nlogo.api.{LogoException, ExtensionException, Argument, Context, Command, WorldDimensions3D, Version}
-import org.nlogo.core.Syntax
+import org.nlogo.api.{LogoException, ExtensionException, Argument, Context, Command, Version}
+import org.nlogo.core.{ Syntax, WorldDimensions3D }
 import org.nlogo.workspace.{DummyClassManager, InMemoryExtensionLoader}
 import org.nlogo.core.{WorldDimensions, View, Model}
 
@@ -68,7 +68,7 @@ error while observer running __BOOM
     assert(trace.take(2000).startsWith(
       """|stack overflow (recursion too deep)
          |  error while observer running RUN""".stripMargin))
-    trace.lines.drop(2).take(100).toSeq.dropRight(1).foreach(l =>
+    trace.linesIterator.drop(2).take(100).toSeq.dropRight(1).foreach(l =>
         assert(l === "  called by run" ||
           l === "  called by procedure OVERFLOW-RUN"))
   }
@@ -78,7 +78,7 @@ error while observer running __BOOM
     assert(trace.take(2000).startsWith(
       """|stack overflow (recursion too deep)
          |  error while observer running REPORT""".stripMargin))
-    trace.lines.drop(2).take(100).foreach(l =>
+    trace.linesIterator.drop(2).take(100).foreach(l =>
         assert(l === "  called by runresult" ||
           l === "  called by procedure OVERFLOW"))
   }
@@ -89,7 +89,7 @@ error while observer running __BOOM
     assert(trace.take(2000).startsWith(
       """|stack overflow (recursion too deep)
          |  error while observer running FOREACH""".stripMargin))
-    trace.lines.drop(2).take(100).toSeq.dropRight(1).foreach(l =>
+    trace.linesIterator.drop(2).take(100).toSeq.dropRight(1).foreach(l =>
         assert(l === "  called by foreach" ||
           l === "  called by procedure OVERFLOW-FOREACH"))
   }
@@ -103,7 +103,7 @@ class TestExtensionStackTraces extends AnyFunSuite {
       override val barPrim = new Command {
         def getAgentClassString = "OTPL"
         override def getSyntax = Syntax.commandSyntax()
-        override def perform(args: Array[Argument], context: Context) {
+        override def perform(args: Array[Argument], context: Context): Unit = {
           throw new ExtensionException(wrapperCause)
         }
       }

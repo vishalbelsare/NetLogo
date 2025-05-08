@@ -19,7 +19,7 @@ class Circle(color: Color) extends Element(color) with BaseCircle with Cloneable
 
   override def diameter: Int = bounds.getWidth.toInt
 
-  def this(center: Point, circum: Point, color: Color) {
+  def this(center: Point, circum: Point, color: Color) = {
     this(color)
     val radius: Double = distance(center, circum)
     x = center.x - round(radius).toInt
@@ -28,7 +28,7 @@ class Circle(color: Color) extends Element(color) with BaseCircle with Cloneable
     yDiameter = xDiameter
   }
 
-  def this(x: Int, y: Int, xDiameter: Int, color: Color) {
+  def this(x: Int, y: Int, xDiameter: Int, color: Color) = {
     this(color)
     this.x = x
     this.y = y
@@ -36,13 +36,19 @@ class Circle(color: Color) extends Element(color) with BaseCircle with Cloneable
     yDiameter = xDiameter
   }
 
+  def this(color: Color, filled: Boolean, marked: Boolean, x: Int, y: Int, diameter: Int) = {
+    this(x, y, diameter, color)
+    this.filled = filled
+    this.marked = marked
+  }
+
   def origin: Point =
-    new Point(x + round(xDiameter / 2), y + round(yDiameter / 2))
+    new Point(x + round(xDiameter.toFloat / 2), y + round(yDiameter.toFloat / 2))
 
   def bounds: AwtRectangle =
     new AwtRectangle(x, y, xDiameter, yDiameter)
 
-  def modify(center: Point, circum: Point) {
+  def modify(center: Point, circum: Point): Unit = {
     val radius: Double = distance(center, circum)
     x = center.x - round(radius).toInt
     y = center.y - round(radius).toInt
@@ -52,7 +58,7 @@ class Circle(color: Color) extends Element(color) with BaseCircle with Cloneable
 
   def setModifiedPoint(modified: Point): Unit = { }
 
-  def reshapeElement(oldPoint: Point, newPoint: Point) {
+  def reshapeElement(oldPoint: Point, newPoint: Point): Unit = {
     val change: Double = distance(origin, newPoint)
     x = origin.x - change.toInt
     y = origin.y - change.toInt
@@ -60,7 +66,7 @@ class Circle(color: Color) extends Element(color) with BaseCircle with Cloneable
     yDiameter = change.toInt * 2
   }
 
-  def moveElement(xOffset: Int, yOffset: Int) {
+  def moveElement(xOffset: Int, yOffset: Int): Unit = {
     x += xOffset
     y += yOffset
   }
@@ -78,7 +84,7 @@ class Circle(color: Color) extends Element(color) with BaseCircle with Cloneable
     check.contains(p.x, p.y)
   }
 
-  def draw(g: GraphicsInterface, turtleColor: Color, scale: Double, angle: Double) {
+  def draw(g: GraphicsInterface, turtleColor: Color, scale: Double, angle: Double): Unit = {
     g.setColor(displayColor(turtleColor))
     if (filled) {
       g.fillCircle(x, y, xDiameter, yDiameter, scale, angle)

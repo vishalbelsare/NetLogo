@@ -118,10 +118,14 @@ StringRunLetVarsDoNotEscape4
   O> foo => ERROR There is already a local variable here called A
 
 CannotReportOutOfRunString
-  to-report foo run "report 10" end
+  to-report foo run "report 10" report 10 end
   foo => ERROR REPORT can only be used inside TO-REPORT.
 
 StopInRunString
   globals [b]
   to foo run "stop set b 10" set b 5 end
   b => 0
+
+CheckSyntax
+  __check-syntax "plotxy ticks 3" => ""
+  __check-syntax "show x" => "Nothing named X has been defined."

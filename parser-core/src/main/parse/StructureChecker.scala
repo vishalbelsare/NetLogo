@@ -10,7 +10,7 @@ package org.nlogo.parse
 
 import
   org.nlogo.core,
-    core.{ BreedIdentifierHandler, StructureDeclarations, Token },
+    core.{ BreedIdentifierHandler, I18N, StructureDeclarations, Token, TokenType },
       StructureDeclarations.{ Breed, Declaration, Extensions, Identifier, Includes, Procedure, Variables },
     core.Fail._
 
@@ -18,7 +18,27 @@ import SymbolType._
 
 object StructureChecker {
 
-  def rejectDuplicateDeclarations(declarations: Seq[Declaration]) {
+  def rejectMisplacedConstants(declarations: Seq[Declaration]): Unit = {
+    for (declaration <- declarations) {
+      declaration match {
+        case Variables(_, names) =>
+          for (name <- names) {
+            if (name.token.tpe == TokenType.Literal) {
+              exception(I18N.errors.get("compiler.StructureChecker.variableConstant"), name.token)
+            }
+          }
+        case Procedure(_, _, inputs, _) =>
+          for (input <- inputs) {
+            if (input.token.tpe == TokenType.Literal) {
+              exception(I18N.errors.get("compiler.StructureChecker.inputConstant"), input.token)
+            }
+          }
+        case _ =>
+      }
+    }
+  }
+
+  def rejectDuplicateDeclarations(declarations: Seq[Declaration]): Unit = {
 
     // O(n^2) -- maybe we should fold instead --ST
     def checkPair(decl1: Declaration, decl2: Declaration): Option[(String, Token)] =
@@ -50,9 +70,9 @@ object StructureChecker {
 
   }
 
-  def rejectDuplicateNames(declarations: Seq[Declaration], usedNames: SymbolTable) {
+  def rejectDuplicateNames(declarations: Seq[Declaration], usedNames: SymbolTable): Unit = {
 
-    def checkForInconsistentIDs(usageIdentifier: String, usageType: SymbolType, occ: Occurrence) {
+    def checkForInconsistentIDs(usageIdentifier: String, usageType: SymbolType, occ: Occurrence): Unit = {
       cAssert(
         usageDoesNotClashWithOccurence(usageIdentifier, usageType, occ),
         duplicateOf(usageType, occ.identifier.name),
@@ -81,6 +101,23 @@ object StructureChecker {
     } {
       checkForInconsistentIDs(firstUsage.identifier.name, firstUsage.typeOfDeclaration, secondUsage)
     }
+  }
+
+  def rejectMissingReport(declarations: Seq[Declaration]): Unit = {
+    declarations.foreach(_ match {
+      case Procedure(_, true, _, tokens) =>
+        if (!tokens.exists(_ match {
+          case Token(_, TokenType.Ident, "REPORT") |
+               Token(_, TokenType.Ident, "RUN") |
+               Token(_, TokenType.Ident, "RUNRESULT") |
+               Token(_, TokenType.Ident, "ERROR") => true
+          case _ => false
+        })) {
+          exception("Reporter procedures must report a value", tokens(1))
+        }
+
+      case _ =>
+    })
   }
 
   def breedPrimitives(declarations: Seq[Declaration]): SymbolTable = {
@@ -169,23 +206,23 @@ object StructureChecker {
 
   private def breedOverridesBuiltIn(breed: Breed, duplicatedType: SymbolType, duplicatedName: String): String = {
     val typeName = SymbolType.typeName(duplicatedType)
-    s"Defining a breed [${breed.plural.name} ${breed.singular.name}] redefines $duplicatedName, a $typeName"
+    I18N.errors.getN("compiler.StructureChecker.breedOverrides", s"[${breed.plural.name} ${breed.singular.name}]", duplicatedName, typeName)
   }
 
-  private def checkNotArrow(ident: Identifier) {
-    cAssert(ident.name != "->", "-> can only be used to create anonymous procedures", ident.token)
+  private def checkNotArrow(ident: Identifier): Unit = {
+    cAssert(ident.name != "->", I18N.errors.get("compiler.StructureChecker.invalidArrow"), ident.token)
   }
 
   private def redeclarationOf(kind: String) =
-    s"Redeclaration of $kind"
+    I18N.errors.getN("compiler.StructureChecker.redeclaration", kind)
 
   private def duplicateOf(symbolType: SymbolType, origName: String) = {
     val typeName = SymbolType.typeName(symbolType)
-    s"There is already a $typeName called $origName"
+    I18N.errors.getN("compiler.StructureChecker.duplicateType", typeName, origName)
   }
 
   private def duplicateVariableIdentifier(ident: Identifier) =
-    s"There is already a local variable called ${ident.name} here"
+    I18N.errors.getN("compiler.StructureChecker.duplicateVariable", ident.name)
 
   private case class Occurrence(declaration: Declaration, identifier: Identifier, typeOfDeclaration: SymbolType, isGlobal: Boolean = true)
 

@@ -17,10 +17,10 @@ trait ParallelSuite extends AnyFunSuite {
   /**
    * Run the threads, and throw any errors after all threads are completed.
    */
-  def openParallel(path: String, threadCount: Int = 10)(f: Fixture => Unit){
+  def openParallel(path: String, threadCount: Int = 10)(f: Fixture => Unit): Unit ={
     class MyThread extends Thread("testParallelOperation") {
       var exception: Option[Exception] = None
-      override def run() {
+      override def run(): Unit = {
         Fixture.withFixture(path){implicit fixture =>
           fixture.workspace.open(path)
           try f(fixture)

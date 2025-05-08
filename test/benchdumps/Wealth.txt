@@ -95,7 +95,7 @@ reporter procedure AREA-OF-EQUALITY-TRIANGLE:[]{OTPL}:
           ALOAD 1
           INVOKEVIRTUAL org/nlogo/prim/_asm_procedureareaofequalitytriangle_report_0.validDouble (DLorg/nlogo/nvm/Context;)D
          L13
-          LDC 2.0
+          LDC 2.0D
          L14
           DSTORE 4
           DSTORE 2
@@ -109,7 +109,7 @@ reporter procedure AREA-OF-EQUALITY-TRIANGLE:[]{OTPL}:
           ALOAD 0
           INVOKESTATIC org/nlogo/core/I18N.errorsJ ()Lorg/nlogo/core/I18NJava;
           LDC "org.nlogo.prim.etc.$common.divByZero"
-          INVOKEINTERFACE org/nlogo/core/I18NJava.get (Ljava/lang/String;)Ljava/lang/String;
+          INVOKEINTERFACE org/nlogo/core/I18NJava.get (Ljava/lang/String;)Ljava/lang/String; (itf)
           INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
           ATHROW
          L15
@@ -147,7 +147,7 @@ reporter procedure AREA-OF-EQUALITY-TRIANGLE:[]{OTPL}:
           ATHROW
          L18
          FRAME FULL [org/nlogo/prim/_asm_procedureareaofequalitytriangle_report_0 org/nlogo/nvm/Context java/lang/Object T D] [D D]
-          LDC 2.0
+          LDC 2.0D
          L19
           DSTORE 4
           DSTORE 2
@@ -170,7 +170,7 @@ reporter procedure AREA-OF-EQUALITY-TRIANGLE:[]{OTPL}:
           ALOAD 0
           INVOKESTATIC org/nlogo/core/I18N.errorsJ ()Lorg/nlogo/core/I18NJava;
           LDC "org.nlogo.prim.etc.$common.divByZero"
-          INVOKEINTERFACE org/nlogo/core/I18NJava.get (Ljava/lang/String;)Ljava/lang/String;
+          INVOKEINTERFACE org/nlogo/core/I18NJava.get (Ljava/lang/String;)Ljava/lang/String; (itf)
           INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
           ATHROW
          L21
@@ -216,7 +216,7 @@ reporter procedure AREA-OF-EQUALITY-TRIANGLE:[]{OTPL}:
           ICONST_0
           LDC "REPORT"
           AASTORE
-          INVOKEINTERFACE org/nlogo/core/I18NJava.getN (Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;
+          INVOKEINTERFACE org/nlogo/core/I18NJava.getN (Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String; (itf)
           INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
           ATHROW
          L23
@@ -247,7 +247,7 @@ reporter procedure AREA-OF-EQUALITY-TRIANGLE:[]{OTPL}:
           ICONST_0
           LDC "REPORT"
           AASTORE
-          INVOKEINTERFACE org/nlogo/core/I18NJava.getN (Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;
+          INVOKEINTERFACE org/nlogo/core/I18NJava.getN (Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String; (itf)
           INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
           ATHROW
          L25
@@ -261,7 +261,7 @@ reporter procedure AREA-OF-EQUALITY-TRIANGLE:[]{OTPL}:
           ALOAD 0
           INVOKESTATIC org/nlogo/core/I18N.errorsJ ()Lorg/nlogo/core/I18NJava;
           LDC "org.nlogo.prim._returnreport.reportNotCalledInReportProcedure"
-          INVOKEINTERFACE org/nlogo/core/I18NJava.get (Ljava/lang/String;)Ljava/lang/String;
+          INVOKEINTERFACE org/nlogo/core/I18NJava.get (Ljava/lang/String;)Ljava/lang/String; (itf)
           INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
           ATHROW
          L1
@@ -274,18 +274,18 @@ procedure BENCHMARK:[_repeatlocal:0]{O---}:
           // parameter final  context
           // parameter final  arg0
          L0
-          LDC 48281.0
+          LDC 48281.0D
          L1
           DSTORE 2
           DLOAD 2
           D2L
           LSTORE 4
           LLOAD 4
-          LDC -2147483648
+          LDC -2147483648L
           LCMP
           IFLT L2
           LLOAD 4
-          LDC 2147483647
+          LDC 2147483647L
           LCMP
           IFLE L3
          L2
@@ -294,32 +294,67 @@ procedure BENCHMARK:[_repeatlocal:0]{O---}:
           DUP
           ALOAD 1
           ALOAD 0
-          NEW java/lang/StringBuilder
-          DUP
-          LDC 75
-          INVOKESPECIAL java/lang/StringBuilder.<init> (I)V
           GETSTATIC org/nlogo/api/Dump$.MODULE$ : Lorg/nlogo/api/Dump$;
           DLOAD 2
           INVOKEVIRTUAL org/nlogo/api/Dump$.number (D)Ljava/lang/String;
-          INVOKEVIRTUAL java/lang/StringBuilder.append (Ljava/lang/String;)Ljava/lang/StringBuilder;
-          LDC " is not in the allowable range for random seeds (-2147483648 to 2147483647)"
-          INVOKEVIRTUAL java/lang/StringBuilder.append (Ljava/lang/String;)Ljava/lang/StringBuilder;
-          INVOKEVIRTUAL java/lang/StringBuilder.toString ()Ljava/lang/String;
+          INVOKEDYNAMIC makeConcatWithConstants(Ljava/lang/String;)Ljava/lang/String; [
+            // handle kind 0x6 : INVOKESTATIC
+            java/lang/invoke/StringConcatFactory.makeConcatWithConstants(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/invoke/CallSite;
+            // arguments:
+            "\u0001 is not in the allowable range for random seeds (-2147483648 to 2147483647)"
+          ]
           INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
           ATHROW
          L3
          FRAME SAME
+          LLOAD 4
+          L2I
+          ISTORE 6
           ALOAD 1
           GETFIELD org/nlogo/nvm/Context.job : Lorg/nlogo/nvm/Job;
           GETFIELD org/nlogo/nvm/Job.random : Lorg/nlogo/api/MersenneTwisterFast;
-          LLOAD 4
-          L2I
+          ILOAD 6
           I2L
           INVOKEVIRTUAL org/nlogo/api/MersenneTwisterFast.setSeed (J)V
           ALOAD 1
+          GETFIELD org/nlogo/nvm/Context.job : Lorg/nlogo/nvm/Job;
+          GETFIELD org/nlogo/nvm/Job.workspace : Lorg/nlogo/nvm/Workspace;
+          IFNULL L4
+          ALOAD 1
+          GETFIELD org/nlogo/nvm/Context.job : Lorg/nlogo/nvm/Job;
+          GETFIELD org/nlogo/nvm/Job.random : Lorg/nlogo/api/MersenneTwisterFast;
+          ALOAD 1
+          GETFIELD org/nlogo/nvm/Context.job : Lorg/nlogo/nvm/Job;
+          GETFIELD org/nlogo/nvm/Job.workspace : Lorg/nlogo/nvm/Workspace;
+          INVOKEINTERFACE org/nlogo/nvm/Workspace.world ()Lorg/nlogo/agent/World; (itf)
+          INVOKEVIRTUAL org/nlogo/agent/World.mainRNG ()Lorg/nlogo/api/MersenneTwisterFast;
+          ASTORE 7
+          DUP
+          IFNONNULL L5
+          POP
+          ALOAD 7
+          IFNULL L6
+          GOTO L4
+         L5
+         FRAME FULL [org/nlogo/prim/_asm_procedurebenchmark_randomseed_0 org/nlogo/nvm/Context D J I org/nlogo/api/MersenneTwisterFast] [org/nlogo/api/MersenneTwisterFast]
+          ALOAD 7
+          INVOKEVIRTUAL java/lang/Object.equals (Ljava/lang/Object;)Z
+          IFEQ L4
+         L6
+         FRAME SAME
+          ALOAD 1
+          GETFIELD org/nlogo/nvm/Context.job : Lorg/nlogo/nvm/Job;
+          GETFIELD org/nlogo/nvm/Job.workspace : Lorg/nlogo/nvm/Workspace;
+          INVOKEINTERFACE org/nlogo/nvm/Workspace.plotRNG ()Lorg/nlogo/api/MersenneTwisterFast; (itf)
+          ILOAD 6
+          I2L
+          INVOKEVIRTUAL org/nlogo/api/MersenneTwisterFast.setSeed (J)V
+         L4
+         FRAME CHOP 1
+          ALOAD 1
           ICONST_1
           PUTFIELD org/nlogo/nvm/Context.ip : I
-         L4
+         L7
           RETURN
 [1]_resettimer "reset-timer"
 [2]_asm_procedurebenchmark_call_1 "setup"
@@ -347,7 +382,7 @@ procedure BENCHMARK:[_repeatlocal:0]{O---}:
           // parameter final  context
           // parameter final  arg0
          L0
-          LDC 2400.0
+          LDC 2400.0D
          L1
           DSTORE 2
           ALOAD 1
@@ -499,7 +534,7 @@ procedure GO:[]{O---}:
           ALOAD 0
           INVOKESTATIC org/nlogo/core/I18N.errorsJ ()Lorg/nlogo/core/I18NJava;
           LDC "org.nlogo.prim.$common.onlyObserverCanAskAllTurtles"
-          INVOKEINTERFACE org/nlogo/core/I18NJava.get (Ljava/lang/String;)Ljava/lang/String;
+          INVOKEINTERFACE org/nlogo/core/I18NJava.get (Ljava/lang/String;)Ljava/lang/String; (itf)
           INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
           ATHROW
          L3
@@ -515,7 +550,7 @@ procedure GO:[]{O---}:
           ALOAD 0
           INVOKESTATIC org/nlogo/core/I18N.errorsJ ()Lorg/nlogo/core/I18NJava;
           LDC "org.nlogo.prim.$common.onlyObserverCanAskAllPatches"
-          INVOKEINTERFACE org/nlogo/core/I18NJava.get (Ljava/lang/String;)Ljava/lang/String;
+          INVOKEINTERFACE org/nlogo/core/I18NJava.get (Ljava/lang/String;)Ljava/lang/String; (itf)
           INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
           ATHROW
          L2
@@ -570,7 +605,7 @@ procedure GO:[]{O---}:
           INVOKEVIRTUAL org/nlogo/agent/World.ticks ()D
           DSTORE 2
           DLOAD 2
-          LDC -1.0
+          LDC -1.0D
           DCMPL
           IFNE L3
           NEW org/nlogo/nvm/RuntimePrimitiveException
@@ -579,7 +614,7 @@ procedure GO:[]{O---}:
           ALOAD 0
           INVOKESTATIC org/nlogo/core/I18N.errorsJ ()Lorg/nlogo/core/I18NJava;
           LDC "org.nlogo.prim.etc.$common.tickCounterNotStarted"
-          INVOKEINTERFACE org/nlogo/core/I18NJava.get (Ljava/lang/String;)Ljava/lang/String;
+          INVOKEINTERFACE org/nlogo/core/I18NJava.get (Ljava/lang/String;)Ljava/lang/String; (itf)
           INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
           ATHROW
          L3
@@ -624,7 +659,7 @@ procedure GO:[]{O---}:
           ALOAD 0
           INVOKESTATIC org/nlogo/core/I18N.errorsJ ()Lorg/nlogo/core/I18NJava;
           LDC "org.nlogo.prim.etc.$common.divByZero"
-          INVOKEINTERFACE org/nlogo/core/I18NJava.get (Ljava/lang/String;)Ljava/lang/String;
+          INVOKEINTERFACE org/nlogo/core/I18NJava.get (Ljava/lang/String;)Ljava/lang/String; (itf)
           INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
           ATHROW
          L7
@@ -694,7 +729,7 @@ procedure GO:[]{O---}:
           ALOAD 0
           INVOKESTATIC org/nlogo/core/I18N.errorsJ ()Lorg/nlogo/core/I18NJava;
           LDC "org.nlogo.prim.$common.onlyObserverCanAskAllTurtles"
-          INVOKEINTERFACE org/nlogo/core/I18NJava.get (Ljava/lang/String;)Ljava/lang/String;
+          INVOKEINTERFACE org/nlogo/core/I18NJava.get (Ljava/lang/String;)Ljava/lang/String; (itf)
           INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
           ATHROW
          L3
@@ -710,7 +745,7 @@ procedure GO:[]{O---}:
           ALOAD 0
           INVOKESTATIC org/nlogo/core/I18N.errorsJ ()Lorg/nlogo/core/I18NJava;
           LDC "org.nlogo.prim.$common.onlyObserverCanAskAllPatches"
-          INVOKEINTERFACE org/nlogo/core/I18NJava.get (Ljava/lang/String;)Ljava/lang/String;
+          INVOKEINTERFACE org/nlogo/core/I18NJava.get (Ljava/lang/String;)Ljava/lang/String; (itf)
           INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
           ATHROW
          L2
@@ -796,7 +831,7 @@ procedure GO:[]{O---}:
           ALOAD 0
           INVOKESTATIC org/nlogo/core/I18N.errorsJ ()Lorg/nlogo/core/I18NJava;
           LDC "org.nlogo.prim.$common.onlyObserverCanAskAllTurtles"
-          INVOKEINTERFACE org/nlogo/core/I18NJava.get (Ljava/lang/String;)Ljava/lang/String;
+          INVOKEINTERFACE org/nlogo/core/I18NJava.get (Ljava/lang/String;)Ljava/lang/String; (itf)
           INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
           ATHROW
          L3
@@ -812,7 +847,7 @@ procedure GO:[]{O---}:
           ALOAD 0
           INVOKESTATIC org/nlogo/core/I18N.errorsJ ()Lorg/nlogo/core/I18NJava;
           LDC "org.nlogo.prim.$common.onlyObserverCanAskAllPatches"
-          INVOKEINTERFACE org/nlogo/core/I18NJava.get (Ljava/lang/String;)Ljava/lang/String;
+          INVOKEINTERFACE org/nlogo/core/I18NJava.get (Ljava/lang/String;)Ljava/lang/String; (itf)
           INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
           ATHROW
          L2
@@ -1065,10 +1100,10 @@ reporter procedure GRAIN-AHEAD:[TOTAL HOW-FAR _repeatlocal:2]{-T--}:
           IFEQ L13
           ALOAD 2
           CHECKCAST org/nlogo/agent/Agent
-          ASTORE 4
-          ALOAD 4
+          ASTORE 3
+          ALOAD 3
           INVOKEVIRTUAL org/nlogo/agent/Agent.id ()J
-          LDC -1
+          LDC -1L
           LCMP
           IFNE L2
           NEW org/nlogo/nvm/RuntimePrimitiveException
@@ -1078,89 +1113,84 @@ reporter procedure GRAIN-AHEAD:[TOTAL HOW-FAR _repeatlocal:2]{-T--}:
           GETSTATIC org/nlogo/core/I18N$.MODULE$ : Lorg/nlogo/core/I18N$;
           INVOKEVIRTUAL org/nlogo/core/I18N$.errors ()Lorg/nlogo/core/I18N$BundleKind;
           LDC "org.nlogo.$common.thatAgentIsDead"
-          GETSTATIC scala/Predef$.MODULE$ : Lscala/Predef$;
+          GETSTATIC scala/runtime/ScalaRunTime$.MODULE$ : Lscala/runtime/ScalaRunTime$;
           ICONST_1
           ANEWARRAY java/lang/Object
           DUP
           ICONST_0
-          ALOAD 4
+          ALOAD 3
           INVOKEVIRTUAL org/nlogo/agent/Agent.classDisplayName ()Ljava/lang/String;
           AASTORE
-          INVOKEVIRTUAL scala/Predef$.wrapRefArray ([Ljava/lang/Object;)Lscala/collection/mutable/WrappedArray;
-          INVOKEVIRTUAL org/nlogo/core/I18N$BundleKind.getN (Ljava/lang/String;Lscala/collection/Seq;)Ljava/lang/String;
+          INVOKEVIRTUAL scala/runtime/ScalaRunTime$.wrapRefArray ([Ljava/lang/Object;)Lscala/collection/immutable/ArraySeq;
+          INVOKEVIRTUAL org/nlogo/core/I18N$BundleKind.getN (Ljava/lang/String;Lscala/collection/immutable/Seq;)Ljava/lang/String;
           INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
           ATHROW
          L2
-         FRAME FULL [org/nlogo/prim/_asm_proceduregrainahead_setprocedurevariable_3 org/nlogo/nvm/Context java/lang/Object T org/nlogo/agent/Agent] [D]
-          ALOAD 4
+         FRAME FULL [org/nlogo/prim/_asm_proceduregrainahead_setprocedurevariable_3 org/nlogo/nvm/Context java/lang/Object org/nlogo/agent/Agent] [D]
+          ALOAD 3
           ICONST_5
           INVOKEVIRTUAL org/nlogo/agent/Agent.getPatchVariable (I)Ljava/lang/Object;
          L3
           GOTO L14
          L4
          FRAME SAME1 org/nlogo/api/AgentException
-          ASTORE 5
+          ASTORE 4
           NEW org/nlogo/nvm/RuntimePrimitiveException
           DUP
           ALOAD 1
           ALOAD 0
-          ALOAD 5
+          ALOAD 4
           INVOKEVIRTUAL org/nlogo/api/AgentException.getMessage ()Ljava/lang/String;
           INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
           ATHROW
-         L14
-         FRAME FULL [org/nlogo/prim/_asm_proceduregrainahead_setprocedurevariable_3 org/nlogo/nvm/Context java/lang/Object T org/nlogo/agent/Agent] [D java/lang/Object]
-          ASTORE 3
-          GOTO L15
          L13
          FRAME FULL [org/nlogo/prim/_asm_proceduregrainahead_setprocedurevariable_3 org/nlogo/nvm/Context java/lang/Object] [D]
           ALOAD 2
           INSTANCEOF org/nlogo/agent/AgentSet
-          IFEQ L16
+          IFEQ L15
           ALOAD 2
           CHECKCAST org/nlogo/agent/AgentSet
-          ASTORE 6
+          ASTORE 5
           NEW org/nlogo/api/LogoListBuilder
           DUP
           INVOKESPECIAL org/nlogo/api/LogoListBuilder.<init> ()V
-          ASTORE 7
+          ASTORE 6
          L5
-          ALOAD 6
+          ALOAD 5
           ALOAD 1
           GETFIELD org/nlogo/nvm/Context.job : Lorg/nlogo/nvm/Job;
           GETFIELD org/nlogo/nvm/Job.random : Lorg/nlogo/api/MersenneTwisterFast;
           INVOKEVIRTUAL org/nlogo/agent/AgentSet.shufflerator (Lorg/nlogo/api/MersenneTwisterFast;)Lorg/nlogo/agent/AgentIterator;
-          ASTORE 8
-         L17
-         FRAME FULL [org/nlogo/prim/_asm_proceduregrainahead_setprocedurevariable_3 org/nlogo/nvm/Context java/lang/Object T T T org/nlogo/agent/AgentSet org/nlogo/api/LogoListBuilder org/nlogo/agent/AgentIterator] [D]
-          ALOAD 8
-          INVOKEINTERFACE org/nlogo/agent/AgentIterator.hasNext ()Z
-          IFEQ L18
+          ASTORE 7
+         L16
+         FRAME FULL [org/nlogo/prim/_asm_proceduregrainahead_setprocedurevariable_3 org/nlogo/nvm/Context java/lang/Object T T org/nlogo/agent/AgentSet org/nlogo/api/LogoListBuilder org/nlogo/agent/AgentIterator] [D]
           ALOAD 7
-          ALOAD 8
-          INVOKEINTERFACE org/nlogo/agent/AgentIterator.next ()Lorg/nlogo/agent/Agent;
+          INVOKEINTERFACE org/nlogo/agent/AgentIterator.hasNext ()Z (itf)
+          IFEQ L17
+          ALOAD 6
+          ALOAD 7
+          INVOKEINTERFACE org/nlogo/agent/AgentIterator.next ()Lorg/nlogo/agent/Agent; (itf)
           ICONST_5
           INVOKEVIRTUAL org/nlogo/agent/Agent.getPatchVariable (I)Ljava/lang/Object;
           INVOKEVIRTUAL org/nlogo/api/LogoListBuilder.add (Ljava/lang/Object;)V
-          GOTO L17
+          GOTO L16
          L6
-         FRAME FULL [org/nlogo/prim/_asm_proceduregrainahead_setprocedurevariable_3 org/nlogo/nvm/Context java/lang/Object T T T org/nlogo/agent/AgentSet org/nlogo/api/LogoListBuilder] [org/nlogo/api/AgentException]
-          ASTORE 9
+         FRAME FULL [org/nlogo/prim/_asm_proceduregrainahead_setprocedurevariable_3 org/nlogo/nvm/Context java/lang/Object T T org/nlogo/agent/AgentSet org/nlogo/api/LogoListBuilder] [org/nlogo/api/AgentException]
+          ASTORE 8
           NEW org/nlogo/nvm/RuntimePrimitiveException
           DUP
           ALOAD 1
           ALOAD 0
-          ALOAD 9
+          ALOAD 8
           INVOKEVIRTUAL org/nlogo/api/AgentException.getMessage ()Ljava/lang/String;
           INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
           ATHROW
-         L18
-         FRAME FULL [org/nlogo/prim/_asm_proceduregrainahead_setprocedurevariable_3 org/nlogo/nvm/Context java/lang/Object T T T org/nlogo/agent/AgentSet org/nlogo/api/LogoListBuilder org/nlogo/agent/AgentIterator] [D]
-          ALOAD 7
+         L17
+         FRAME FULL [org/nlogo/prim/_asm_proceduregrainahead_setprocedurevariable_3 org/nlogo/nvm/Context java/lang/Object T T org/nlogo/agent/AgentSet org/nlogo/api/LogoListBuilder org/nlogo/agent/AgentIterator] [D]
+          ALOAD 6
           INVOKEVIRTUAL org/nlogo/api/LogoListBuilder.toLogoList ()Lorg/nlogo/core/LogoList;
-          ASTORE 3
-          GOTO L15
-         L16
+          GOTO L14
+         L15
          FRAME FULL [org/nlogo/prim/_asm_proceduregrainahead_setprocedurevariable_3 org/nlogo/nvm/Context java/lang/Object] [D]
           NEW org/nlogo/nvm/ArgumentTypeException
           DUP
@@ -1181,16 +1211,14 @@ reporter procedure GRAIN-AHEAD:[TOTAL HOW-FAR _repeatlocal:2]{-T--}:
           ALOAD 2
           INVOKESPECIAL org/nlogo/nvm/ArgumentTypeException.<init> (Lorg/nlogo/nvm/Context;Lorg/nlogo/nvm/Instruction;IILjava/lang/Object;)V
           ATHROW
-         L15
-         FRAME FULL [org/nlogo/prim/_asm_proceduregrainahead_setprocedurevariable_3 org/nlogo/nvm/Context java/lang/Object java/lang/Object] [D]
-          ALOAD 3
-         L19
+         L14
+         FRAME FULL [org/nlogo/prim/_asm_proceduregrainahead_setprocedurevariable_3 org/nlogo/nvm/Context java/lang/Object] [D java/lang/Object]
           ASTORE 2
          L7
           ALOAD 2
           CHECKCAST java/lang/Double
           INVOKEVIRTUAL java/lang/Double.doubleValue ()D
-          GOTO L20
+          GOTO L18
          L8
          FRAME SAME1 java/lang/ClassCastException
           POP
@@ -1203,8 +1231,8 @@ reporter procedure GRAIN-AHEAD:[TOTAL HOW-FAR _repeatlocal:2]{-T--}:
           ALOAD 2
           INVOKESPECIAL org/nlogo/nvm/ArgumentTypeException.<init> (Lorg/nlogo/nvm/Context;Lorg/nlogo/nvm/Instruction;IILjava/lang/Object;)V
           ATHROW
-         L20
-         FRAME FULL [org/nlogo/prim/_asm_proceduregrainahead_setprocedurevariable_3 org/nlogo/nvm/Context java/lang/Object java/lang/Object] [D D]
+         L18
+         FRAME FULL [org/nlogo/prim/_asm_proceduregrainahead_setprocedurevariable_3 org/nlogo/nvm/Context java/lang/Object] [D D]
           DSTORE 4
           DSTORE 2
           ALOAD 0
@@ -1213,7 +1241,7 @@ reporter procedure GRAIN-AHEAD:[TOTAL HOW-FAR _repeatlocal:2]{-T--}:
           DADD
           ALOAD 1
           INVOKEVIRTUAL org/nlogo/prim/_asm_proceduregrainahead_setprocedurevariable_3.validDouble (DLorg/nlogo/nvm/Context;)D
-         L21
+         L19
           DSTORE 2
           NEW java/lang/Double
           DUP
@@ -1229,7 +1257,7 @@ reporter procedure GRAIN-AHEAD:[TOTAL HOW-FAR _repeatlocal:2]{-T--}:
           ALOAD 1
           ICONST_4
           PUTFIELD org/nlogo/nvm/Context.ip : I
-         L22
+         L20
           RETURN
 [4]_asm_proceduregrainahead_setprocedurevariable_5 "set how-far how-far + 1" Object => void
       _plus "how-far + 1" double,double => double
@@ -1364,7 +1392,7 @@ reporter procedure GRAIN-AHEAD:[TOTAL HOW-FAR _repeatlocal:2]{-T--}:
           ICONST_0
           LDC "REPORT"
           AASTORE
-          INVOKEINTERFACE org/nlogo/core/I18NJava.getN (Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;
+          INVOKEINTERFACE org/nlogo/core/I18NJava.getN (Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String; (itf)
           INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
           ATHROW
          L2
@@ -1395,7 +1423,7 @@ reporter procedure GRAIN-AHEAD:[TOTAL HOW-FAR _repeatlocal:2]{-T--}:
           ICONST_0
           LDC "REPORT"
           AASTORE
-          INVOKEINTERFACE org/nlogo/core/I18NJava.getN (Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;
+          INVOKEINTERFACE org/nlogo/core/I18NJava.getN (Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String; (itf)
           INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
           ATHROW
          L4
@@ -1409,7 +1437,7 @@ reporter procedure GRAIN-AHEAD:[TOTAL HOW-FAR _repeatlocal:2]{-T--}:
           ALOAD 0
           INVOKESTATIC org/nlogo/core/I18N.errorsJ ()Lorg/nlogo/core/I18NJava;
           LDC "org.nlogo.prim._returnreport.reportNotCalledInReportProcedure"
-          INVOKEINTERFACE org/nlogo/core/I18NJava.get (Ljava/lang/String;)Ljava/lang/String;
+          INVOKEINTERFACE org/nlogo/core/I18NJava.get (Ljava/lang/String;)Ljava/lang/String; (itf)
           INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
           ATHROW
          L1
@@ -1561,7 +1589,7 @@ procedure GROW-GRAIN:[]{-TP-}:
           ALOAD 3
           INVOKESTATIC org/nlogo/api/TypeNames.aName (Ljava/lang/Object;)Ljava/lang/String;
           AASTORE
-          INVOKEINTERFACE org/nlogo/core/I18NJava.getN (Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;
+          INVOKEINTERFACE org/nlogo/core/I18NJava.getN (Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String; (itf)
           INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
           ATHROW
          L10
@@ -1840,7 +1868,7 @@ procedure GROW-GRAIN:[]{-TP-}:
           ALOAD 3
           INVOKESTATIC org/nlogo/api/TypeNames.aName (Ljava/lang/Object;)Ljava/lang/String;
           AASTORE
-          INVOKEINTERFACE org/nlogo/core/I18NJava.getN (Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;
+          INVOKEINTERFACE org/nlogo/core/I18NJava.getN (Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String; (itf)
           INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
           ATHROW
          L10
@@ -1966,7 +1994,7 @@ procedure HARVEST:[]{OTPL}:
           ALOAD 0
           INVOKESTATIC org/nlogo/core/I18N.errorsJ ()Lorg/nlogo/core/I18NJava;
           LDC "org.nlogo.prim.$common.onlyObserverCanAskAllTurtles"
-          INVOKEINTERFACE org/nlogo/core/I18NJava.get (Ljava/lang/String;)Ljava/lang/String;
+          INVOKEINTERFACE org/nlogo/core/I18NJava.get (Ljava/lang/String;)Ljava/lang/String; (itf)
           INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
           ATHROW
          L3
@@ -1982,7 +2010,7 @@ procedure HARVEST:[]{OTPL}:
           ALOAD 0
           INVOKESTATIC org/nlogo/core/I18N.errorsJ ()Lorg/nlogo/core/I18NJava;
           LDC "org.nlogo.prim.$common.onlyObserverCanAskAllPatches"
-          INVOKEINTERFACE org/nlogo/core/I18NJava.get (Ljava/lang/String;)Ljava/lang/String;
+          INVOKEINTERFACE org/nlogo/core/I18NJava.get (Ljava/lang/String;)Ljava/lang/String; (itf)
           INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
           ATHROW
          L2
@@ -2127,7 +2155,7 @@ procedure HARVEST:[]{OTPL}:
           ALOAD 0
           INVOKESTATIC org/nlogo/core/I18N.errorsJ ()Lorg/nlogo/core/I18NJava;
           LDC "org.nlogo.prim.etc.$common.divByZero"
-          INVOKEINTERFACE org/nlogo/core/I18NJava.get (Ljava/lang/String;)Ljava/lang/String;
+          INVOKEINTERFACE org/nlogo/core/I18NJava.get (Ljava/lang/String;)Ljava/lang/String; (itf)
           INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
           ATHROW
          L20
@@ -2216,7 +2244,7 @@ procedure HARVEST:[]{OTPL}:
           ALOAD 0
           INVOKESTATIC org/nlogo/core/I18N.errorsJ ()Lorg/nlogo/core/I18NJava;
           LDC "org.nlogo.prim.$common.onlyObserverCanAskAllTurtles"
-          INVOKEINTERFACE org/nlogo/core/I18NJava.get (Ljava/lang/String;)Ljava/lang/String;
+          INVOKEINTERFACE org/nlogo/core/I18NJava.get (Ljava/lang/String;)Ljava/lang/String; (itf)
           INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
           ATHROW
          L3
@@ -2232,7 +2260,7 @@ procedure HARVEST:[]{OTPL}:
           ALOAD 0
           INVOKESTATIC org/nlogo/core/I18N.errorsJ ()Lorg/nlogo/core/I18NJava;
           LDC "org.nlogo.prim.$common.onlyObserverCanAskAllPatches"
-          INVOKEINTERFACE org/nlogo/core/I18NJava.get (Ljava/lang/String;)Ljava/lang/String;
+          INVOKEINTERFACE org/nlogo/core/I18NJava.get (Ljava/lang/String;)Ljava/lang/String; (itf)
           INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
           ATHROW
          L2
@@ -2631,7 +2659,7 @@ procedure MOVE-EAT-AGE-DIE:[]{-T--}:
           INVOKESTATIC java/lang/Double.valueOf (D)Ljava/lang/Double;
           INVOKESTATIC org/nlogo/api/TypeNames.aName (Ljava/lang/Object;)Ljava/lang/String;
           AASTORE
-          INVOKEINTERFACE org/nlogo/core/I18NJava.getN (Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;
+          INVOKEINTERFACE org/nlogo/core/I18NJava.getN (Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String; (itf)
           INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
           ATHROW
          L14
@@ -2773,7 +2801,7 @@ procedure MOVE-EAT-AGE-DIE:[]{-T--}:
           ALOAD 3
           INVOKESTATIC org/nlogo/api/TypeNames.aName (Ljava/lang/Object;)Ljava/lang/String;
           AASTORE
-          INVOKEINTERFACE org/nlogo/core/I18NJava.getN (Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;
+          INVOKEINTERFACE org/nlogo/core/I18NJava.getN (Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String; (itf)
           INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
           ATHROW
          L20
@@ -2841,7 +2869,7 @@ procedure RECOLOR-PATCH:[]{-TP-}:
           TRYCATCHBLOCK L5 L6 L6 java/lang/ClassCastException
           TRYCATCHBLOCK L7 L8 L9 org/nlogo/api/AgentException
          L10
-          LDC 45.0
+          LDC 45.0D
          L0
           ALOAD 1
           GETFIELD org/nlogo/nvm/Context.agent : Lorg/nlogo/agent/Agent;
@@ -2916,7 +2944,7 @@ procedure RECOLOR-PATCH:[]{-TP-}:
           DSTORE 2
           DLOAD 2
           INVOKESTATIC org/nlogo/api/Color.findCentralColorNumber (D)D
-          LDC 5.0
+          LDC 5.0D
           DSUB
           DSTORE 2
           DCONST_0
@@ -2991,14 +3019,14 @@ procedure RECOLOR-PATCH:[]{-TP-}:
          L18
          FRAME SAME
           DLOAD 10
-          LDC 10.0
+          LDC 10.0D
           DMUL
           DSTORE 10
           DLOAD 10
-          LDC 9.9999
+          LDC 9.9999D
           DCMPL
           IFLT L22
-          LDC 9.9999
+          LDC 9.9999D
           DSTORE 10
           GOTO L23
          L22
@@ -3082,7 +3110,7 @@ procedure RECOLOR-TURTLES:[MAX-WEALTH]{OTPL}:
               ASTORE 3
               ALOAD 3
               INVOKEVIRTUAL org/nlogo/agent/Agent.id ()J
-              LDC -1
+              LDC -1L
               LCMP
               IFNE L0
               NEW org/nlogo/nvm/RuntimePrimitiveException
@@ -3098,7 +3126,7 @@ procedure RECOLOR-TURTLES:[MAX-WEALTH]{OTPL}:
               ALOAD 3
               INVOKEVIRTUAL org/nlogo/agent/Agent.classDisplayName ()Ljava/lang/String;
               AASTORE
-              INVOKEINTERFACE org/nlogo/core/I18NJava.getN (Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;
+              INVOKEINTERFACE org/nlogo/core/I18NJava.getN (Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String; (itf)
               INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
               ATHROW
              L0
@@ -3141,11 +3169,11 @@ procedure RECOLOR-TURTLES:[MAX-WEALTH]{OTPL}:
              L11
              FRAME APPEND [org/nlogo/agent/AgentSet org/nlogo/api/LogoListBuilder org/nlogo/agent/AgentIterator]
               ALOAD 5
-              INVOKEINTERFACE org/nlogo/agent/AgentIterator.hasNext ()Z
+              INVOKEINTERFACE org/nlogo/agent/AgentIterator.hasNext ()Z (itf)
               IFEQ L4
               ALOAD 4
               ALOAD 5
-              INVOKEINTERFACE org/nlogo/agent/AgentIterator.next ()Lorg/nlogo/agent/Agent;
+              INVOKEINTERFACE org/nlogo/agent/AgentIterator.next ()Lorg/nlogo/agent/Agent; (itf)
               BIPUSH 14
               INVOKEVIRTUAL org/nlogo/agent/Agent.getTurtleVariable (I)Ljava/lang/Object;
               INVOKEVIRTUAL org/nlogo/api/LogoListBuilder.add (Ljava/lang/Object;)V
@@ -3226,7 +3254,7 @@ procedure RECOLOR-TURTLES:[MAX-WEALTH]{OTPL}:
           ALOAD 0
           INVOKESTATIC org/nlogo/core/I18N.errorsJ ()Lorg/nlogo/core/I18NJava;
           LDC "org.nlogo.prim.$common.onlyObserverCanAskAllTurtles"
-          INVOKEINTERFACE org/nlogo/core/I18NJava.get (Ljava/lang/String;)Ljava/lang/String;
+          INVOKEINTERFACE org/nlogo/core/I18NJava.get (Ljava/lang/String;)Ljava/lang/String; (itf)
           INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
           ATHROW
          L3
@@ -3242,7 +3270,7 @@ procedure RECOLOR-TURTLES:[MAX-WEALTH]{OTPL}:
           ALOAD 0
           INVOKESTATIC org/nlogo/core/I18N.errorsJ ()Lorg/nlogo/core/I18NJava;
           LDC "org.nlogo.prim.$common.onlyObserverCanAskAllPatches"
-          INVOKEINTERFACE org/nlogo/core/I18NJava.get (Ljava/lang/String;)Ljava/lang/String;
+          INVOKEINTERFACE org/nlogo/core/I18NJava.get (Ljava/lang/String;)Ljava/lang/String; (itf)
           INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
           ATHROW
          L2
@@ -3313,7 +3341,7 @@ procedure RECOLOR-TURTLES:[MAX-WEALTH]{OTPL}:
           ATHROW
          L7
          FRAME FULL [org/nlogo/prim/_asm_procedurerecolorturtles_ifelse_3 org/nlogo/nvm/Context java/lang/Object] [java/lang/Object D]
-          LDC 3.0
+          LDC 3.0D
          L8
           DSTORE 4
           DSTORE 2
@@ -3327,7 +3355,7 @@ procedure RECOLOR-TURTLES:[MAX-WEALTH]{OTPL}:
           ALOAD 0
           INVOKESTATIC org/nlogo/core/I18N.errorsJ ()Lorg/nlogo/core/I18NJava;
           LDC "org.nlogo.prim.etc.$common.divByZero"
-          INVOKEINTERFACE org/nlogo/core/I18NJava.get (Ljava/lang/String;)Ljava/lang/String;
+          INVOKEINTERFACE org/nlogo/core/I18NJava.get (Ljava/lang/String;)Ljava/lang/String; (itf)
           INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
           ATHROW
          L9
@@ -3379,7 +3407,7 @@ procedure RECOLOR-TURTLES:[MAX-WEALTH]{OTPL}:
           INVOKESTATIC java/lang/Double.valueOf (D)Ljava/lang/Double;
           INVOKESTATIC org/nlogo/api/TypeNames.aName (Ljava/lang/Object;)Ljava/lang/String;
           AASTORE
-          INVOKEINTERFACE org/nlogo/core/I18NJava.getN (Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;
+          INVOKEINTERFACE org/nlogo/core/I18NJava.getN (Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String; (itf)
           INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
           ATHROW
          L14
@@ -3526,7 +3554,7 @@ procedure RECOLOR-TURTLES:[MAX-WEALTH]{OTPL}:
           ATHROW
          L7
          FRAME FULL [org/nlogo/prim/_asm_procedurerecolorturtles_ifelse_6 org/nlogo/nvm/Context java/lang/Object] [java/lang/Object D]
-          LDC 2.0
+          LDC 2.0D
          L8
           DSTORE 4
           DSTORE 2
@@ -3537,7 +3565,7 @@ procedure RECOLOR-TURTLES:[MAX-WEALTH]{OTPL}:
           ALOAD 1
           INVOKEVIRTUAL org/nlogo/prim/_asm_procedurerecolorturtles_ifelse_6.validDouble (DLorg/nlogo/nvm/Context;)D
          L9
-          LDC 3.0
+          LDC 3.0D
          L10
           DSTORE 4
           DSTORE 2
@@ -3551,7 +3579,7 @@ procedure RECOLOR-TURTLES:[MAX-WEALTH]{OTPL}:
           ALOAD 0
           INVOKESTATIC org/nlogo/core/I18N.errorsJ ()Lorg/nlogo/core/I18NJava;
           LDC "org.nlogo.prim.etc.$common.divByZero"
-          INVOKEINTERFACE org/nlogo/core/I18NJava.get (Ljava/lang/String;)Ljava/lang/String;
+          INVOKEINTERFACE org/nlogo/core/I18NJava.get (Ljava/lang/String;)Ljava/lang/String; (itf)
           INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
           ATHROW
          L11
@@ -3603,7 +3631,7 @@ procedure RECOLOR-TURTLES:[MAX-WEALTH]{OTPL}:
           INVOKESTATIC java/lang/Double.valueOf (D)Ljava/lang/Double;
           INVOKESTATIC org/nlogo/api/TypeNames.aName (Ljava/lang/Object;)Ljava/lang/String;
           AASTORE
-          INVOKEINTERFACE org/nlogo/core/I18NJava.getN (Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;
+          INVOKEINTERFACE org/nlogo/core/I18NJava.getN (Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String; (itf)
           INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
           ATHROW
          L16
@@ -3812,12 +3840,12 @@ procedure SET-INITIAL-TURTLE-VARS:[]{-T--}:
           // parameter final  context
           TRYCATCHBLOCK L0 L1 L2 org/nlogo/api/AgentException
          L3
-          LDC 90.0
+          LDC 90.0D
          L4
           ALOAD 1
           GETFIELD org/nlogo/nvm/Context.job : Lorg/nlogo/nvm/Job;
           GETFIELD org/nlogo/nvm/Job.random : Lorg/nlogo/api/MersenneTwisterFast;
-          LDC 4
+          LDC 4L
           INVOKEVIRTUAL org/nlogo/api/MersenneTwisterFast.nextLong (J)J
           L2D
          L5
@@ -3994,7 +4022,7 @@ procedure SET-INITIAL-TURTLE-VARS:[]{-T--}:
           GOTO L21
          L20
          FRAME FULL [org/nlogo/prim/_asm_proceduresetinitialturtlevars_setturtlevariable_2 org/nlogo/nvm/Context D J] [D J]
-          LDC -1
+          LDC -1L
          L21
          FRAME FULL [org/nlogo/prim/_asm_proceduresetinitialturtlevars_setturtlevariable_2 org/nlogo/nvm/Context D J] [D J J]
           LADD
@@ -4129,7 +4157,7 @@ procedure SET-INITIAL-TURTLE-VARS:[]{-T--}:
           GOTO L11
          L10
          FRAME FULL [org/nlogo/prim/_asm_proceduresetinitialturtlevars_setturtlevariable_3 org/nlogo/nvm/Context D J] [D J]
-          LDC -1
+          LDC -1L
          L11
          FRAME FULL [org/nlogo/prim/_asm_proceduresetinitialturtlevars_setturtlevariable_3 org/nlogo/nvm/Context D J] [D J J]
           LADD
@@ -4259,7 +4287,7 @@ procedure SET-INITIAL-TURTLE-VARS:[]{-T--}:
           ALOAD 1
           GETFIELD org/nlogo/nvm/Context.job : Lorg/nlogo/nvm/Job;
           GETFIELD org/nlogo/nvm/Job.random : Lorg/nlogo/api/MersenneTwisterFast;
-          LDC 50
+          LDC 50L
           INVOKEVIRTUAL org/nlogo/api/MersenneTwisterFast.nextLong (J)J
           L2D
          L10
@@ -4360,7 +4388,7 @@ procedure SET-INITIAL-TURTLE-VARS:[]{-T--}:
           GOTO L11
          L10
          FRAME FULL [org/nlogo/prim/_asm_proceduresetinitialturtlevars_setturtlevariable_5 org/nlogo/nvm/Context D J] [D J]
-          LDC -1
+          LDC -1L
          L11
          FRAME FULL [org/nlogo/prim/_asm_proceduresetinitialturtlevars_setturtlevariable_5 org/nlogo/nvm/Context D J] [D J J]
           LADD
@@ -4602,7 +4630,7 @@ procedure SETUP-PATCHES:[_repeatlocal:0 _repeatlocal:1]{O---}:
           ALOAD 0
           INVOKESTATIC org/nlogo/core/I18N.errorsJ ()Lorg/nlogo/core/I18NJava;
           LDC "org.nlogo.prim.$common.onlyObserverCanAskAllTurtles"
-          INVOKEINTERFACE org/nlogo/core/I18NJava.get (Ljava/lang/String;)Ljava/lang/String;
+          INVOKEINTERFACE org/nlogo/core/I18NJava.get (Ljava/lang/String;)Ljava/lang/String; (itf)
           INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
           ATHROW
          L3
@@ -4618,7 +4646,7 @@ procedure SETUP-PATCHES:[_repeatlocal:0 _repeatlocal:1]{O---}:
           ALOAD 0
           INVOKESTATIC org/nlogo/core/I18N.errorsJ ()Lorg/nlogo/core/I18NJava;
           LDC "org.nlogo.prim.$common.onlyObserverCanAskAllPatches"
-          INVOKEINTERFACE org/nlogo/core/I18NJava.get (Ljava/lang/String;)Ljava/lang/String;
+          INVOKEINTERFACE org/nlogo/core/I18NJava.get (Ljava/lang/String;)Ljava/lang/String; (itf)
           INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
           ATHROW
          L2
@@ -4672,7 +4700,7 @@ procedure SETUP-PATCHES:[_repeatlocal:0 _repeatlocal:1]{O---}:
           _constdouble:100.0 "100.0" => double
         _observervariable:PERCENT-BEST-LAND "percent-best-land" => Object
          L0
-          LDC 100.0
+          LDC 100.0D
          L1
           DSTORE 2
           ALOAD 0
@@ -4731,7 +4759,7 @@ procedure SETUP-PATCHES:[_repeatlocal:0 _repeatlocal:1]{O---}:
           ALOAD 4
           INVOKESTATIC org/nlogo/api/TypeNames.aName (Ljava/lang/Object;)Ljava/lang/String;
           AASTORE
-          INVOKEINTERFACE org/nlogo/core/I18NJava.getN (Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;
+          INVOKEINTERFACE org/nlogo/core/I18NJava.getN (Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String; (itf)
           INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
           ATHROW
          L7
@@ -4852,7 +4880,7 @@ procedure SETUP-PATCHES:[_repeatlocal:0 _repeatlocal:1]{O---}:
           // parameter final  context
           // parameter final  arg0
          L0
-          LDC 5.0
+          LDC 5.0D
          L1
           DSTORE 2
           ALOAD 1
@@ -4961,10 +4989,10 @@ procedure SETUP-PATCHES:[_repeatlocal:0 _repeatlocal:1]{O---}:
          L2
          FRAME FULL [org/nlogo/prim/_asm_proceduresetuppatches_ask_7 org/nlogo/nvm/Context org/nlogo/agent/IndexedAgentSet org/nlogo/nvm/Reporter org/nlogo/nvm/Context java/util/ArrayList org/nlogo/agent/AgentIterator] []
           ALOAD 6
-          INVOKEINTERFACE org/nlogo/agent/AgentIterator.hasNext ()Z
+          INVOKEINTERFACE org/nlogo/agent/AgentIterator.hasNext ()Z (itf)
           IFEQ L3
           ALOAD 6
-          INVOKEINTERFACE org/nlogo/agent/AgentIterator.next ()Lorg/nlogo/agent/Agent;
+          INVOKEINTERFACE org/nlogo/agent/AgentIterator.next ()Lorg/nlogo/agent/Agent; (itf)
           ASTORE 7
           ALOAD 4
           ALOAD 7
@@ -4996,7 +5024,7 @@ procedure SETUP-PATCHES:[_repeatlocal:0 _repeatlocal:1]{O---}:
           ALOAD 8
           INVOKESTATIC org/nlogo/api/Dump.logoObject (Ljava/lang/Object;)Ljava/lang/String;
           AASTORE
-          INVOKEINTERFACE org/nlogo/core/I18NJava.getN (Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;
+          INVOKEINTERFACE org/nlogo/core/I18NJava.getN (Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String; (itf)
           INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
           ATHROW
          L4
@@ -5007,7 +5035,7 @@ procedure SETUP-PATCHES:[_repeatlocal:0 _repeatlocal:1]{O---}:
           IFEQ L5
           ALOAD 5
           ALOAD 7
-          INVOKEINTERFACE java/util/List.add (Ljava/lang/Object;)Z
+          INVOKEINTERFACE java/util/List.add (Ljava/lang/Object;)Z (itf)
           POP
          L5
          FRAME SAME
@@ -5018,9 +5046,9 @@ procedure SETUP-PATCHES:[_repeatlocal:0 _repeatlocal:1]{O---}:
           INVOKEVIRTUAL org/nlogo/agent/AgentSet.kind ()Lorg/nlogo/core/AgentKind;
           ALOAD 5
           ALOAD 5
-          INVOKEINTERFACE java/util/List.size ()I
+          INVOKEINTERFACE java/util/List.size ()I (itf)
           ANEWARRAY org/nlogo/agent/Agent
-          INVOKEINTERFACE java/util/List.toArray ([Ljava/lang/Object;)[Ljava/lang/Object;
+          INVOKEINTERFACE java/util/List.toArray ([Ljava/lang/Object;)[Ljava/lang/Object; (itf)
           CHECKCAST [Lorg/nlogo/agent/Agent;
           INVOKESTATIC org/nlogo/agent/AgentSet.fromArray (Lorg/nlogo/core/AgentKind;[Lorg/nlogo/agent/Agent;)Lorg/nlogo/agent/IndexedAgentSet;
          L6
@@ -5040,7 +5068,7 @@ procedure SETUP-PATCHES:[_repeatlocal:0 _repeatlocal:1]{O---}:
           ALOAD 0
           INVOKESTATIC org/nlogo/core/I18N.errorsJ ()Lorg/nlogo/core/I18NJava;
           LDC "org.nlogo.prim.$common.onlyObserverCanAskAllTurtles"
-          INVOKEINTERFACE org/nlogo/core/I18NJava.get (Ljava/lang/String;)Ljava/lang/String;
+          INVOKEINTERFACE org/nlogo/core/I18NJava.get (Ljava/lang/String;)Ljava/lang/String; (itf)
           INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
           ATHROW
          L8
@@ -5056,7 +5084,7 @@ procedure SETUP-PATCHES:[_repeatlocal:0 _repeatlocal:1]{O---}:
           ALOAD 0
           INVOKESTATIC org/nlogo/core/I18N.errorsJ ()Lorg/nlogo/core/I18NJava;
           LDC "org.nlogo.prim.$common.onlyObserverCanAskAllPatches"
-          INVOKEINTERFACE org/nlogo/core/I18NJava.get (Ljava/lang/String;)Ljava/lang/String;
+          INVOKEINTERFACE org/nlogo/core/I18NJava.get (Ljava/lang/String;)Ljava/lang/String; (itf)
           INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
           ATHROW
          L7
@@ -5175,7 +5203,7 @@ procedure SETUP-PATCHES:[_repeatlocal:0 _repeatlocal:1]{O---}:
           // parameter final  context
           // parameter final  arg0
          L0
-          LDC 10.0
+          LDC 10.0D
          L1
           DSTORE 2
           ALOAD 1
@@ -5259,7 +5287,7 @@ procedure SETUP-PATCHES:[_repeatlocal:0 _repeatlocal:1]{O---}:
           ALOAD 0
           INVOKESTATIC org/nlogo/core/I18N.errorsJ ()Lorg/nlogo/core/I18NJava;
           LDC "org.nlogo.prim.$common.onlyObserverCanAskAllTurtles"
-          INVOKEINTERFACE org/nlogo/core/I18NJava.get (Ljava/lang/String;)Ljava/lang/String;
+          INVOKEINTERFACE org/nlogo/core/I18NJava.get (Ljava/lang/String;)Ljava/lang/String; (itf)
           INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
           ATHROW
          L3
@@ -5275,7 +5303,7 @@ procedure SETUP-PATCHES:[_repeatlocal:0 _repeatlocal:1]{O---}:
           ALOAD 0
           INVOKESTATIC org/nlogo/core/I18N.errorsJ ()Lorg/nlogo/core/I18NJava;
           LDC "org.nlogo.prim.$common.onlyObserverCanAskAllPatches"
-          INVOKEINTERFACE org/nlogo/core/I18NJava.get (Ljava/lang/String;)Ljava/lang/String;
+          INVOKEINTERFACE org/nlogo/core/I18NJava.get (Ljava/lang/String;)Ljava/lang/String; (itf)
           INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
           ATHROW
          L2
@@ -5629,7 +5657,7 @@ procedure SETUP-TURTLES:[]{O---}:
           DLOAD 4
           INVOKESTATIC java/lang/Double.valueOf (D)Ljava/lang/Double;
           AASTORE
-          INVOKEINTERFACE org/nlogo/core/I18NJava.getN (Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;
+          INVOKEINTERFACE org/nlogo/core/I18NJava.getN (Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String; (itf)
           INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
           ATHROW
          L6
@@ -5759,7 +5787,7 @@ procedure SETUP-TURTLES:[]{O---}:
           GOTO L12
          L11
          FRAME FULL [org/nlogo/prim/_asm_proceduresetupturtles_setturtlevariable_6 org/nlogo/nvm/Context D J] [J]
-          LDC -1
+          LDC -1L
          L12
          FRAME FULL [org/nlogo/prim/_asm_proceduresetupturtles_setturtlevariable_6 org/nlogo/nvm/Context D J] [J J]
           LADD
@@ -6126,7 +6154,7 @@ procedure TURN-TOWARDS-GRAIN:[BEST-DIRECTION BEST-AMOUNT]{-T--}:
           ALOAD 3
           INVOKESTATIC org/nlogo/api/TypeNames.aName (Ljava/lang/Object;)Ljava/lang/String;
           AASTORE
-          INVOKEINTERFACE org/nlogo/core/I18NJava.getN (Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;
+          INVOKEINTERFACE org/nlogo/core/I18NJava.getN (Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String; (itf)
           INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
           ATHROW
          L6
@@ -6369,7 +6397,7 @@ procedure TURN-TOWARDS-GRAIN:[BEST-DIRECTION BEST-AMOUNT]{-T--}:
           ALOAD 3
           INVOKESTATIC org/nlogo/api/TypeNames.aName (Ljava/lang/Object;)Ljava/lang/String;
           AASTORE
-          INVOKEINTERFACE org/nlogo/core/I18NJava.getN (Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;
+          INVOKEINTERFACE org/nlogo/core/I18NJava.getN (Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String; (itf)
           INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
           ATHROW
          L6
@@ -6612,7 +6640,7 @@ procedure TURN-TOWARDS-GRAIN:[BEST-DIRECTION BEST-AMOUNT]{-T--}:
           ALOAD 3
           INVOKESTATIC org/nlogo/api/TypeNames.aName (Ljava/lang/Object;)Ljava/lang/String;
           AASTORE
-          INVOKEINTERFACE org/nlogo/core/I18NJava.getN (Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;
+          INVOKEINTERFACE org/nlogo/core/I18NJava.getN (Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String; (itf)
           INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
           ATHROW
          L6
@@ -6778,7 +6806,7 @@ procedure UPDATE-CLASS-HISTOGRAM:[]{OTPL}:
               ATHROW
              L3
              FRAME SAME1 java/lang/Object
-              LDC 15.0
+              LDC 15.0D
              L4
               DSTORE 3
               ASTORE 2
@@ -6835,10 +6863,10 @@ procedure UPDATE-CLASS-HISTOGRAM:[]{OTPL}:
            L2
            FRAME FULL [org/nlogo/prim/_asm_procedureupdateclasshistogram_countwith_2 org/nlogo/nvm/Context org/nlogo/agent/TreeAgentSet org/nlogo/nvm/Reporter org/nlogo/nvm/Context I org/nlogo/agent/AgentIterator] []
             ALOAD 6
-            INVOKEINTERFACE org/nlogo/agent/AgentIterator.hasNext ()Z
+            INVOKEINTERFACE org/nlogo/agent/AgentIterator.hasNext ()Z (itf)
             IFEQ L3
             ALOAD 6
-            INVOKEINTERFACE org/nlogo/agent/AgentIterator.next ()Lorg/nlogo/agent/Agent;
+            INVOKEINTERFACE org/nlogo/agent/AgentIterator.next ()Lorg/nlogo/agent/Agent; (itf)
             ASTORE 7
             ALOAD 4
             ALOAD 7
@@ -6870,7 +6898,7 @@ procedure UPDATE-CLASS-HISTOGRAM:[]{OTPL}:
             ALOAD 8
             INVOKESTATIC org/nlogo/api/Dump.logoObject (Ljava/lang/Object;)Ljava/lang/String;
             AASTORE
-            INVOKEINTERFACE org/nlogo/core/I18NJava.getN (Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;
+            INVOKEINTERFACE org/nlogo/core/I18NJava.getN (Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String; (itf)
             INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
             ATHROW
            L4
@@ -6928,7 +6956,7 @@ procedure UPDATE-CLASS-HISTOGRAM:[]{OTPL}:
               ATHROW
              L3
              FRAME SAME1 java/lang/Object
-              LDC 55.0
+              LDC 55.0D
              L4
               DSTORE 3
               ASTORE 2
@@ -6985,10 +7013,10 @@ procedure UPDATE-CLASS-HISTOGRAM:[]{OTPL}:
            L2
            FRAME FULL [org/nlogo/prim/_asm_procedureupdateclasshistogram_countwith_5 org/nlogo/nvm/Context org/nlogo/agent/TreeAgentSet org/nlogo/nvm/Reporter org/nlogo/nvm/Context I org/nlogo/agent/AgentIterator] []
             ALOAD 6
-            INVOKEINTERFACE org/nlogo/agent/AgentIterator.hasNext ()Z
+            INVOKEINTERFACE org/nlogo/agent/AgentIterator.hasNext ()Z (itf)
             IFEQ L3
             ALOAD 6
-            INVOKEINTERFACE org/nlogo/agent/AgentIterator.next ()Lorg/nlogo/agent/Agent;
+            INVOKEINTERFACE org/nlogo/agent/AgentIterator.next ()Lorg/nlogo/agent/Agent; (itf)
             ASTORE 7
             ALOAD 4
             ALOAD 7
@@ -7020,7 +7048,7 @@ procedure UPDATE-CLASS-HISTOGRAM:[]{OTPL}:
             ALOAD 8
             INVOKESTATIC org/nlogo/api/Dump.logoObject (Ljava/lang/Object;)Ljava/lang/String;
             AASTORE
-            INVOKEINTERFACE org/nlogo/core/I18NJava.getN (Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;
+            INVOKEINTERFACE org/nlogo/core/I18NJava.getN (Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String; (itf)
             INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
             ATHROW
            L4
@@ -7078,7 +7106,7 @@ procedure UPDATE-CLASS-HISTOGRAM:[]{OTPL}:
               ATHROW
              L3
              FRAME SAME1 java/lang/Object
-              LDC 105.0
+              LDC 105.0D
              L4
               DSTORE 3
               ASTORE 2
@@ -7135,10 +7163,10 @@ procedure UPDATE-CLASS-HISTOGRAM:[]{OTPL}:
            L2
            FRAME FULL [org/nlogo/prim/_asm_procedureupdateclasshistogram_countwith_8 org/nlogo/nvm/Context org/nlogo/agent/TreeAgentSet org/nlogo/nvm/Reporter org/nlogo/nvm/Context I org/nlogo/agent/AgentIterator] []
             ALOAD 6
-            INVOKEINTERFACE org/nlogo/agent/AgentIterator.hasNext ()Z
+            INVOKEINTERFACE org/nlogo/agent/AgentIterator.hasNext ()Z (itf)
             IFEQ L3
             ALOAD 6
-            INVOKEINTERFACE org/nlogo/agent/AgentIterator.next ()Lorg/nlogo/agent/Agent;
+            INVOKEINTERFACE org/nlogo/agent/AgentIterator.next ()Lorg/nlogo/agent/Agent; (itf)
             ASTORE 7
             ALOAD 4
             ALOAD 7
@@ -7170,7 +7198,7 @@ procedure UPDATE-CLASS-HISTOGRAM:[]{OTPL}:
             ALOAD 8
             INVOKESTATIC org/nlogo/api/Dump.logoObject (Ljava/lang/Object;)Ljava/lang/String;
             AASTORE
-            INVOKEINTERFACE org/nlogo/core/I18NJava.getN (Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;
+            INVOKEINTERFACE org/nlogo/core/I18NJava.getN (Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String; (itf)
             INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
             ATHROW
            L4
@@ -7244,7 +7272,7 @@ procedure UPDATE-CLASS-PLOT:[]{OTPL}:
               ATHROW
              L3
              FRAME SAME1 java/lang/Object
-              LDC 15.0
+              LDC 15.0D
              L4
               DSTORE 3
               ASTORE 2
@@ -7301,10 +7329,10 @@ procedure UPDATE-CLASS-PLOT:[]{OTPL}:
            L2
            FRAME FULL [org/nlogo/prim/_asm_procedureupdateclassplot_countwith_2 org/nlogo/nvm/Context org/nlogo/agent/TreeAgentSet org/nlogo/nvm/Reporter org/nlogo/nvm/Context I org/nlogo/agent/AgentIterator] []
             ALOAD 6
-            INVOKEINTERFACE org/nlogo/agent/AgentIterator.hasNext ()Z
+            INVOKEINTERFACE org/nlogo/agent/AgentIterator.hasNext ()Z (itf)
             IFEQ L3
             ALOAD 6
-            INVOKEINTERFACE org/nlogo/agent/AgentIterator.next ()Lorg/nlogo/agent/Agent;
+            INVOKEINTERFACE org/nlogo/agent/AgentIterator.next ()Lorg/nlogo/agent/Agent; (itf)
             ASTORE 7
             ALOAD 4
             ALOAD 7
@@ -7336,7 +7364,7 @@ procedure UPDATE-CLASS-PLOT:[]{OTPL}:
             ALOAD 8
             INVOKESTATIC org/nlogo/api/Dump.logoObject (Ljava/lang/Object;)Ljava/lang/String;
             AASTORE
-            INVOKEINTERFACE org/nlogo/core/I18NJava.getN (Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;
+            INVOKEINTERFACE org/nlogo/core/I18NJava.getN (Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String; (itf)
             INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
             ATHROW
            L4
@@ -7393,7 +7421,7 @@ procedure UPDATE-CLASS-PLOT:[]{OTPL}:
               ATHROW
              L3
              FRAME SAME1 java/lang/Object
-              LDC 55.0
+              LDC 55.0D
              L4
               DSTORE 3
               ASTORE 2
@@ -7450,10 +7478,10 @@ procedure UPDATE-CLASS-PLOT:[]{OTPL}:
            L2
            FRAME FULL [org/nlogo/prim/_asm_procedureupdateclassplot_countwith_5 org/nlogo/nvm/Context org/nlogo/agent/TreeAgentSet org/nlogo/nvm/Reporter org/nlogo/nvm/Context I org/nlogo/agent/AgentIterator] []
             ALOAD 6
-            INVOKEINTERFACE org/nlogo/agent/AgentIterator.hasNext ()Z
+            INVOKEINTERFACE org/nlogo/agent/AgentIterator.hasNext ()Z (itf)
             IFEQ L3
             ALOAD 6
-            INVOKEINTERFACE org/nlogo/agent/AgentIterator.next ()Lorg/nlogo/agent/Agent;
+            INVOKEINTERFACE org/nlogo/agent/AgentIterator.next ()Lorg/nlogo/agent/Agent; (itf)
             ASTORE 7
             ALOAD 4
             ALOAD 7
@@ -7485,7 +7513,7 @@ procedure UPDATE-CLASS-PLOT:[]{OTPL}:
             ALOAD 8
             INVOKESTATIC org/nlogo/api/Dump.logoObject (Ljava/lang/Object;)Ljava/lang/String;
             AASTORE
-            INVOKEINTERFACE org/nlogo/core/I18NJava.getN (Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;
+            INVOKEINTERFACE org/nlogo/core/I18NJava.getN (Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String; (itf)
             INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
             ATHROW
            L4
@@ -7542,7 +7570,7 @@ procedure UPDATE-CLASS-PLOT:[]{OTPL}:
               ATHROW
              L3
              FRAME SAME1 java/lang/Object
-              LDC 105.0
+              LDC 105.0D
              L4
               DSTORE 3
               ASTORE 2
@@ -7599,10 +7627,10 @@ procedure UPDATE-CLASS-PLOT:[]{OTPL}:
            L2
            FRAME FULL [org/nlogo/prim/_asm_procedureupdateclassplot_countwith_8 org/nlogo/nvm/Context org/nlogo/agent/TreeAgentSet org/nlogo/nvm/Reporter org/nlogo/nvm/Context I org/nlogo/agent/AgentIterator] []
             ALOAD 6
-            INVOKEINTERFACE org/nlogo/agent/AgentIterator.hasNext ()Z
+            INVOKEINTERFACE org/nlogo/agent/AgentIterator.hasNext ()Z (itf)
             IFEQ L3
             ALOAD 6
-            INVOKEINTERFACE org/nlogo/agent/AgentIterator.next ()Lorg/nlogo/agent/Agent;
+            INVOKEINTERFACE org/nlogo/agent/AgentIterator.next ()Lorg/nlogo/agent/Agent; (itf)
             ASTORE 7
             ALOAD 4
             ALOAD 7
@@ -7634,7 +7662,7 @@ procedure UPDATE-CLASS-PLOT:[]{OTPL}:
             ALOAD 8
             INVOKESTATIC org/nlogo/api/Dump.logoObject (Ljava/lang/Object;)Ljava/lang/String;
             AASTORE
-            INVOKEINTERFACE org/nlogo/core/I18NJava.getN (Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;
+            INVOKEINTERFACE org/nlogo/core/I18NJava.getN (Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String; (itf)
             INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
             ATHROW
            L4
@@ -7708,7 +7736,7 @@ procedure UPDATE-LORENZ-AND-GINI-PLOTS:[SORTED-WEALTHS TOTAL-WEALTH WEALTH-SUM-S
         _observervariable:NUM-PEOPLE "num-people" => Object
             TRYCATCHBLOCK L0 L1 L1 java/lang/ClassCastException
            L2
-            LDC 100.0
+            LDC 100.0D
            L3
             ALOAD 0
             GETFIELD org/nlogo/prim/_asm_procedureupdatelorenzandginiplots_div_5.world : Lorg/nlogo/agent/World;
@@ -7748,7 +7776,7 @@ procedure UPDATE-LORENZ-AND-GINI-PLOTS:[SORTED-WEALTHS TOTAL-WEALTH WEALTH-SUM-S
             ALOAD 0
             INVOKESTATIC org/nlogo/core/I18N.errorsJ ()Lorg/nlogo/core/I18NJava;
             LDC "org.nlogo.prim.etc.$common.divByZero"
-            INVOKEINTERFACE org/nlogo/core/I18NJava.get (Ljava/lang/String;)Ljava/lang/String;
+            INVOKEINTERFACE org/nlogo/core/I18NJava.get (Ljava/lang/String;)Ljava/lang/String; (itf)
             INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
             ATHROW
            L6
@@ -7794,7 +7822,7 @@ procedure UPDATE-LORENZ-AND-GINI-PLOTS:[SORTED-WEALTHS TOTAL-WEALTH WEALTH-SUM-S
           ASTORE 3
           ALOAD 3
           INVOKEVIRTUAL org/nlogo/agent/Agent.id ()J
-          LDC -1
+          LDC -1L
           LCMP
           IFNE L0
           NEW org/nlogo/nvm/RuntimePrimitiveException
@@ -7810,7 +7838,7 @@ procedure UPDATE-LORENZ-AND-GINI-PLOTS:[SORTED-WEALTHS TOTAL-WEALTH WEALTH-SUM-S
           ALOAD 3
           INVOKEVIRTUAL org/nlogo/agent/Agent.classDisplayName ()Ljava/lang/String;
           AASTORE
-          INVOKEINTERFACE org/nlogo/core/I18NJava.getN (Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;
+          INVOKEINTERFACE org/nlogo/core/I18NJava.getN (Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String; (itf)
           INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
           ATHROW
          L0
@@ -7853,11 +7881,11 @@ procedure UPDATE-LORENZ-AND-GINI-PLOTS:[SORTED-WEALTHS TOTAL-WEALTH WEALTH-SUM-S
          L11
          FRAME APPEND [org/nlogo/agent/AgentSet org/nlogo/api/LogoListBuilder org/nlogo/agent/AgentIterator]
           ALOAD 5
-          INVOKEINTERFACE org/nlogo/agent/AgentIterator.hasNext ()Z
+          INVOKEINTERFACE org/nlogo/agent/AgentIterator.hasNext ()Z (itf)
           IFEQ L4
           ALOAD 4
           ALOAD 5
-          INVOKEINTERFACE org/nlogo/agent/AgentIterator.next ()Lorg/nlogo/agent/Agent;
+          INVOKEINTERFACE org/nlogo/agent/AgentIterator.next ()Lorg/nlogo/agent/Agent; (itf)
           BIPUSH 14
           INVOKEVIRTUAL org/nlogo/agent/Agent.getTurtleVariable (I)Ljava/lang/Object;
           INVOKEVIRTUAL org/nlogo/api/LogoListBuilder.add (Ljava/lang/Object;)V
@@ -7930,10 +7958,10 @@ procedure UPDATE-LORENZ-AND-GINI-PLOTS:[SORTED-WEALTHS TOTAL-WEALTH WEALTH-SUM-S
          L16
          FRAME FULL [org/nlogo/prim/_asm_procedureupdatelorenzandginiplots_setprocedurevariable_7 org/nlogo/nvm/Context java/lang/Object org/nlogo/core/LogoList java/util/ArrayList java/util/ArrayList java/util/ArrayList java/util/Iterator] []
           ALOAD 7
-          INVOKEINTERFACE java/util/Iterator.hasNext ()Z
+          INVOKEINTERFACE java/util/Iterator.hasNext ()Z (itf)
           IFEQ L17
           ALOAD 7
-          INVOKEINTERFACE java/util/Iterator.next ()Ljava/lang/Object;
+          INVOKEINTERFACE java/util/Iterator.next ()Ljava/lang/Object; (itf)
           ASTORE 8
           ALOAD 8
           INSTANCEOF java/lang/Double
@@ -8062,10 +8090,10 @@ procedure UPDATE-LORENZ-AND-GINI-PLOTS:[SORTED-WEALTHS TOTAL-WEALTH WEALTH-SUM-S
          L5
          FRAME FULL [org/nlogo/prim/_asm_procedureupdatelorenzandginiplots_setprocedurevariable_8 org/nlogo/nvm/Context org/nlogo/core/LogoList D java/util/Iterator] []
           ALOAD 5
-          INVOKEINTERFACE java/util/Iterator.hasNext ()Z
+          INVOKEINTERFACE java/util/Iterator.hasNext ()Z (itf)
           IFEQ L6
           ALOAD 5
-          INVOKEINTERFACE java/util/Iterator.next ()Ljava/lang/Object;
+          INVOKEINTERFACE java/util/Iterator.next ()Ljava/lang/Object; (itf)
           ASTORE 6
           ALOAD 6
           INSTANCEOF java/lang/Double
@@ -8298,7 +8326,7 @@ procedure UPDATE-LORENZ-AND-GINI-PLOTS:[SORTED-WEALTHS TOTAL-WEALTH WEALTH-SUM-S
           ILOAD 5
           INVOKESTATIC java/lang/Integer.valueOf (I)Ljava/lang/Integer;
           AASTORE
-          INVOKEINTERFACE org/nlogo/core/I18NJava.getN (Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;
+          INVOKEINTERFACE org/nlogo/core/I18NJava.getN (Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String; (itf)
           INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
           ATHROW
          L12
@@ -8337,7 +8365,7 @@ procedure UPDATE-LORENZ-AND-GINI-PLOTS:[SORTED-WEALTHS TOTAL-WEALTH WEALTH-SUM-S
           INVOKEVIRTUAL org/nlogo/core/LogoList.size ()I
           INVOKESTATIC java/lang/Integer.valueOf (I)Ljava/lang/Integer;
           AASTORE
-          INVOKEINTERFACE org/nlogo/core/I18NJava.getN (Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;
+          INVOKEINTERFACE org/nlogo/core/I18NJava.getN (Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String; (itf)
           INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
           ATHROW
          L14
@@ -8382,7 +8410,7 @@ procedure UPDATE-LORENZ-AND-GINI-PLOTS:[SORTED-WEALTHS TOTAL-WEALTH WEALTH-SUM-S
           INVOKEVIRTUAL java/lang/String.length ()I
           INVOKESTATIC java/lang/Integer.valueOf (I)Ljava/lang/Integer;
           AASTORE
-          INVOKEINTERFACE org/nlogo/core/I18NJava.getN (Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;
+          INVOKEINTERFACE org/nlogo/core/I18NJava.getN (Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String; (itf)
           INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
           ATHROW
          L17
@@ -8530,7 +8558,7 @@ procedure UPDATE-LORENZ-AND-GINI-PLOTS:[SORTED-WEALTHS TOTAL-WEALTH WEALTH-SUM-S
             ALOAD 0
             INVOKESTATIC org/nlogo/core/I18N.errorsJ ()Lorg/nlogo/core/I18NJava;
             LDC "org.nlogo.prim.etc.$common.divByZero"
-            INVOKEINTERFACE org/nlogo/core/I18NJava.get (Ljava/lang/String;)Ljava/lang/String;
+            INVOKEINTERFACE org/nlogo/core/I18NJava.get (Ljava/lang/String;)Ljava/lang/String; (itf)
             INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
             ATHROW
            L9
@@ -8542,7 +8570,7 @@ procedure UPDATE-LORENZ-AND-GINI-PLOTS:[SORTED-WEALTHS TOTAL-WEALTH WEALTH-SUM-S
             ALOAD 1
             INVOKEVIRTUAL org/nlogo/prim/_asm_procedureupdatelorenzandginiplots_mult_14.validDouble (DLorg/nlogo/nvm/Context;)D
            L10
-            LDC 100.0
+            LDC 100.0D
            L11
             DSTORE 4
             DSTORE 2
@@ -8730,7 +8758,7 @@ procedure UPDATE-LORENZ-AND-GINI-PLOTS:[SORTED-WEALTHS TOTAL-WEALTH WEALTH-SUM-S
           ALOAD 0
           INVOKESTATIC org/nlogo/core/I18N.errorsJ ()Lorg/nlogo/core/I18NJava;
           LDC "org.nlogo.prim.etc.$common.divByZero"
-          INVOKEINTERFACE org/nlogo/core/I18NJava.get (Ljava/lang/String;)Ljava/lang/String;
+          INVOKEINTERFACE org/nlogo/core/I18NJava.get (Ljava/lang/String;)Ljava/lang/String; (itf)
           INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
           ATHROW
          L17
@@ -8815,7 +8843,7 @@ procedure UPDATE-LORENZ-AND-GINI-PLOTS:[SORTED-WEALTHS TOTAL-WEALTH WEALTH-SUM-S
           ALOAD 0
           INVOKESTATIC org/nlogo/core/I18N.errorsJ ()Lorg/nlogo/core/I18NJava;
           LDC "org.nlogo.prim.etc.$common.divByZero"
-          INVOKEINTERFACE org/nlogo/core/I18NJava.get (Ljava/lang/String;)Ljava/lang/String;
+          INVOKEINTERFACE org/nlogo/core/I18NJava.get (Ljava/lang/String;)Ljava/lang/String; (itf)
           INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
           ATHROW
          L24
@@ -8967,7 +8995,7 @@ procedure UPDATE-LORENZ-AND-GINI-PLOTS:[SORTED-WEALTHS TOTAL-WEALTH WEALTH-SUM-S
             ALOAD 0
             INVOKESTATIC org/nlogo/core/I18N.errorsJ ()Lorg/nlogo/core/I18NJava;
             LDC "org.nlogo.prim.etc.$common.divByZero"
-            INVOKEINTERFACE org/nlogo/core/I18NJava.get (Ljava/lang/String;)Ljava/lang/String;
+            INVOKEINTERFACE org/nlogo/core/I18NJava.get (Ljava/lang/String;)Ljava/lang/String; (itf)
             INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
             ATHROW
            L11
@@ -9035,7 +9063,7 @@ procedure UPDATE-LORENZ-AND-GINI-PLOTS:[SORTED-WEALTHS TOTAL-WEALTH WEALTH-SUM-S
             ALOAD 0
             INVOKESTATIC org/nlogo/core/I18N.errorsJ ()Lorg/nlogo/core/I18NJava;
             LDC "org.nlogo.prim.etc.$common.divByZero"
-            INVOKEINTERFACE org/nlogo/core/I18NJava.get (Ljava/lang/String;)Ljava/lang/String;
+            INVOKEINTERFACE org/nlogo/core/I18NJava.get (Ljava/lang/String;)Ljava/lang/String; (itf)
             INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
             ATHROW
            L15

@@ -2,28 +2,29 @@
 
 package org.nlogo.hubnet.server.gui
 
-import org.nlogo.api.{ ModelLoader, ModelType, ViewInterface }
-import org.nlogo.api.HubNetInterface.ClientInterface
-import org.nlogo.core.{ Femto, Model, Widget => CoreWidget }
-import org.nlogo.hubnet.protocol.ComputerInterface
-import org.nlogo.hubnet.connection.{ HubNetException, NetworkUtils }
-import org.nlogo.hubnet.server.{HubNetManager, ClientEventListener, ConnectionManager}
-import org.nlogo.fileformat.ModelConversion
-import org.nlogo.nvm.DefaultCompilerServices
-import org.nlogo.awt.EventQueue.invokeLater
-import org.nlogo.window._
-
-import java.net.{ InetAddress, NetworkInterface }
 import java.awt.Component
-import javax.swing.JOptionPane
+import java.net.{ InetAddress, NetworkInterface }
+
+import org.nlogo.api.{ AbstractModelLoader, ModelType, ViewInterface }
+import org.nlogo.api.HubNetInterface.ClientInterface
+import org.nlogo.awt.EventQueue.invokeLater
+import org.nlogo.core.{ Femto, I18N, Model, Widget => CoreWidget }
+import org.nlogo.fileformat.FileFormat.ModelConversion
+import org.nlogo.hubnet.connection.{ HubNetException, NetworkUtils }
+import org.nlogo.hubnet.protocol.ComputerInterface
+import org.nlogo.hubnet.server.{ ClientEventListener, ConnectionManager, HubNetManager }
+import org.nlogo.nvm.DefaultCompilerServices
+import org.nlogo.swing.OptionPane
+import org.nlogo.theme.ThemeSync
+import org.nlogo.window._
 
 class GUIHubNetManager(workspace: GUIWorkspace,
                        linkParent: Component,
                        ifactory: InterfaceFactory,
                        menuFactory: MenuBarFactory,
-                       loader: ModelLoader,
+                       loader: AbstractModelLoader,
                        modelConverter: ModelConversion)
-  extends HubNetManager(workspace, loader, modelConverter) with ViewInterface {
+  extends HubNetManager(workspace, loader, modelConverter) with ViewInterface with ThemeSync {
 
   private var _clientEditor: HubNetClientEditor = new HubNetClientEditor(workspace, linkParent, ifactory, menuFactory)
   // used in the discovery messages, and displayed in the control center.
@@ -31,13 +32,13 @@ class GUIHubNetManager(workspace: GUIWorkspace,
   private var serverInterface = Option.empty[(NetworkInterface, InetAddress)]
 
   private val listener = new ClientEventListener() {
-    def addClient(clientId: String, remoteAddress: String) {
+    def addClient(clientId: String, remoteAddress: String): Unit = {
       invokeLater(() => controlCenter.addClient(clientId, remoteAddress))
     }
-    def clientDisconnect(clientId: String) {
+    def clientDisconnect(clientId: String): Unit = {
       invokeLater(() => controlCenter.clientDisconnect(clientId))
     }
-    def logMessage(message:String) {
+    def logMessage(message:String): Unit = {
       invokeLater(() => controlCenter.logMessage(message))
     }
   }
@@ -49,13 +50,14 @@ class GUIHubNetManager(workspace: GUIWorkspace,
   /**
    * Launch a local computer client, if there is a session open connect to it.
    */
-  override def newClient(isRobo: Boolean, waitTime: Int) {
+  override def newClient(isRobo: Boolean, waitTime: Int): Option[AnyRef] = {
     val clientApp = Femto.get[ClientAppInterface]("org.nlogo.hubnet.client.ClientApp")
     val host = try Some(InetAddress.getLocalHost.getHostAddress.toString)
     catch {case ex: java.net.UnknownHostException => None}
     // TODO: this seems like a bunch of bugs waiting to happen
     clientApp.startup("", host.orNull, connectionManager.port, true,
       isRobo, waitTime, new DefaultCompilerServices(workspace.compiler))
+    Some(clientApp)
   }
 
   /// client editor
@@ -67,7 +69,7 @@ class GUIHubNetManager(workspace: GUIWorkspace,
   def clientEditor: AnyRef = _clientEditor
   def getInterfaceWidth = _clientEditor.interfacePanel.getPreferredSize.width
   def getInterfaceHeight = _clientEditor.interfacePanel.getPreferredSize.height
-  def load(model: Model) {
+  def load(model: Model): Unit = {
     model.optionalSectionValue[Seq[CoreWidget]]("org.nlogo.modelsection.hubnetclient").foreach { hubNetWidgets =>
       _clientEditor.load(hubNetWidgets)
     }
@@ -84,7 +86,7 @@ class GUIHubNetManager(workspace: GUIWorkspace,
   def defaultComponent = Seq()
 
   @throws(classOf[java.io.IOException])
-  def importClientInterface(model: Model, client: Boolean) {
+  def importClientInterface(model: Model, client: Boolean): Unit = {
     _clientEditor.close()
     val widgets: Seq[CoreWidget] =
       if (client)
@@ -95,40 +97,41 @@ class GUIHubNetManager(workspace: GUIWorkspace,
     openClientEditor()
   }
 
-  def setTitle(name: String, dir: String, modelType: ModelType) {
+  def setTitle(name: String, dir: String, modelType: ModelType): Unit = {
     _clientEditor.setTitle(name, dir, modelType)
   }
 
-  def showControlCenter() {
+  def showControlCenter(): Unit = {
     if (controlCenter == null) {
       controlCenter =
         new ControlCenter(connectionManager, workspace.getFrame, serverName, workspace.modelNameForDisplay, serverInterface.map(_._2))
       controlCenter.pack()
     }
+    controlCenter.syncTheme()
     controlCenter.setVisible(true)
   }
 
-  private def closeControlCenter(){
+  private def closeControlCenter(): Unit ={
     // the hubnet manager is created in AbstractWorkspace, but the control center
     // isn't started unless showControlCenter is called.
     if(controlCenter != null) controlCenter.dispose()
   }
 
   /// client editor
-  def openClientEditor() {
+  def openClientEditor(): Unit = {
     org.nlogo.awt.Positioning.moveNextTo(_clientEditor, linkParent)
     _clientEditor.setVisible(true)
     _clientEditor.setSize(_clientEditor.getPreferredSize)
   }
 
-  def closeClientEditor() {
+  def closeClientEditor(): Unit = {
      _clientEditor.close()
      _clientEditor.dispose()
      _clientEditor = new HubNetClientEditor(workspace, linkParent, ifactory, menuFactory)
   }
 
   @throws(classOf[HubNetException])
-  def reset() {
+  def reset(): Unit = {
     if(connectionManager.isRunning) {
       connectionManager.shutdown()
       closeControlCenter()
@@ -138,12 +141,12 @@ class GUIHubNetManager(workspace: GUIWorkspace,
       serverName = name
       serverInterface = selectedNetwork
       if (serverInterface.isEmpty) {
-        JOptionPane.showMessageDialog(workspace.getFrame,
-          "Unable to find a suitable network connection for HubNet, please check your network connection")
+        new OptionPane(workspace.getFrame, I18N.gui.get("common.messages.error"),
+                       I18N.gui.get("edit.hubnet.checkNetwork"), OptionPane.Options.Ok, OptionPane.Icons.Error)
       }
       else if (serverInterface.exists(_._1.isLoopback))
-        JOptionPane.showMessageDialog(workspace.getFrame,
-          "Unable to find an external network connection, HubNet will be served locally")
+        new OptionPane(workspace.getFrame, I18N.gui.get("common.messages.error"),
+                       I18N.gui.get("edit.hubnet.noNetwork"), OptionPane.Options.Ok, OptionPane.Icons.Error)
     }
     serverInterface.foreach { nw =>
       connectionManager.startup(serverName, nw)
@@ -169,7 +172,7 @@ class GUIHubNetManager(workspace: GUIWorkspace,
     }
   }
 
-  def disconnect() {
+  def disconnect(): Unit = {
     connectionManager.shutdown()
     closeControlCenter()
     messagesList.clear()
@@ -180,5 +183,12 @@ class GUIHubNetManager(workspace: GUIWorkspace,
   // JC - 3/31/11
   def sendFromLocalClient(clientName:String, tag: String, content: AnyRef) = {
     Some("unimplemented")
+  }
+
+  override def syncTheme(): Unit = {
+    _clientEditor.syncTheme()
+
+    if (controlCenter != null)
+      controlCenter.syncTheme()
   }
 }

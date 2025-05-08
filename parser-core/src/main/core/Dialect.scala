@@ -8,12 +8,15 @@ trait Dialect extends LowPriorityDialect {
   def is3D:           Boolean
   def agentVariables: AgentVariableSet
   def tokenMapper:    TokenMapperInterface
+  def breedPrimMapper(primName: String): String = {
+    primName
+  }
 }
 
 object Dialect extends LowPriorityDialect
 
 trait LowPriorityDialect {
-  implicit val dialect = NetLogoCore
+  implicit val dialect: org.nlogo.core.NetLogoCore.type = NetLogoCore
 }
 
 case object NetLogoCore extends Dialect {

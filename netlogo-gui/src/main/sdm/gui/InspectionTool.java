@@ -10,10 +10,11 @@ import org.jhotdraw.framework.DrawingView;
 
 import java.util.List;
 import java.util.ArrayList;
-import scala.collection.JavaConverters;
 import java.awt.event.MouseEvent;
 
-strictfp class InspectionTool
+import scala.jdk.javaapi.CollectionConverters;
+
+class InspectionTool
     extends org.jhotdraw.standard.SelectionTool {
 
   private final AggregateModelEditor editor;
@@ -59,9 +60,9 @@ strictfp class InspectionTool
      }
    } // END while
     if (figure instanceof ConverterFigure) {
-      ((ConverterFigure) figure).inputs(JavaConverters.collectionAsScalaIterable(lst).toList());
+      ((ConverterFigure) figure).inputs(CollectionConverters.asScala(lst).toList());
     } else if (figure instanceof RateConnection) {
-      ((RateConnection) figure).inputs(JavaConverters.collectionAsScalaIterable(lst).toList());
+      ((RateConnection) figure).inputs(CollectionConverters.asScala(lst).toList());
     }
   }
 
@@ -97,8 +98,13 @@ strictfp class InspectionTool
       super.mouseUp(e, x, y);
     }
     else {
-      link.mouseUp(e, x, y);
-      rct.mouseUp(e, x, y);
+      if (link != null) {
+        link.mouseUp(e, x, y);
+      }
+
+      if (rct != null) {
+        rct.mouseUp(e, x, y);
+      }
     }
   }
 

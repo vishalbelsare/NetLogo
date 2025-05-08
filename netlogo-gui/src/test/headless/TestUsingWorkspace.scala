@@ -2,8 +2,8 @@
 
 package org.nlogo.headless
 
-import org.nlogo.util.{ MockSuite, WorldType }
-import org.nlogo.api.{ Version, ViewSettings, Perspective }
+import org.nlogo.util.MockSuite
+import org.nlogo.api.{ Version, ViewSettings, Perspective, WorldType }
 import org.nlogo.shape.ShapeConverter
 import org.nlogo.core.Model
 
@@ -22,7 +22,7 @@ trait TestUsingWorkspace extends MockSuite {
 
   def testUsingWorkspace(testName: String, radius: Int = 5,
                          worldType: WorldType = WorldType.Torus)
-                        (f: HeadlessWorkspace => Unit) {
+                        (f: HeadlessWorkspace => Unit): Unit = {
     if (!Version.is3D) {
       test(testName) {
         runWorkspaceTest(radius, worldType){f}
@@ -32,7 +32,7 @@ trait TestUsingWorkspace extends MockSuite {
 
   def mockTestUsingWorkspace(name:String, radius: Int = 5,
                              worldType: WorldType = WorldType.Torus)
-                            (f: HeadlessWorkspace => Unit){
+                            (f: HeadlessWorkspace => Unit): Unit ={
     if (!Version.is3D) {
       mockTest(name){
         runWorkspaceTest(radius, worldType){ f }
@@ -41,12 +41,13 @@ trait TestUsingWorkspace extends MockSuite {
   }
 
   def runWorkspaceTest(radius: Int = 5, worldType: WorldType = WorldType.Torus)
-                      (f: HeadlessWorkspace => Unit) {
+                      (f: HeadlessWorkspace => Unit): Unit = {
     val workspace: HeadlessWorkspace = HeadlessWorkspace.newInstance
     try {
       workspace.initForTesting(-radius, radius, -radius, radius, HeadlessWorkspace.TestDeclarations)
       workspace.changeTopology(worldType.xWrap, worldType.yWrap)
-      workspace.world.turtleShapes.replaceShapes(Model.defaultShapes.map(ShapeConverter.baseVectorShapeToVectorShape))
+      workspace.world.turtleShapes.replaceShapes(
+        Model.defaultTurtleShapes.map(ShapeConverter.baseVectorShapeToVectorShape))
       workspace.world.linkShapes.replaceShapes(Model.defaultLinkShapes.map(ShapeConverter.baseLinkShapeToLinkShape))
       f(workspace)
     }

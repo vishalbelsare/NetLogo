@@ -6,13 +6,13 @@ import NetLogoBuild.autogenRoot
 
 object EventsGenerator {
 
-  lazy val settings = Seq(sourceGenerators in Compile += task.taskValue)
+  lazy val settings = Seq(Compile / sourceGenerators += task.taskValue)
 
   lazy val task =
     Def.task {
       val streamsValue = streams.value
       val autogenRootValue = autogenRoot.value
-      val sourceManagedValue = (sourceManaged in Compile).value
+      val sourceManagedValue = (Compile / sourceManaged).value
       val cachedEvents = FileFunction.cached(streams.value.cacheDirectory / "events", inStyle = FilesInfo.hash, outStyle = FilesInfo.hash) {
         (in: Set[File]) =>
           Set("window", "app.common").map { pkg =>
@@ -40,7 +40,7 @@ object EventsGenerator {
 
     append("package org.nlogo." + ppackage + " ;")
     append("\n")
-    append(access + "final strictfp class Events")
+    append(access + "final class Events")
     append("{")
     append("    // not instantiable")
     append("    private Events() { throw new IllegalStateException() ; }")
@@ -56,7 +56,7 @@ object EventsGenerator {
         val fieldString = splitt.drop(1).mkString("-")
 
         val name = shortName + "Event"
-        append("    " + access + "static strictfp class " + name + " extends " + qualify + "Event")
+        append("    " + access + "static class " + name + " extends " + qualify + "Event")
         append("    {")
         val fields = fieldString.split(""" \s*-\s* """).filter(!_.isEmpty).map(_.trim)
         if (!fields.isEmpty) {

@@ -6,6 +6,7 @@ package misc
 
 import org.nlogo.plot.PlotPen
 import org.nlogo.core._
+import org.nlogo.api.PlotCompilationErrorAction
 
 class TestPlotModels extends FixtureSuite {
 
@@ -15,10 +16,14 @@ class TestPlotModels extends FixtureSuite {
 
   def onlyPlot(implicit fixture: Fixture) =
     fixture.workspace.plotManager.plots match {
-      case Seq(plot) => plot }
+      case Seq(plot) => plot
+      case p => throw new IllegalStateException
+    }
   def onlyPen(implicit fixture: Fixture) =
     onlyPlot.pens match {
-      case Seq(pen) => pen }
+      case Seq(pen) => pen
+      case p => throw new IllegalStateException
+    }
 
   val modelCode =
     """|breed [dogs dog]
@@ -250,10 +255,10 @@ class TestPlotModels extends FixtureSuite {
              pens = List(Pen(display = "", updateCode = "set x n-values 10 [random 10]"))))))
     testCommand("reset-ticks")
     testCommand("random-seed 10")
-    testReporter("n-values 10 [random 10]", "[8 9 8 4 2 4 5 4 7 9]")
+    testReporter("n-values 10 [random 10]", "[8 9 8 2 0 4 3 4 7 9]")
     testCommand("random-seed 10")
     testCommand("tick") // runs plot code, which uses rng in this test case
-    testReporter("n-values 10 [random 10]", "[8 9 8 4 2 4 5 4 7 9]")
+    testReporter("n-values 10 [random 10]", "[8 9 8 2 0 4 3 4 7 9]")
   }
 
   test("legend is correctly off") { implicit fixture =>
@@ -294,4 +299,16 @@ class TestPlotModels extends FixtureSuite {
     testCompileError(Model(code = modelCode, widgets = List(View(), Plot(display = Some(""), pens = List(Pen(display = "p", updateCode = "create-fails 8")))))) { ex =>
       assert("Nothing named CREATE-FAILS has been defined." === ex.getMessage)
     }}
+
+  test("Plot With Bad Pen Update Code Should Output Exception on Load (headless only, Output Option)") { implicit fixture =>
+    import fixture._
+    setPlotCompilationErrorAction(PlotCompilationErrorAction.Output)
+    openModel(Model(code = modelCode, widgets = List(View(), Plot(display = Some(""), pens = List(Pen(display = "p", updateCode = "create-fails 8"))))))
+  }
+
+  test("Plot With Bad Pen Update Code Should Ignore Exception on Load (headless only, Ignore Option)") { implicit fixture =>
+    import fixture._
+    setPlotCompilationErrorAction(PlotCompilationErrorAction.Ignore)
+    openModel(Model(code = modelCode, widgets = List(View(), Plot(display = Some(""), pens = List(Pen(display = "p", updateCode = "create-fails 8"))))))
+  }
 }

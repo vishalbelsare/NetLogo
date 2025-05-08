@@ -6,7 +6,7 @@ import org.nlogo.agent.AgentSet;
 import org.nlogo.api.JobOwner;
 import org.nlogo.api.LogoException;
 
-public abstract strictfp class Job {
+public abstract class Job {
 
   public static final byte RUNNING = 0;
   public static final byte DONE = 1;
@@ -23,7 +23,7 @@ public abstract strictfp class Job {
   public final AgentSet agentset;
   public final Context parentContext;
   public final Procedure topLevelProcedure;
-  protected final Workspace workspace;
+  public final Workspace workspace;
 
   public org.nlogo.api.MersenneTwisterFast random;
 

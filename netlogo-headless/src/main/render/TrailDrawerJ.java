@@ -4,7 +4,7 @@ package org.nlogo.render;
 
 import org.nlogo.api.Graphics2DWrapper;
 
-public strictfp abstract class TrailDrawerJ
+public abstract class TrailDrawerJ
     implements org.nlogo.api.TrailDrawerInterface,
     org.nlogo.api.ViewSettings {
   private final org.nlogo.api.World world;
@@ -46,14 +46,14 @@ public strictfp abstract class TrailDrawerJ
   }
 
   public boolean sendPixels() {
-    return sendPixels;
+    return _sendPixels;
   }
 
   public void sendPixels(boolean dirty) {
-    sendPixels = dirty;
+    _sendPixels = dirty;
   }
 
-  protected boolean sendPixels = false;
+  protected boolean _sendPixels = false;
 
   public boolean isDirty() {
     return drawingDirty;

@@ -2,13 +2,14 @@
 
 package org.nlogo.editor
 
-import java.awt.event.InputEvent.{ALT_DOWN_MASK => AltKey, CTRL_DOWN_MASK => CtrlKey, SHIFT_DOWN_MASK => ShiftKey}
-import java.awt.event.{KeyEvent, TextEvent, TextListener}
-import java.awt.{Font, GraphicsEnvironment}
-import javax.swing.text.{DefaultEditorKit, TextAction}
-import javax.swing.{Action, KeyStroke}
+import java.awt.{ Font, GraphicsEnvironment }
+import java.awt.event.{ ActionEvent, KeyEvent, TextEvent, TextListener }
+import java.awt.event.InputEvent.{ ALT_DOWN_MASK => AltKey, CTRL_DOWN_MASK => CtrlKey, SHIFT_DOWN_MASK => ShiftKey }
+import javax.swing.{ Action, InputMap, KeyStroke }
+import javax.swing.text.{ DefaultEditorKit, TextAction }
 
 import org.fife.ui.rtextarea.RTextAreaEditorKit
+
 import org.nlogo.editor.KeyBinding._
 
 object EditorConfiguration {
@@ -26,7 +27,7 @@ object EditorConfiguration {
   val defaultFont = new Font(platformMonospacedFont, Font.PLAIN, 12)
 
   private val emptyListener =
-    new TextListener() { override def textValueChanged(e: TextEvent) { } }
+    new TextListener() { override def textValueChanged(e: TextEvent): Unit = { } }
 
   def defaultContextActions(colorizer: Colorizer): Seq[Action] =
     Seq(new MouseQuickHelpAction(colorizer))
@@ -116,6 +117,16 @@ case class EditorConfiguration(
         case e: InstallableAction => e.install(editor)
         case _ =>
       }
+
+      editor.getActionMap.put(DefaultEditorKit.previousWordAction, new CorrectPreviousWordAction(editor, false))
+      editor.getActionMap.put(DefaultEditorKit.selectionPreviousWordAction, new CorrectPreviousWordAction(editor, true))
+      editor.getActionMap.put(DefaultEditorKit.nextWordAction, new CorrectNextWordAction(editor, false))
+      editor.getActionMap.put(DefaultEditorKit.selectionNextWordAction, new CorrectNextWordAction(editor, true))
+      editor.getActionMap.put(DefaultEditorKit.selectWordAction, new CorrectSelectWordAction(editor))
+      editor.getActionMap.put(DefaultEditorKit.deletePrevWordAction, new CorrectDeletePrevWordAction(editor))
+      editor.getActionMap.put(DefaultEditorKit.deleteNextWordAction, new CorrectDeleteNextWordAction(editor))
+      editor.getActionMap.put(DefaultEditorKit.backwardAction, new CorrectBackwardAction(editor))
+      editor.getActionMap.put(DefaultEditorKit.forwardAction, new CorrectForwardAction(editor))
     }
 
   def configureAdvancedEditorArea(editor: AbstractEditorArea) = {
@@ -148,9 +159,109 @@ case class EditorConfiguration(
         (KeyEvent.VK_K,          CtrlKey) -> RTextAreaEditorKit.rtaDeleteRestOfLineAction
       ).foreach { case ((key, mod), action) => editor.getInputMap().put(KeyStroke.getKeyStroke(key, mod), action)}
     }
+
+    editor.getInputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_DELETE, CtrlKey), new CorrectDeleteNextWordAction(editor))
+
+    // there doesn't seem to be a way to directly remove an undesired action if it's in a parent map,
+    // so recursively search through the parents to find the correct map to remove it from (Isaac B 4/13/25)
+    def removeQuote(map: InputMap): Unit = {
+      if (map.keys != null && map.keys.exists(_.getKeyChar == '"')) {
+        map.remove(KeyStroke.getKeyStroke('"'))
+      } else if (map.getParent != null) {
+        removeQuote(map.getParent)
+      }
+    }
+
+    removeQuote(editor.getInputMap)
   }
 
   def permanentActions: Seq[Action] = additionalActions.values.toSeq ++ menuActions
 
   def editorOnlyActions: Seq[Action] = Seq()
+
+  private class CorrectPreviousWordAction(editor: AbstractEditorArea, select: Boolean)
+    extends TextAction("previous word") {
+
+    def actionPerformed(e: ActionEvent): Unit = {
+      if (editor.getCaretPosition > 0) {
+        if (editor.getText()(editor.getCaretPosition - 1).isLetterOrDigit) {
+          while (editor.getCaretPosition > 0 && editor.getText()(editor.getCaretPosition - 1).isLetterOrDigit) {
+            if (select) {
+              editor.moveCaretPosition(editor.getCaretPosition - 1)
+            } else {
+              editor.setCaretPosition(editor.getCaretPosition - 1)
+            }
+          }
+        } else if (select) {
+          editor.moveCaretPosition(editor.getCaretPosition - 1)
+        } else {
+          editor.setCaretPosition(editor.getCaretPosition - 1)
+        }
+      }
+    }
+  }
+
+  private class CorrectNextWordAction(editor: AbstractEditorArea, select: Boolean) extends TextAction("next word") {
+    def actionPerformed(e: ActionEvent): Unit = {
+      if (editor.getCaretPosition < editor.getText().size) {
+        if (editor.getText()(editor.getCaretPosition).isLetterOrDigit) {
+          while (editor.getCaretPosition < editor.getText().size &&
+                 editor.getText()(editor.getCaretPosition).isLetterOrDigit) {
+            if (select) {
+              editor.moveCaretPosition(editor.getCaretPosition + 1)
+            } else {
+              editor.setCaretPosition(editor.getCaretPosition + 1)
+            }
+          }
+        } else if (select) {
+          editor.moveCaretPosition(editor.getCaretPosition + 1)
+        } else {
+          editor.setCaretPosition(editor.getCaretPosition + 1)
+        }
+      }
+    }
+  }
+
+  private class CorrectSelectWordAction(editor: AbstractEditorArea) extends TextAction("select word") {
+    def actionPerformed(e: ActionEvent): Unit = {
+      new CorrectPreviousWordAction(editor, false).actionPerformed(e)
+      new CorrectNextWordAction(editor, true).actionPerformed(e)
+    }
+  }
+
+  private class CorrectDeletePrevWordAction(editor: AbstractEditorArea) extends TextAction("delete previous word") {
+    def actionPerformed(e: ActionEvent): Unit = {
+      new CorrectPreviousWordAction(editor, true).actionPerformed(e)
+
+      editor.replaceSelection(null)
+    }
+  }
+
+  private class CorrectDeleteNextWordAction(editor: AbstractEditorArea) extends TextAction("delete next word") {
+    def actionPerformed(e: ActionEvent): Unit = {
+      new CorrectNextWordAction(editor, true).actionPerformed(e)
+
+      editor.replaceSelection(null)
+    }
+  }
+
+  private class CorrectBackwardAction(editor: AbstractEditorArea) extends TextAction("caret backward") {
+    def actionPerformed(e: ActionEvent): Unit = {
+      if (editor.getSelectionStart == editor.getSelectionEnd) {
+        editor.setCaretPosition((editor.getCaretPosition - 1).max(0))
+      } else {
+        editor.setCaretPosition(editor.getSelectionStart)
+      }
+    }
+  }
+
+  private class CorrectForwardAction(editor: AbstractEditorArea) extends TextAction("caret backward") {
+    def actionPerformed(e: ActionEvent): Unit = {
+      if (editor.getSelectionStart == editor.getSelectionEnd) {
+        editor.setCaretPosition((editor.getCaretPosition + 1).min(editor.getText.size))
+      } else {
+        editor.setCaretPosition(editor.getSelectionEnd)
+      }
+    }
+  }
 }

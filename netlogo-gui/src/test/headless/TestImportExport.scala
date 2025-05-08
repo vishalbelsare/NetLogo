@@ -11,7 +11,7 @@ import org.nlogo.util.SlowTest
 class TestImportExport extends AnyFunSuite with AbstractTestLanguage
 with BeforeAndAfterEach with OneInstancePerTest with SlowTest {
 
-  override def beforeEach() {
+  override def beforeEach(): Unit = {
     init()
     // the default error handler just spits something to stdout or stderr or somewhere.
     // we want to fail hard. - ST 7/21/10
@@ -22,7 +22,7 @@ with BeforeAndAfterEach with OneInstancePerTest with SlowTest {
       }
   }
 
-  override def afterEach() { workspace.dispose() }
+  override def afterEach(): Unit = { workspace.dispose() }
 
   def getUniqueFilename() = {
     new java.io.File("tmp").mkdir()
@@ -37,7 +37,7 @@ with BeforeAndAfterEach with OneInstancePerTest with SlowTest {
 
   def roundTripHelper(setup: String,
                       model: String = "",
-                      worldSize: Int = 0) {
+                      worldSize: Int = 0): Unit = {
     val filename = getUniqueFilename()
 
     // get ready
@@ -70,7 +70,7 @@ with BeforeAndAfterEach with OneInstancePerTest with SlowTest {
   }
 
   def dropLines(s: String, n: Int): String =
-    io.Source.fromString(s).getLines.drop(n).mkString("\n")
+    io.Source.fromString(s).getLines().drop(n).mkString("\n")
 
   /// tests that use roundTripHelper
 
@@ -243,7 +243,7 @@ with BeforeAndAfterEach with OneInstancePerTest with SlowTest {
     }
 
   test("testImportSubject", SlowTest.Tag) {
-    import scala.collection.JavaConverters._
+    import scala.jdk.CollectionConverters.IterableHasAsScala
 
     val filename = getUniqueFilename()
     workspace.initForTesting(10)
@@ -274,6 +274,10 @@ with BeforeAndAfterEach with OneInstancePerTest with SlowTest {
   }
 
   if(!Version.is3D)
+    // The way this exception is thrown causes it to show up in the "Annotations" report of a test run in GitHub
+    // Actions.  I poked at it a little but it doesn't seem important enough to change anything just to get that not to
+    // show there, since the test is valid and passing.  So instead I'm leaving this note to the next explorer who
+    // decides to check into it.  -Jeremy B May 2023
     test("testNonExistentPlot", SlowTest.Tag) {
       workspace.initForTesting(10)
       workspace.importerErrorHandler =
@@ -420,6 +424,10 @@ with BeforeAndAfterEach with OneInstancePerTest with SlowTest {
     testCommand("table:put t1 7 8")
     testReporter("table:to-list t1", "[[1 2] [3 4] [7 8]]")
     testReporter("table:to-list t2", "[[1 2] [3 4]]")
+  }
+
+  test("testImportingArrayContainingStringsWithCurlyBraces") {
+    roundTripHelper("set a array:from-list [\"}}\" \"{{\"]", "extensions [array] globals [a]")
   }
 
   /// other tests (that don't use roundTripHelper)

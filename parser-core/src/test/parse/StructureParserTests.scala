@@ -17,7 +17,7 @@ class StructureParserTests extends AnyFunSuite {
     new StructureParser(None, false).parse(
       tokenizer.tokenizeString(source).map(Namer0), core.StructureResults.empty)
 
-  def expectError(source: String, error: String) {
+  def expectError(source: String, error: String): Unit = {
     val e = intercept[CompilerException] {
       compile(source)
     }
@@ -163,7 +163,25 @@ class StructureParserTests extends AnyFunSuite {
     expectError("globals [", "closing bracket expected") }
   test("missing close bracket in globals") {
     expectError("globals [g turtles-own [t]",
-      "closing bracket expected") }
+      "Keyword TURTLES-OWN cannot be used in this context.") }
+  test("constant in globals") {
+    expectError("globals [d e f]",
+      "Variable name conflicts with a constant.") }
+  test("constant in turtles-own") {
+    expectError("turtles-own [d e f]",
+      "Variable name conflicts with a constant.") }
+  test("constant in patches-own") {
+    expectError("patches-own [d e f]",
+      "Variable name conflicts with a constant.") }
+  test("constant in links-own") {
+    expectError("links-own [d e f]",
+      "Variable name conflicts with a constant.") }
+  test("constant in breed-own") {
+    expectError("breed [tests test] tests-own [d e f]",
+      "Variable name conflicts with a constant.") }
+  test("constant in procedure input") {
+    expectError("to test [d e f] end",
+      "Input name conflicts with a constant.") }
   test("missing breed singular") {
     expectError("breed [xs]",
       "Breed declarations must have plural and singular. BREED [XS] has only one name.") }
@@ -212,7 +230,7 @@ class StructureParserTests extends AnyFunSuite {
   // https://github.com/NetLogo/NetLogo/issues/414
   test("missing end 1") {
     expectError("to foo to bar",
-      "END expected") }
+      "Keyword TO cannot be used in this context.") }
   test("missing end 2") {
     expectError("to foo fd 1",
       "END expected") }
@@ -224,31 +242,31 @@ class StructureParserTests extends AnyFunSuite {
       "closing bracket expected") }
   test("missing close bracket in formals 1") {
     expectError("to foo [ end",
-      "closing bracket expected") }
+      "Keyword END cannot be used in this context.") }
   test("missing close bracket in formals 2") {
     expectError("to foo [ to",
-      "closing bracket expected") }
+      "Keyword TO cannot be used in this context.") }
   test("declaration after procedure") {
     expectError("to foo end globals []",
-      "TO or TO-REPORT expected") }
+      "Keyword GLOBALS cannot be used in this context.") }
 
-  def compileAll(src: String): StructureResults = {
+  def compileAll(src: String, nlsSrc: String): StructureResults = {
     StructureParser.parseSources(
       tokenizer,
       CompilationOperand( Map("" -> src), new DummyExtensionManager, new DummyLibraryManager
                         , new DummyCompilationEnvironment, subprogram = false),
-      (_, name) => if (name == "foo.nls") Some(("foo.nls", "")) else None)
+      (_, name) => if (name == "foo.nls") Some(("foo.nls", nlsSrc)) else None)
   }
 
-  def expectParseAllError(src: String, error: String) = {
+  def expectParseAllError(src: String, error: String, nlsSrc: String = "") = {
     val e = intercept[CompilerException] {
-      compileAll(src)
+      compileAll(src, nlsSrc)
     }
     assertResult(error)(e.getMessage.takeWhile(_ != ','))
   }
 
   test("invalid included file") {
-    expectParseAllError("""__includes [ "foobar.nlogo" ]""", "Included files must end with .nls")
+    expectParseAllError("""__includes [ "foobar.nlogox" ]""", "Included files must end with .nls")
   }
 
   test("nonexistent included file") {
@@ -256,8 +274,22 @@ class StructureParserTests extends AnyFunSuite {
   }
 
   test("included file returns correct results") {
-    val results = compileAll("""__includes [ "foo.nls" ]""")
+    val results = compileAll("""__includes [ "foo.nls" ]""", "")
     assert(results.includes.nonEmpty || results.includedSources.nonEmpty)
+  }
+
+  test("included file merges globals and turtle vars") {
+    val src = """__includes [ "foo.nls" ] globals [ a b c ] breed [ mice mouse ] turtles-own [ t1 t2 ] mice-own [ m1 m2 ]"""
+    val nlsSrc = "globals [ d f g ] turtles-own [ t3 t4 ] mice-own [ m3 m4 ]"
+    val results = compileAll(src, nlsSrc)
+    val expected = """globals [A B C D F G]
+interfaceGlobals []
+turtles-own [WHO COLOR HEADING XCOR YCOR SHAPE LABEL LABEL-COLOR BREED HIDDEN? SIZE PEN-SIZE PEN-MODE T1 T2 T3 T4]
+patches-own [PXCOR PYCOR PCOLOR PLABEL PLABEL-COLOR]
+links-own [END1 END2 COLOR LABEL LABEL-COLOR HIDDEN? BREED THICKNESS SHAPE TIE-MODE]
+breeds MICE = Breed(MICE, MOUSE, M1 M2 M3 M4, false)
+link-breeds"""
+    assertResult(expected)(results.program.dump.trim)
   }
 
   test("mutually referrent sources") {

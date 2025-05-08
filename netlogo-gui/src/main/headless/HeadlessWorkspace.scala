@@ -9,17 +9,16 @@ import java.nio.file.Paths
 // AbstractWorkspace are not, so if you want to document a method for everyone, override that method
 // here and document it here.  The overriding method can simply call super(). - ST 6/1/05, 7/28/11
 
-import org.nlogo.api.{ ComponentSerialization, Version, RendererInterface,
-  WorldDimensions3D, AggregateManagerInterface, FileIO, LogoException, ModelReader, ModelType, NetLogoLegacyDialect,
+import org.nlogo.api.{ ComponentSerialization, Version, RendererInterface, AggregateManagerInterface, FileIO,
+  LogoException, ModelReader, ModelType, NetLogoLegacyDialect,
   NetLogoThreeDDialect, CommandRunnable, ReporterRunnable }, ModelReader.modelSuffix
-import org.nlogo.core.{ AgentKind, CompilerException, Femto, Model, Output, Program, UpdateMode, WorldDimensions }
+import org.nlogo.core.{ AgentKind, CompilerException, Femto, Model, Output, Program, UpdateMode, WorldDimensions,
+  WorldDimensions3D }
 import org.nlogo.agent.{ CompilationManagement, World, World2D, World3D }
 import org.nlogo.nvm.{ LabInterface, DefaultCompilerServices, PresentationCompilerInterface }
 import org.nlogo.workspace.{ AbstractWorkspaceScala, HubNetManagerFactory }
-import org.nlogo.fileformat, fileformat.{ NLogoFormat, NLogoThreeDFormat }
+import org.nlogo.fileformat.{ FileFormat, NLogoFormat, NLogoThreeDFormat }
 import org.nlogo.util.Pico
-
-import scala.io.Codec
 
 /**
  * Companion object, and factory object, for the HeadlessWorkspace class.
@@ -46,7 +45,7 @@ object HeadlessWorkspace {
     pico.add("org.nlogo.sdm.AggregateManagerLite")
     pico.add("org.nlogo.render.Renderer")
     pico.addComponent(subclass)
-    pico.addAdapter(new ModelLoaderComponent())
+    pico.addAdapter(new LegacyModelLoaderComponent())
     pico.add(classOf[HubNetManagerFactory], "org.nlogo.hubnet.server.HeadlessHubNetManagerFactory")
     val hw = pico.getComponent(subclass)
     hw.set3d(is3d)
@@ -128,7 +127,11 @@ with org.nlogo.api.ViewSettings {
   def modelOpened = _openModel.nonEmpty
 
   private[this] var _openModel = Option.empty[Model]
-  def setOpenModel(model: Model): Unit = { _openModel = Some(model) }
+  def setOpenModel(model: Model): Unit = {
+    _openModel = Some(model)
+
+    resourceManager.setResources(model.resources)
+  }
 
   val outputAreaBuffer = new StringBuilder
 
@@ -154,7 +157,7 @@ with org.nlogo.api.ViewSettings {
   /**
    * Internal use only.
    */
-  def waitFor(runnable: CommandRunnable) {
+  def waitFor(runnable: CommandRunnable): Unit = {
     runnable.run()
   }
 
@@ -167,19 +170,19 @@ with org.nlogo.api.ViewSettings {
   /**
    * Internal use only.
    */
-  def waitForQueuedEvents() { }
+  def waitForQueuedEvents(): Unit = { }
 
   /**
    * Internal use only.
    */
-  def initForTesting(worldSize: Int) {
+  def initForTesting(worldSize: Int): Unit = {
     initForTesting(worldSize, "")
   }
 
   /**
    * Internal use only.
    */
-  def initForTesting(worldSize: Int, modelString: String) {
+  def initForTesting(worldSize: Int, modelString: String): Unit = {
     if (is3d)
       initForTesting(new WorldDimensions3D(
           -worldSize, worldSize, -worldSize, worldSize, -worldSize, worldSize),
@@ -191,14 +194,14 @@ with org.nlogo.api.ViewSettings {
   /**
    * Internal use only.
    */
-  def initForTesting(minPxcor: Int, maxPxcor: Int, minPycor: Int, maxPycor: Int, source: String) {
+  def initForTesting(minPxcor: Int, maxPxcor: Int, minPycor: Int, maxPycor: Int, source: String): Unit = {
     initForTesting(new WorldDimensions(minPxcor, maxPxcor, minPycor, maxPycor), source)
   }
 
   /**
    * Internal use only.
    */
-  def initForTesting(d: WorldDimensions, source: String) {
+  def initForTesting(d: WorldDimensions, source: String): Unit = {
     world.turtleShapes.add(org.nlogo.shape.VectorShape.getDefaultShape)
     world.linkShapes.add(org.nlogo.shape.LinkShape.getDefaultLinkShape)
     world.createPatches(d)
@@ -230,7 +233,7 @@ with org.nlogo.api.ViewSettings {
   /**
    * Internal use only.
    */
-  def initForTesting(d: org.nlogo.core.WorldDimensions) {
+  def initForTesting(d: org.nlogo.core.WorldDimensions): Unit = {
     world.createPatches(d)
     world.realloc()
     clearDrawing()
@@ -239,12 +242,12 @@ with org.nlogo.api.ViewSettings {
   /**
    * Kills all turtles, clears all patch variables, and makes a new patch grid.
    */
-  def setDimensions(d: WorldDimensions) {
+  def setDimensions(d: WorldDimensions): Unit = {
     world.createPatches(d)
     clearDrawing()
   }
 
-  def setDimensions(d: WorldDimensions, patchSize: Double) {
+  def setDimensions(d: WorldDimensions, patchSize: Double): Unit = {
     world.patchSize(patchSize)
     if (!compilerTestingMode) {
       world.createPatches(d)
@@ -255,34 +258,34 @@ with org.nlogo.api.ViewSettings {
 
   private var _frameRate = 0.0
   override def frameRate = _frameRate
-  override def frameRate(frameRate: Double) { _frameRate = frameRate }
+  override def frameRate(frameRate: Double): Unit = { _frameRate = frameRate }
 
   private var _tickCounterLabel = "ticks"
   override def tickCounterLabel = _tickCounterLabel
-  override def tickCounterLabel(s: String) { _tickCounterLabel = tickCounterLabel }
+  override def tickCounterLabel(s: String): Unit = { _tickCounterLabel = tickCounterLabel }
 
   private var _showTickCounter = true
   override def showTickCounter = _showTickCounter
-  override def showTickCounter(showTickCounter: Boolean) { _showTickCounter = showTickCounter }
+  override def showTickCounter(showTickCounter: Boolean): Unit = { _showTickCounter = showTickCounter }
 
   override def getMinimumWidth = 0
-  override def insetWidth = 0
+  override def insetWidth() = 0
   override def computePatchSize(width: Int, numPatches: Int): Double =
-    width / numPatches
+    width.toDouble / numPatches
   override def calculateHeight(worldHeight: Int, patchSize: Double) =
     (worldHeight * patchSize).toInt
   def calculateWidth(worldWidth: Int, patchSize: Double): Int =
     (worldWidth * patchSize).toInt
-  override def resizeView() { }
+  override def resizeView(): Unit = { }
   override def viewWidth = world.worldWidth
   override def viewHeight = world.worldHeight
-  override def patchSize(patchSize: Double) {
+  override def patchSize(patchSize: Double): Unit = {
     world.patchSize(patchSize)
     renderer.resetCache(patchSize)
     renderer.trailDrawer.rescaleDrawing()
   }
   override def patchSize = world.patchSize
-  override def changeTopology(wrapX: Boolean, wrapY: Boolean) {
+  override def changeTopology(wrapX: Boolean, wrapY: Boolean): Unit = {
     world.changeTopology(wrapX, wrapY)
     renderer.changeTopology(wrapX, wrapY)
   }
@@ -291,44 +294,44 @@ with org.nlogo.api.ViewSettings {
   override def renderPerspective = true
   override def viewOffsetX = world.observer.followOffsetX
   override def viewOffsetY = world.observer.followOffsetY
-  override def updateMode(updateMode: UpdateMode) { }
-  override def setSize(x: Int, y: Int) { }
-  override def clearTurtles() {
+  override def updateMode(updateMode: UpdateMode): Unit = { }
+  override def setSize(x: Int, y: Int): Unit = { }
+  override def clearTurtles(): Unit = {
     if (!compilerTestingMode)
       world.clearTurtles()
   }
-  override def inspectAgent(agent: org.nlogo.api.Agent, radius: Double) {
+  override def inspectAgent(agent: org.nlogo.api.Agent, radius: Double): Unit = {
     if (!silent)
       println(agent)
   }
-  def inspectAgent(agentClass: AgentKind, agent: org.nlogo.agent.Agent, radius: Double) {
+  def inspectAgent(agentClass: AgentKind, agent: org.nlogo.agent.Agent, radius: Double): Unit = {
     if (!silent) {
       println(agent)
     }
   }
   override def stopInspectingAgent(agent: org.nlogo.agent.Agent): Unit = { }
   override def stopInspectingDeadAgents(): Unit = { }
-  override def getAndCreateDrawing =
+  override def getAndCreateDrawing() =
     renderer.trailDrawer.getAndCreateDrawing(true)
   override def importDrawing(is: InputStream, mimeTypeOpt: Option[String] = None): Unit = {
     renderer.trailDrawer.importDrawing(is, mimeTypeOpt)
   }
-  override def importDrawing(file: org.nlogo.core.File) {
+  override def importDrawing(file: org.nlogo.core.File): Unit = {
     renderer.trailDrawer.importDrawing(file)
   }
-  override def clearDrawing() {
+  override def clearDrawing(): Unit = {
     world.clearDrawing()
     renderer.trailDrawer.clearDrawing()
   }
-  override def exportDrawing(filename: String, format: String) {
+  override def exportDrawing(filename: String, format: String): Unit = {
     FileIO.writeImageFile(
       renderer.trailDrawer.getAndCreateDrawing(true), filename, format)
   }
-  override def exportDrawingToCSV(writer: java.io.PrintWriter) {
+  override def exportDrawingToCSV(writer: java.io.PrintWriter): Unit = {
     renderer.trailDrawer.exportDrawingToCSV(writer)
   }
 
-  def exportOutput(filename: String) {
+  def exportOutput(filename: String): Unit = {
     val file: org.nlogo.core.File = new org.nlogo.api.LocalFile(filename)
     try {
       file.open(org.nlogo.core.FileMode.Write)
@@ -352,7 +355,7 @@ with org.nlogo.api.ViewSettings {
     }
   }
 
-  override def exportOutputAreaToCSV(writer: java.io.PrintWriter) {
+  override def exportOutputAreaToCSV(writer: java.io.PrintWriter): Unit = {
     if (_openModel.exists(_.widgets.exists(_.isInstanceOf[Output]))) {
       writer.println(org.nlogo.api.Dump.csv.encode("OUTPUT"))
       org.nlogo.api.Dump.csv.stringToCSV(writer, outputAreaBuffer.toString)
@@ -363,7 +366,7 @@ with org.nlogo.api.ViewSettings {
    * Internal use only.
    */
   // called from job thread - ST 10/1/03
-  override def clearOutput() {
+  override def clearOutput(): Unit = {
     outputAreaBuffer.setLength(0)
   }
 
@@ -395,7 +398,7 @@ with org.nlogo.api.ViewSettings {
     renderer.exportView(graphics, this)
   }
 
-  override def exportView(filename: String, format: String) {
+  override def exportView(filename: String, format: String): Unit = {
     FileIO.writeImageFile(renderer.exportView(this), filename, format)
   }
 
@@ -407,7 +410,7 @@ with org.nlogo.api.ViewSettings {
   /**
    * Internal use only. Called from job thread.
    */
-  override def sendOutput(oo: org.nlogo.agent.OutputObject, toOutputArea: Boolean) {
+  override def sendOutput(oo: org.nlogo.agent.OutputObject, toOutputArea: Boolean): Unit = {
     // output always goes to stdout in headless mode
     if (!silent)
       print(oo.get)
@@ -419,29 +422,29 @@ with org.nlogo.api.ViewSettings {
   /**
    * Internal use only.
    */
-  def ownerFinished(owner: org.nlogo.api.JobOwner) { }
+  def ownerFinished(owner: org.nlogo.api.JobOwner): Unit = { }
 
   /**
    * Internal use only.
    */
-  def updateDisplay(haveWorldLockAlready: Boolean) { }
+  def updateDisplay(haveWorldLockAlready: Boolean): Unit = { }
 
   /**
    * Internal use only.
    */
-  override def requestDisplayUpdate(force: Boolean) {
+  override def requestDisplayUpdate(force: Boolean): Unit = {
     hubNetManager.foreach(_.incrementalUpdateFromEventThread())
   }
 
   /**
    * Internal use only.
    */
-  override def breathe() { }
+  override def breathe(): Unit = { }
 
   /**
    * Internal use only.
    */
-  def periodicUpdate() { }
+  def periodicUpdate(): Unit = { }
 
   /**
    * Internal use only.
@@ -465,7 +468,7 @@ with org.nlogo.api.ViewSettings {
    * Internal use only.
    */
   def runtimeError(owner: org.nlogo.api.JobOwner, context: org.nlogo.nvm.Context,
-                   instruction: org.nlogo.nvm.Instruction, ex: Exception) {
+                   instruction: org.nlogo.nvm.Instruction, ex: Exception): Unit = {
     ex match {
       case le: LogoException =>
         lastLogoException = le
@@ -477,7 +480,7 @@ with org.nlogo.api.ViewSettings {
   }
 
   private lazy val loader = {
-    fileformat.standardLoader(compiler.utilities)
+    FileFormat.standardAnyLoader(true, compiler.utilities)
       .addSerializer[Array[String], NLogoFormat](
         Femto.get[ComponentSerialization[Array[String], NLogoFormat]]("org.nlogo.sdm.NLogoSDMFormat"))
       .addSerializer[Array[String], NLogoThreeDFormat](
@@ -493,7 +496,7 @@ with org.nlogo.api.ViewSettings {
   @throws(classOf[java.io.IOException])
   @throws(classOf[CompilerException])
   @throws(classOf[LogoException])
-  override def open(path: String, shouldAutoInstallLibs: Boolean) {
+  override def open(path: String, shouldAutoInstallLibs: Boolean): Unit = {
     try {
       val m = loader.readModel(Paths.get(path).toUri).get
       setModelPath(path)
@@ -505,7 +508,7 @@ with org.nlogo.api.ViewSettings {
       case ex: CompilerException =>
         // models with special comment are allowed not to compile
         if (compilerTestingMode &&
-            FileIO.fileToString(path)(Codec.UTF8).startsWith(";; DOESN'T COMPILE IN CURRENT BUILD"))
+            FileIO.fileToString(path).startsWith(";; DOESN'T COMPILE IN CURRENT BUILD"))
           System.out.println("ignored compile error: " + path)
         else throw ex
     }
@@ -516,7 +519,7 @@ with org.nlogo.api.ViewSettings {
    *
    * @param modelContents
    */
-  override def openString(modelContents: String) {
+  override def openString(modelContents: String): Unit = {
     openFromSource(modelContents, modelSuffix)
   }
 
@@ -527,7 +530,7 @@ with org.nlogo.api.ViewSettings {
    * @param source The complete model, including widgets and so forth,
    *               in the same format as it would be stored in a file.
    */
-  def openFromSource(source: String, extension: String) {
+  def openFromSource(source: String, extension: String): Unit = {
     loader.readModel(source, extension).foreach(m => openModel(m, false))
   }
 
@@ -538,7 +541,7 @@ with org.nlogo.api.ViewSettings {
   /**
    * Halts all running NetLogo code in this workspace.
    */
-  override def halt() {
+  override def halt(): Unit = {
     // we just invoke the method in our superclass, but explicitly writing that lets us doc the
     // method - ST 6/1/05
     super.halt()

@@ -15,7 +15,7 @@ class Backifier(program: Program,
     "org.nlogo.prim._run"                 -> "org.nlogo.prim.etc._run",
     "org.nlogo.prim._stop"                -> "org.nlogo.prim.etc._stop",
     "org.nlogo.prim.etc._plus"            -> "org.nlogo.prim._plus",
-    "org.nlogo.prim.etc._breedon"         -> "org.nlogo.prim._breedon",
+    "org.nlogo.prim._breedon"             -> "org.nlogo.prim._breedon",
     "org.nlogo.prim.etc._breedat"         -> "org.nlogo.prim._breedat",
     "org.nlogo.prim.etc._isbreed"         -> "org.nlogo.prim._isbreed",
     "org.nlogo.prim.etc._link"            -> "org.nlogo.prim._link",
@@ -61,16 +61,21 @@ class Backifier(program: Program,
     "org.nlogo.prim.etc._plotxmin"        -> "org.nlogo.prim.plot._plotxmin",
     "org.nlogo.prim.etc._plotxmax"        -> "org.nlogo.prim.plot._plotxmax",
     "org.nlogo.prim.etc._setplotxrange"   -> "org.nlogo.prim.plot._setplotxrange",
-    "org.nlogo.prim.etc._setplotpencolor"   -> "org.nlogo.prim.plot._setplotpencolor",
-    "org.nlogo.prim.etc._setplotpenmode"   -> "org.nlogo.prim.plot._setplotpenmode",
-    "org.nlogo.prim.etc._setplotpeninterval"   -> "org.nlogo.prim.plot._setplotpeninterval",
+    "org.nlogo.prim.etc._setplotpencolor" -> "org.nlogo.prim.plot._setplotpencolor",
+    "org.nlogo.prim.etc._setplotpenmode"  -> "org.nlogo.prim.plot._setplotpenmode",
+    "org.nlogo.prim.etc._setplotpeninterval" -> "org.nlogo.prim.plot._setplotpeninterval",
     "org.nlogo.prim.etc._plotxy"          -> "org.nlogo.prim.plot._plotxy",
     "org.nlogo.prim.etc._setcurrentplotpen" -> "org.nlogo.prim.plot._setcurrentplotpen",
     "org.nlogo.prim.etc._setplotyrange"   -> "org.nlogo.prim.plot._setplotyrange",
     "org.nlogo.prim.etc._clearallplots"   -> "org.nlogo.prim.plot._clearallplots",
-    "org.nlogo.prim.etc._clearplot"   -> "org.nlogo.prim.plot._clearplot",
-    "org.nlogo.prim.etc._autoplotoff"   -> "org.nlogo.prim.plot._autoplotoff",
-    "org.nlogo.prim.etc._autoploton"   -> "org.nlogo.prim.plot._autoploton",
+    "org.nlogo.prim.etc._clearplot"       -> "org.nlogo.prim.plot._clearplot",
+    "org.nlogo.prim.etc._autoplot"        -> "org.nlogo.prim.plot._autoplot",
+    "org.nlogo.prim.etc._autoplotoff"     -> "org.nlogo.prim.plot._autoplotoff",
+    "org.nlogo.prim.etc._autoploton"      -> "org.nlogo.prim.plot._autoploton",
+    "org.nlogo.prim.etc._autoplotxoff"    -> "org.nlogo.prim.plot._autoplotxoff",
+    "org.nlogo.prim.etc._autoplotxon"     -> "org.nlogo.prim.plot._autoplotxon",
+    "org.nlogo.prim.etc._autoplotyoff"    -> "org.nlogo.prim.plot._autoplotyoff",
+    "org.nlogo.prim.etc._autoplotyon"     -> "org.nlogo.prim.plot._autoplotyon",
     "org.nlogo.prim.etc._updateplots"     -> "org.nlogo.prim.plot._updateplots",
     "org.nlogo.prim.etc._plot"            -> "org.nlogo.prim.plot._plot",
     "org.nlogo.prim.etc._setupplots"      -> "org.nlogo.prim.plot._setupplots",
@@ -98,10 +103,11 @@ class Backifier(program: Program,
 
   private def backifyName(name: String): String = {
       val alteredName = name.replaceFirst("\\.core\\.", ".").replaceFirst("\\.compile\\.", ".")
-      if (replacements.contains(alteredName))
+      if (replacements.contains(alteredName)) {
         replacements(alteredName)
-      else
+      } else {
         alteredName
+      }
   }
 
   private def fallback[T1 <: core.Instruction, T2 <: nvm.Instruction](i: T1): T2 = {
@@ -120,10 +126,9 @@ class Backifier(program: Program,
             }
         }
       case Some((className, breedName, _)) =>
-        val name = "org.nlogo.prim." + className
-        val primName = if (replacements.contains(name)) replacements(name) else name
-        Instantiator.newInstance[T2](
-          Class.forName(primName), breedName)
+        val name = s"org.nlogo.prim.${program.dialect.breedPrimMapper(className)}"
+        val primName = if (replacements.contains(name)) { replacements(name) } else { name }
+        Instantiator.newInstance[T2](Class.forName(primName), breedName)
     }
   }
 
@@ -133,20 +138,37 @@ class Backifier(program: Program,
         new nvmprim._extern(
           extensionManager.replaceIdentifier(c.token.text.toUpperCase)
             .asInstanceOf[nlogoApi.Command])
+
       case core.prim._call(proc) =>
         new nvmprim._call(procedures(proc.name))
+
       case core.prim._let(Some(let), _) =>
         new nvmprim._let(let)
+
+      case core.prim._multilet(lets) =>
+        new nvmprim._multiassign("LET", lets.size)
+
+      case core.prim._multiassignnest(prim, totalNeeded) =>
+        new nvmprim._multiassignnest(prim, totalNeeded)
+
+      case core.prim._multiset(sets) =>
+        new nvmprim._multiassign("SET", sets.size)
+
       case nlogoApi.NetLogoLegacyDialect._magicopen(name) =>
         new nvmprim._magicopen(name)
+
       case cc: core.prim._carefully =>
         new nvmprim._carefully(cc.let)
+
       case bk: core.prim._bk =>
         new nvmprim._bk(c.token)
+
       case fd: core.prim._fd =>
         new nvmprim._fd(c.token)
+
       case rep: core.prim._repeat =>
         new nvmprim._repeat(c.token)
+
       case _ =>
         fallback[core.Command, nvm.Command](c)
     }
@@ -168,6 +190,7 @@ class Backifier(program: Program,
           case l: core.LogoList      => new nvmprim._constlist(l)
           case core.Nobody           => new nvmprim._nobody()
           case s: String             => new nvmprim._conststring(s)
+          case _                     => throw new IllegalStateException
         }
 
       case core.prim._constcodeblock(toks) =>

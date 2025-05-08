@@ -13,7 +13,7 @@ class PlotManagerTests extends SimplePlotTest {
   def normalThunkFactory = new DummyLogoThunkFactory() {
     override def makeCommandThunk(code: String, jobOwnerName: String): CommandLogoThunk = {
       return new CommandLogoThunk {
-        def call: Try[Boolean] = {
+        def call(): Try[Boolean] = {
           Success(false)
         }
       }
@@ -22,7 +22,7 @@ class PlotManagerTests extends SimplePlotTest {
   def errorThunkFactory = new DummyLogoThunkFactory() {
     override def makeCommandThunk(code: String, jobOwnerName: String): CommandLogoThunk = {
       return new CommandLogoThunk {
-        def call: Try[Boolean] = {
+        def call(): Try[Boolean] = {
           Failure(new LogoException("runtime error!") {})
         }
       }

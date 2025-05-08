@@ -35,7 +35,7 @@ extends Command with PlotHelpers {
 
 abstract class PlotActionCommand(args: Int*)
 extends PlotCommand(args: _*) {
-  override def perform(context: Context) {
+  override def perform(context: Context): Unit = {
     plotManager.publish(action(context))
     context.ip = next
   }
@@ -51,7 +51,7 @@ extends Reporter with PlotHelpers {
 //
 
 class _clearallplots extends PlotCommand() {
-  override def perform(context: Context) {
+  override def perform(context: Context): Unit = {
     for (name <- plotManager.getPlotNames)
       plotManager.publish(PlotAction.ClearPlot(name))
     context.ip = next
@@ -60,20 +60,20 @@ class _clearallplots extends PlotCommand() {
 
 class _setupplots extends PlotCommand() {
   override def callsOtherCode = true
-  override def perform(context: Context) {
+  override def perform(context: Context): Unit = {
     workspace.setupPlots(context)
     context.ip = next
   }
 }
 class _updateplots extends PlotCommand() {
   override def callsOtherCode = true
-  override def perform(context: Context) {
+  override def perform(context: Context): Unit = {
     workspace.updatePlots(context)
     context.ip = next
   }
 }
 class _setcurrentplot extends PlotCommand(Syntax.StringType) {
-  override def perform(context: Context) {
+  override def perform(context: Context): Unit = {
     val name = argEvalString(context, 0)
     if (!plotManager.hasPlot(name))
       throw new RuntimePrimitiveException(context, this,
@@ -101,6 +101,26 @@ class _autoploton extends PlotActionCommand() {
     PlotAction.AutoPlot(currentPlot(context).name, on = true)
 }
 
+class _autoplotxoff extends PlotActionCommand() {
+  override def action(context: Context) =
+    PlotAction.AutoPlotX(currentPlot(context).name, on = false)
+}
+
+class _autoplotxon extends PlotActionCommand() {
+  override def action(context: Context) =
+    PlotAction.AutoPlotX(currentPlot(context).name, on = true)
+}
+
+class _autoplotyoff extends PlotActionCommand() {
+  override def action(context: Context) =
+    PlotAction.AutoPlotY(currentPlot(context).name, on = false)
+}
+
+class _autoplotyon extends PlotActionCommand() {
+  override def action(context: Context) =
+    PlotAction.AutoPlotY(currentPlot(context).name, on = true)
+}
+
 class SetPlotRangeCommand(isX: Boolean) extends PlotActionCommand(Syntax.NumberType, Syntax.NumberType) {
   override def action(context: Context) = {
     val min = argEvalDoubleValue(context, 0)
@@ -125,7 +145,7 @@ class _createtemporaryplotpen extends PlotActionCommand(Syntax.StringType) {
 }
 
 class _exportplot extends PlotCommand(Syntax.StringType, Syntax.StringType) {
-  override def perform(context: Context) {
+  override def perform(context: Context): Unit = {
     val name = argEvalString(context, 0)
     val path = argEvalString(context, 1)
     if (plotManager.hasPlot(name))
@@ -133,7 +153,7 @@ class _exportplot extends PlotCommand(Syntax.StringType, Syntax.StringType) {
         context, this, "no such plot: \"" + name + "\"")
     // Workspace.waitFor() switches to the event thread if we're running with a GUI - ST 12/17/04
     workspace.waitFor(new api.CommandRunnable {
-      def run() {
+      def run(): Unit = {
         try workspace.exportPlot(name, workspace.fileManager.attachPrefix(path))
         catch {
           case ex: java.io.IOException =>
@@ -148,13 +168,13 @@ class _exportplot extends PlotCommand(Syntax.StringType, Syntax.StringType) {
 
 // this also requires only the PlotManager, but it seems better to put it here next to exportplot.
 class _exportplots extends PlotCommand(Syntax.StringType) {
-  override def perform(context: Context) {
+  override def perform(context: Context): Unit = {
     val path = argEvalString(context, 0)
     if (plotManager.getPlotNames.isEmpty)
       throw new RuntimePrimitiveException(context, this, "there are no plots to export")
     // Workspace.waitFor() switches to the event thread if we're running with a GUI - ST 12/17/04
     workspace.waitFor(new api.CommandRunnable {
-      def run() {
+      def run(): Unit = {
         try workspace.exportAllPlots(workspace.fileManager.attachPrefix(path))
         catch {
           case ex: java.io.IOException =>
@@ -173,7 +193,15 @@ class _exportplots extends PlotCommand(Syntax.StringType) {
 
 class _autoplot extends PlotReporter(Syntax.BooleanType) {
   override def report(context: Context): java.lang.Boolean =
-    Boolean.box(currentPlotState(context).autoPlotOn)
+    Boolean.box(currentPlotState(context).autoPlotX && currentPlotState(context).autoPlotY)
+}
+class _autoplotx extends PlotReporter(Syntax.BooleanType) {
+  override def report(context: Context): java.lang.Boolean =
+    Boolean.box(currentPlotState(context).autoPlotX)
+}
+class _autoploty extends PlotReporter(Syntax.BooleanType) {
+  override def report(context: Context): java.lang.Boolean =
+    Boolean.box(currentPlotState(context).autoPlotY)
 }
 class _plotname extends PlotReporter(Syntax.StringType) {
   override def report(context: Context): String =
@@ -222,7 +250,7 @@ class _plotxy extends PlotActionCommand(Syntax.NumberType, Syntax.NumberType) {
 }
 
 class _histogram extends PlotCommand(Syntax.ListType) {
-  override def perform(context: Context) {
+  override def perform(context: Context): Unit = {
     val list = argEvalList(context, 0)
     val pen = currentPen(context)
     if (pen.state.interval <= 0)
@@ -300,7 +328,7 @@ class _setplotpenmode extends PlotActionCommand(Syntax.NumberType) {
     val mode = argEvalIntValue(context, 0)
     if (mode < PlotPenModes.MinMode || mode > PlotPenModes.MaxMode) {
       throw new RuntimePrimitiveException(context, this,
-        mode + " is not a valid plot pen mode (valid modes are 0, 1, and 2)")
+        s"$mode is not a valid plot pen mode (valid modes are 0, 1, and 2)")
     }
     val plotName = currentPlot(context).name
     val penName = currentPen(context).name
@@ -320,7 +348,7 @@ class _setplotpencolor extends PlotActionCommand(Syntax.NumberType) {
 }
 
 class _setcurrentplotpen extends PlotCommand(Syntax.StringType) {
-  override def perform(context: Context) {
+  override def perform(context: Context): Unit = {
     val name = argEvalString(context, 0)
     if (!currentPlot(context).getPen(name).isDefined)
       throw new RuntimePrimitiveException(context, this,

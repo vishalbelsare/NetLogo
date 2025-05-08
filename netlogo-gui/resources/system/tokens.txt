@@ -1,6 +1,5 @@
 C __apply etc._apply
 C __bench gui._bench
-C __change-topology etc._changetopology
 C __clear-all-and-reset-ticks etc._clearallandresetticks
 C __delete-log-files gui._deletelogfiles
 C __done _done
@@ -57,6 +56,10 @@ C ask _ask
 C ask-concurrent _askconcurrent
 C auto-plot-off plot._autoplotoff
 C auto-plot-on plot._autoploton
+C auto-plot-x-off plot._autoplotxoff
+C auto-plot-x-on plot._autoplotxon
+C auto-plot-y-off plot._autoplotyoff
+C auto-plot-y-on plot._autoplotyon
 C back _bk
 C beep gui._beep
 C bk _bk
@@ -203,6 +206,7 @@ C set-plot-pen-interval plot._setplotpeninterval
 C set-plot-pen-mode plot._setplotpenmode
 C set-plot-x-range plot._setplotxrange
 C set-plot-y-range plot._setplotyrange
+C set-topology etc._settopology
 C setup-plots plot._setupplots
 C setxy etc._setxy
 C setxyz threed._setxyz
@@ -285,6 +289,8 @@ R asin etc._asin
 R at-points etc._atpoints
 R atan etc._atan
 R autoplot? plot._autoplot
+R autoplotx? plot._autoplotx
+R autoploty? plot._autoploty
 R base-colors etc._basecolors
 R behaviorspace-experiment-name etc._behaviorspaceexperimentname
 R behaviorspace-run-number etc._behaviorspacerunnumber
@@ -326,6 +332,7 @@ R filter etc._filter
 R first etc._first
 R floor etc._floor
 R fput etc._fput
+R home-directory _homedirectory
 R hsb etc._hsb
 R __hsb-old etc._hsbold
 R ifelse-value etc._ifelsevalue
@@ -501,7 +508,7 @@ R turtles _turtles
 R turtles-at etc._turtlesat
 R turtles-at threed._turtlesat
 R turtles-here etc._turtleshere
-R turtles-on etc._turtleson
+R turtles-on _turtleson
 R user-directory gui._userdirectory
 R user-file gui._userfile
 R user-input gui._userinput
@@ -509,6 +516,7 @@ R user-new-file gui._usernewfile
 R user-one-of gui._useroneof
 R user-yes-or-no? gui._useryesorno
 R variance etc._variance
+R who-are-not _whoarenot
 R with _with
 R with-max etc._withmax
 R with-min etc._withmin

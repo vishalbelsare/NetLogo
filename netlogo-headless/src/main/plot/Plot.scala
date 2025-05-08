@@ -7,6 +7,7 @@ import PlotAction.{ PlotXY, SoftResetPen }
 import org.nlogo.core.PlotPenInterface
 import scala.collection.immutable
 import scala.collection.immutable.VectorBuilder
+import scala.math.{ log10, pow }
 
 // normally, to create a new Plot, you have to go through PlotManager.newPlot
 // this makes sense because the PlotManager then controls compilation
@@ -19,23 +20,21 @@ import scala.collection.immutable.VectorBuilder
 class Plot(var name: String, var defaultState: PlotState = PlotState())
 extends PlotInterface {
 
-  import Plot._
-
   var state = defaultState
   var dirty = true
 
   override def toString = "Plot(" + name + ")"
 
-  def name(newName:String){ name = newName }
+  def name(newName:String): Unit ={ name = newName }
 
   var _pens = List[PlotPen]()
   def pens = _pens
-  def pens_=(pens:List[PlotPen]){
+  def pens_=(pens:List[PlotPen]): Unit ={
     _pens = pens
     currentPen = pens.headOption
   }
 
-  def addPen(p:PlotPen){
+  def addPen(p:PlotPen): Unit ={
     pens = pens :+ p
   }
 
@@ -71,7 +70,7 @@ extends PlotInterface {
   /// clearing
   clear() // finally after all fields have been initialized, clear. unsure why...
 
-  def clear() {
+  def clear(): Unit = {
     pens = pens.filterNot(_.temporary)
     currentPen = pens.headOption
     pens.foreach(_.hardReset())
@@ -84,60 +83,77 @@ extends PlotInterface {
     pen
   }
 
-  override def plot(y: Double) {
+  override def plot(y: Double): Unit = {
     currentPen.foreach(plot(_, y))
   }
 
-  def plot(pen: PlotPen, y: Double) {
+  def plot(pen: PlotPen, y: Double): Unit = {
     pen.plot(y)
     if (pen.state.isDown)
       perhapsGrowRanges(pen, pen.state.x, y)
   }
 
-  override def plot(x: Double, y: Double) {
+  override def plot(x: Double, y: Double): Unit = {
     currentPen.foreach(plot(_, x, y))
   }
 
-  def plot(pen: PlotPen, x: Double, y: Double) {
+  def plot(pen: PlotPen, x: Double, y: Double): Unit = {
     pen.plot(x, y)
     if (pen.state.isDown)
       perhapsGrowRanges(pen, x, y)
   }
 
-  def perhapsGrowRanges(pen: PlotPen, x: Double, y: Double){
-    if(state.autoPlotOn){
-      if(pen.state.mode == PlotPenInterface.BarMode){
+  def perhapsGrowRanges(pen: PlotPen, x: Double, y: Double): Unit = {
+    if (state.autoPlotX) {
+      if (pen.state.mode == PlotPenInterface.BarMode) {
         // allow extra room on the right for bar
-        growRanges(x + pen.state.interval, y, true)
+        growRangeX(x + pen.state.interval)
       }
-      // calling growRanges() twice is sometimes redundant,
+
+      // calling growRangeX() twice is sometimes redundant,
       // but it's the easiest way to ensure that both the
       // left and right edges of the bar become visible
       // (consider the case where the bar is causing the
       // min to decrease) - ST 2/23/06
-      growRanges(x, y, true)
+      growRangeX(x)
+    }
+
+    if (state.autoPlotY)
+      growRangeY(y)
+  }
+
+  private def prettyRange(range: Double): Double = {
+    if (range < 0) {
+      if (range > -1)
+        return -1
+
+      val tmag = pow(10, log10(-range).floor - 1) * 2
+
+      (range / tmag).floor * tmag
+    } else {
+      if (range < 1)
+        return 1
+
+      val tmag = pow(10, log10(range).floor - 1) * 2
+
+      (range / tmag).ceil * tmag
     }
   }
 
-  def growRanges(x: Double, y: Double, extraRoom: Boolean) {
-    def adjust(d: Double, factor: Double) =
-      d * (if(extraRoom) factor else 1)
-    if(x > state.xMax){
-      val newRange = adjust(x - state.xMin, AutoplotXFactor)
-      state = state.copy(xMax = newBound(state.xMin + newRange, newRange))
-    }
-    if(x < state.xMin) {
-      val newRange = adjust(state.xMax - x, AutoplotXFactor)
-      state = state.copy(xMin = newBound(state.xMax - newRange, newRange))
-    }
-    if(y > state.yMax){
-      val newRange = adjust(y - state.yMin, AutoplotYFactor)
-      state = state.copy(yMax = newBound(state.yMin + newRange, newRange))
-    }
-    if(y < state.yMin){
-      val newRange = adjust(state.yMax - y, AutoplotYFactor)
-      state = state.copy(yMin = newBound(state.yMax - newRange, newRange))
-    }
+  def growRangeX(x: Double): Unit = {
+    if (x > state.xMax)
+      state = state.copy(xMax = prettyRange(x))
+
+    if (x < state.xMin)
+      state = state.copy(xMin = prettyRange(x))
+  }
+
+  def growRangeY(y: Double): Unit = {
+    if (y > state.yMax)
+      state = state.copy(yMax = prettyRange(y))
+
+    if (y < state.yMin)
+      state = state.copy(yMin = prettyRange(y))
   }
 
   def histogramActions(pen: PlotPenInterface, values: Seq[Double]): immutable.Seq[PlotAction] = {
@@ -145,14 +161,11 @@ extends PlotInterface {
     values.foreach(histogram.nextValue)
     val actions = new VectorBuilder[PlotAction]
     actions += SoftResetPen(this.name, pen.name)
-    if (state.autoPlotOn)
-      // note that we pass extraRoom as false; we know the exact height
-      // of the histogram so there's no point in leaving any extra empty
-      // space like we normally do when growing the ranges;
-      // note also that we never grow the x range, only the y range,
+    if (state.autoPlotY)
+      // note that we never grow the x range, only the y range,
       // because it's the current x range that determined the extent
       // of the histogram in the first place - ST 2/23/06
-      growRanges(state.xMin, histogram.ceiling, false)
+      growRangeY(histogram.ceiling)
     actions ++= (for {
       (barHeight, barNumber) <- histogram.bars.zipWithIndex
       // there is a design decision here not to generate points corresponding to empty bins.  not
@@ -165,7 +178,7 @@ extends PlotInterface {
       // point error doesn't accumulate - ST 2/23/06
       x = state.xMin + barNumber * pen.state.interval
     } yield PlotXY(this.name, pen.name, x, barHeight))
-    actions.result
+    actions.result()
   }
 
   override def clone = {
@@ -180,24 +193,6 @@ extends PlotInterface {
     newPlot.updateCode = updateCode
     // newPlot.dirty will be true by default, which is fine
     newPlot
-  }
-
-}
-
-object Plot {
-
-  /// autoplot
-  val AutoplotXFactor = 1.25
-  val AutoplotYFactor = 1.10
-
-  // The purpose of this is to make the new bounds land on nice
-  // numbers like 12.4 instead of long ones like 12.33333333, so
-  // that displaying them in the axis labels doesn't use up a lot of
-  // screen real estate.  (Thus, the x and y growth factors are only
-  // approximate.) - ST 2/23/06
-  def newBound(bound:Double, range:Double): Double = {
-    val places = 2.0 - StrictMath.floor(StrictMath.log(range) / StrictMath.log(10))
-    org.nlogo.api.Approximate.approximate(bound, places.toInt)
   }
 
 }

@@ -36,6 +36,7 @@ object UserAction {
   val FileOpenGroup         = "org.nlogo.swing.FileOpenGroup"
   val FileSaveGroup         = "org.nlogo.swing.FileSaveGroup"
   val FileShareGroup        = "org.nlogo.swing.FileShareGroup"
+  val FileResourcesGroup    = "org.nlogo.swing.FileResourcesGroup"
 
   val HelpWebGroup     = "org.nlogo.swing.HelpWebGroup"
   val HelpContextGroup = "org.nlogo.swing.HelpContextGroup"
@@ -45,6 +46,7 @@ object UserAction {
   val ToolsMonitorGroup  = "org.nlogo.swing.ToolsMonitorGroup"
   val ToolsDialogsGroup  = "org.nlogo.swing.ToolsDialogsGroup"
   val ToolsHubNetGroup   = "org.nlogo.swing.ToolsHubNetGroup"
+  val ToolsWidgetGroup   = "org.nlogo.swing.ToolsWidgetGroup"
 
   val DefaultGroup = "UndefinedGroup"
   val DefaultRank  = Double.MaxValue
@@ -63,7 +65,7 @@ object UserAction {
 
     def keystrokeChar(key: Char, withMenu: Boolean = false, withShift: Boolean = false, withAlt: Boolean = false): KeyStroke = {
       val mask: Int = (
-            (if (withMenu)  Toolkit.getDefaultToolkit.getMenuShortcutKeyMask else 0)
+            (if (withMenu)  Toolkit.getDefaultToolkit.getMenuShortcutKeyMaskEx else 0)
           | (if (withShift) InputEvent.SHIFT_DOWN_MASK else 0)
           | (if (withAlt)   InputEvent.ALT_DOWN_MASK else 0)
         )
@@ -72,7 +74,7 @@ object UserAction {
 
     def keystroke(key: Int, withMenu: Boolean = false, withShift: Boolean = false, withAlt: Boolean = false): KeyStroke = {
       val mask: Int = (
-            (if (withMenu)  Toolkit.getDefaultToolkit.getMenuShortcutKeyMask else 0)
+            (if (withMenu)  Toolkit.getDefaultToolkit.getMenuShortcutKeyMaskEx else 0)
           | (if (withShift) InputEvent.SHIFT_DOWN_MASK else 0)
           | (if (withAlt)   InputEvent.ALT_DOWN_MASK else 0)
         )

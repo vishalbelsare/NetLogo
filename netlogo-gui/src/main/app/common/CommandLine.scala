@@ -2,16 +2,19 @@
 
 package org.nlogo.app.common
 
-import java.awt.{BorderLayout, Dimension}
-import java.awt.event.{ActionEvent, ActionListener, KeyEvent, KeyListener}
-import javax.swing.{JScrollPane, KeyStroke, ScrollPaneConstants}
+import java.awt.{ BorderLayout, Dimension, Font }
+import java.awt.event.{ ActionEvent, ActionListener, KeyEvent, KeyListener }
+import javax.swing.{ KeyStroke, ScrollPaneConstants }
 
-import org.nlogo.agent.{Agent, AgentSet, OutputObject}
-import org.nlogo.core.{AgentKind, CompilerException, I18N, Widget => CoreWidget}
+import org.nlogo.agent.{ Agent, AgentSet, OutputObject }
+import org.nlogo.awt.Fonts
+import org.nlogo.core.{ AgentKind, CompilerException, I18N, Widget => CoreWidget }
 import org.nlogo.editor.EditorField
-import org.nlogo.ide.{AutoSuggestAction, CodeCompletionPopup}
+import org.nlogo.ide.{ AutoSuggestAction, CodeCompletionPopup }
+import org.nlogo.swing.{ ScrollPane, Transparent }
+import org.nlogo.theme.InterfaceColors
+import org.nlogo.window.{ CommandCenterInterface, EditorColorizer, InterfaceMode, JobWidget, Events => WindowEvents }
 import org.nlogo.workspace.AbstractWorkspace
-import org.nlogo.window.{CommandCenterInterface, EditorColorizer, JobWidget, Events => WindowEvents}
 
 import scala.collection.immutable.List
 
@@ -37,8 +40,6 @@ class CommandLine(commandCenter: CommandCenterInterface,
     with WindowEvents.CompiledEvent.Handler {
   import CommandLine._
 
-  type WidgetModel = CoreWidget
-
   // this is needed for if we're embedded in an agent monitor instead
   // of the command center - ST 7/30/03
   var agent: Agent = null
@@ -54,9 +55,9 @@ class CommandLine(commandCenter: CommandCenterInterface,
     -> new AutoSuggestAction("auto-suggest", codeCompletionPopup))
 
   val textField: EditorField =
-    new org.nlogo.editor.EditorField(30,
-      new java.awt.Font(org.nlogo.awt.Fonts.platformMonospacedFont,
-        java.awt.Font.PLAIN, 12),
+    new EditorField(30,
+      new Font(Fonts.platformMonospacedFont,
+        Font.PLAIN, 12),
       true, new EditorColorizer(workspace), actionMap)
 
   agentKind(AgentKind.Observer)
@@ -66,11 +67,11 @@ class CommandLine(commandCenter: CommandCenterInterface,
 
   setLayout(new BorderLayout)
   displayName(classDisplayName)
-  add(new JScrollPane(textField,
-        ScrollPaneConstants.VERTICAL_SCROLLBAR_NEVER,
-        ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER),
-      java.awt.BorderLayout.CENTER)
 
+  private val scrollPane = new ScrollPane(textField, ScrollPaneConstants.VERTICAL_SCROLLBAR_NEVER,
+                                          ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER) with Transparent
+
+  add(scrollPane, BorderLayout.CENTER)
 
   def agent(agent: Agent): Unit = {
     this.agent = agent
@@ -111,7 +112,9 @@ class CommandLine(commandCenter: CommandCenterInterface,
 
   def keyTyped(e: KeyEvent): Unit = { }
 
-  def keyPressed(e: KeyEvent): Unit =
+  def keyPressed(e: KeyEvent): Unit = {
+    new WindowEvents.SetInterfaceModeEvent(InterfaceMode.Interact, false).raise(CommandLine.this)
+
     e.getKeyCode match {
       case KeyEvent.VK_ENTER =>
         executeCurrentBuffer()
@@ -125,6 +128,7 @@ class CommandLine(commandCenter: CommandCenterInterface,
         cycleListBack()
       case _ =>
     }
+  }
 
   ///
 
@@ -161,17 +165,17 @@ class CommandLine(commandCenter: CommandCenterInterface,
     if (e.sourceOwner == this) {
       error(e.error)
 
-      error match {
-        case err: CompilerException =>
+      error() match {
+        case Some(err: CompilerException) =>
           val offset = headerSource.length
           // highlight error location
 
-          textField.select(err.start - offset, err.end - offset)
+          textField.selectError(err.start - offset, err.end - offset)
           // print error message
           new WindowEvents.OutputEvent(false,
             new OutputObject("", "ERROR: " + err.getMessage(), true, true),
             true, true).raise(this)
-        case e if e == null =>
+        case None =>
           setText("")
           var outStr = innerSource
           if (!outStr.trim.equals("")) {
@@ -247,6 +251,7 @@ class CommandLine(commandCenter: CommandCenterInterface,
     clearList()
     setText("")
     agentKind(AgentKind.Observer)
+    textField.resetUndoHistory()
   }
 
   private[app] def clearList(): Unit = {
@@ -266,7 +271,7 @@ class CommandLine(commandCenter: CommandCenterInterface,
     textField.setEnabled(enabled)
   }
 
-  override def load(model: CoreWidget): Object = {
+  override def load(model: CoreWidget): Unit = {
     throw new UnsupportedOperationException()
   }
 
@@ -278,4 +283,12 @@ class CommandLine(commandCenter: CommandCenterInterface,
   override def raiseWidgetRemoved(): Unit = {}
   override def raiseWidgetAdded(): Unit = {}
 
+  override def syncTheme(): Unit = {
+    textField.setBackground(InterfaceColors.codeBackground())
+    textField.setCaretColor(InterfaceColors.displayAreaText())
+
+    scrollPane.setBackground(InterfaceColors.codeBackground())
+
+    codeCompletionPopup.syncTheme()
+  }
 }

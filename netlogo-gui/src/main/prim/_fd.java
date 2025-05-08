@@ -11,7 +11,7 @@ import org.nlogo.nvm.MutableDouble;
 
 // note that this and _bk are pretty much carbon copies of each other
 
-public final strictfp class _fd
+public final class _fd
     extends Command
     implements org.nlogo.nvm.CustomAssembled {
 
@@ -20,7 +20,7 @@ public final strictfp class _fd
   public _fd(org.nlogo.core.Token token) {
     super();
     token_$eq(token);
-    let = new Let("~" + token.text() + "_" + token.start());
+    let = new Let("~" + token.text() + "_" + token.start(), null);
   }
 
   @Override

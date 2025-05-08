@@ -41,8 +41,8 @@ object Serializer {
     bytes.toByteArray
   }
 
-  def serialize(update: Update, data: DataOutput) {
-    def writeValue(x: AnyRef) {
+  def serialize(update: Update, data: DataOutput): Unit = {
+    def writeValue(x: AnyRef): Unit = {
       x match {
         case s: String =>
           data.writeByte(StringType)
@@ -93,7 +93,7 @@ object Serializer {
           }
       }
     }
-    def writeSeq(xs: Seq[AnyRef]) {
+    def writeSeq(xs: Seq[AnyRef]): Unit = {
       data.writeInt(xs.size)
       xs.foreach(writeValue)
     }
@@ -176,10 +176,11 @@ object Serializer {
             },
             ShapeList.shapesToMap(parser(readValues().mkString("\n\n").split("\n"))))
           result
+        case i =>
+          throw new IllegalStateException
       }
     def readValues(): Vector[AnyRef] =
-      (for(_ <- 0 until data.readInt())
-       yield readValue())(collection.breakOut)
+      (0 until data.readInt()).map(_ => readValue()).toVector
     def readAgentKey(): AgentKey =
       AgentKey(kind = agentKindFromInt(data.readByte().toInt),
                id = data.readLong())
@@ -216,6 +217,7 @@ object Serializer {
       case Mirrorables.Link => 3
       case Mirrorables.World => 4
       case Mirrorables.WidgetValue => 5
+      case _ => throw new IllegalStateException
     }
 
 }

@@ -3,6 +3,8 @@
 package org.nlogo.headless
 package misc
 
+import scala.collection.parallel.CollectionConverters.IterableIsParallelizable
+
 // The purpose here is to run all the model checksums (in parallel!) and report
 // what the slowest models were, so we can try to shorten their runtimes so the
 // whole thing won't take so long.
@@ -14,7 +16,7 @@ object ChecksumReport {
   val tester = new ChecksumTester(println _)
   import tester.info
 
-  def main(args: Array[String]) {
+  def main(args: Array[String]): Unit = {
     val entries = Checksums.load().values
     val results =
       for {
@@ -39,7 +41,7 @@ object ChecksumReport {
         None
     }
 
-  def printReport(runTimes: Map[String, Long]) {
+  def printReport(runTimes: Map[String, Long]): Unit = {
     val numWinners = 30
     info(s"\n$numWinners slowest models:")
     val sorted =

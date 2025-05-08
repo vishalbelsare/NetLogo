@@ -6,19 +6,20 @@ import org.nlogo.core.{Plot => ParsedPlot, Pen => ParsedPen}
 
 object PlotLoader {
 
-  def loadPlot(parsedPlot: ParsedPlot, plot: Plot) {
+  def loadPlot(parsedPlot: ParsedPlot, plot: Plot): Unit = {
     plot.name(parsedPlot.display.getOrElse(""))
     plot.defaultState = plot.defaultState.copy(
         xMin = parsedPlot.xmin,
         xMax = parsedPlot.xmax,
         yMin = parsedPlot.ymin,
         yMax = parsedPlot.ymax,
-        autoPlotOn = parsedPlot.autoPlotOn)
+        autoPlotX = parsedPlot.autoPlotX,
+        autoPlotY = parsedPlot.autoPlotY)
     plot.setupCode = parsedPlot.setupCode
     plot.updateCode = parsedPlot.updateCode
     plot.legendIsOpen = parsedPlot.legendOn
 
-    def loadPens(parsedPens: Seq[ParsedPen]) {
+    def loadPens(parsedPens: Seq[ParsedPen]): Unit = {
       plot.pens = Nil
       for (parsedPen <- parsedPens) {
         val pen = plot.createPlotPen(parsedPen.display, false,

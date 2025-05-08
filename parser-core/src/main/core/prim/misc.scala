@@ -43,6 +43,12 @@ case class _breed(breedName: String) extends Reporter {
     Syntax.reporterSyntax(
       ret = Syntax.TurtlesetType)
 }
+case class _breedon(breedName: String) extends Reporter {
+  override def syntax =
+    Syntax.reporterSyntax(
+      right = List(Syntax.TurtleType | Syntax.PatchType | Syntax.TurtlesetType | Syntax.PatchsetType),
+      ret = Syntax.TurtlesetType)
+}
 case class _breedvariable(name: String) extends Reporter {
   override def syntax =
     Syntax.reporterSyntax(
@@ -187,13 +193,20 @@ case class _hatch(breedName: String) extends Command {
       agentClassString = "-T--",
       blockAgentClassString = Option("-T--"))
 }
+case class _homedirectory() extends Reporter {
+  override def syntax =
+    Syntax.reporterSyntax(
+      ret = Syntax.StringType,
+      defaultOption = Some(0),
+      minimumOption = Some(0))
+}
 case class _inradius() extends Reporter {
   override def syntax =
     Syntax.reporterSyntax(
       left = Syntax.TurtlesetType | Syntax.PatchsetType,
       right = List(Syntax.NumberType),
       ret = Syntax.TurtlesetType | Syntax.PatchsetType,
-      precedence = Syntax.NormalPrecedence + 2,
+      precedence = Syntax.NormalPrecedence + 3,
       agentClassString = "-TP-")
 }
 case class _jump() extends Command {
@@ -226,10 +239,32 @@ case class _lessthan() extends Reporter with Pure {
       ret = Syntax.BooleanType,
       precedence = Syntax.NormalPrecedence - 4)
 }
-case class _let(let: Option[Let], tokenText: Option[String]) extends Command {
+abstract class _abstractlet extends Command {
+  def letList: String
+}
+case class _multilet(lets: Seq[_abstractlet]) extends _abstractlet {
+  override def syntax =
+    Syntax.commandSyntax(right = List(Syntax.ListType))
+
+  override def letList: String =
+    lets.map(_.letList).mkString("[", " ", "]")
+
+}
+case class _multiassignitem() extends Reporter {
+  override def syntax =
+    Syntax.reporterSyntax(ret = Syntax.WildcardType, right = List(Syntax.ListType))
+}
+case class _multiassignnest(prim: String, totalNeeded: Int) extends Command {
+  override def syntax =
+    Syntax.commandSyntax()
+}
+case class _let(let: Option[Let], tokenText: Option[String]) extends _abstractlet {
   def this() = this(None, None)
   override def syntax =
     Syntax.commandSyntax(right = List(Syntax.WildcardType, Syntax.WildcardType))
+
+  override def letList: String =
+    let.map(_.token.text).orNull
 
   override def toString = {
     val vals = Seq(let.map(_.toString).getOrElse("None"), tokenText.getOrElse("None"))
@@ -434,10 +469,24 @@ case class _sentence() extends Reporter with Pure {
       defaultOption = Some(2),
       minimumOption = Some(0))
 }
-case class _set() extends Command {
+abstract class _abstractset extends Command {
+  def setList: String
+}
+case class _multiset(sets: Seq[_abstractset]) extends _abstractset {
+  override def syntax =
+    Syntax.commandSyntax(right = List(Syntax.ListType))
+
+  override def setList: String =
+    sets.map(_.setList).mkString("[", " ", "]")
+
+}
+case class _set() extends _abstractset {
   override def syntax =
     Syntax.commandSyntax(
       right = List(Syntax.WildcardType, Syntax.WildcardType))
+
+  override def setList: String =
+    token.text
 }
 case class _sprout(breedName: String) extends Command {
   def this() = this("")
@@ -471,6 +520,12 @@ case class _turtles() extends Reporter {
     Syntax.reporterSyntax(
       ret = Syntax.TurtlesetType)
 }
+case class _turtleson() extends Reporter {
+  override def syntax =
+    Syntax.reporterSyntax(
+      right = List(Syntax.TurtleType | Syntax.PatchType | Syntax.TurtlesetType | Syntax.PatchsetType),
+      ret = Syntax.TurtlesetType)
+}
 case class _turtleorlinkvariable(varName: String, returnType: Int = Syntax.WildcardType) extends Reporter {
   override def syntax =
     Syntax.reporterSyntax(ret = returnType | Syntax.ReferenceType, agentClassString = "-T-L")
@@ -492,13 +547,24 @@ case class _unknownidentifier() extends Reporter {
     Syntax.reporterSyntax(ret = Syntax.WildcardType)
 }
 case class _unknowncommand(val syntax: Syntax) extends Command
+case class _whoarenot() extends Reporter {
+  override def syntax =
+    Syntax.reporterSyntax(
+      left = Syntax.AgentsetType,
+      right = List(Syntax.AgentType | Syntax.AgentsetType),
+      ret = Syntax.AgentsetType,
+      precedence = Syntax.NormalPrecedence + 2,
+      isRightAssociative = false,
+      agentClassString = "OTPL"
+    )
+}
 case class _with() extends Reporter {
   override def syntax =
     Syntax.reporterSyntax(
       left = Syntax.AgentsetType,
       right = List(Syntax.BooleanBlockType),
       ret = Syntax.AgentsetType,
-      precedence = Syntax.NormalPrecedence + 2,
+      precedence = Syntax.NormalPrecedence + 3,
       isRightAssociative = false,
       agentClassString = "OTPL",
       blockAgentClassString = Option("?"))

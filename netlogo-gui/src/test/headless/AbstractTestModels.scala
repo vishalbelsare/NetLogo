@@ -6,10 +6,12 @@ import scala.util.DynamicVariable
 import org.scalatest.funsuite.AnyFunSuite
 import org.nlogo.api.{LogoException, Version}
 import org.nlogo.api.ModelCreator
+import org.nlogo.api.PlotCompilationErrorAction
 
 /**
  * A DSL for testing models.
  */
+
 trait AbstractTestModels extends AnyFunSuite with ModelCreator {
 
   /**
@@ -17,6 +19,14 @@ trait AbstractTestModels extends AnyFunSuite with ModelCreator {
    */
   def testModel(testName: String, model: Model)(f: => Unit) = {
     test(testName){ runModel(model){ f } }
+  }
+
+/**
+   * Set the PlotCompilationErrorAction and then test a model created in code.
+   * See netlogo-core/src/main/api/Controllable.scala for information on PlotCompilationErrorAction.
+   */
+  def testModelSetPlotCompilationErrorAction(testName: String, model: Model, plotCompilationErrorAction: PlotCompilationErrorAction)(f: => Unit) = {
+    test(testName){ runModelSetPlotCompilationErrorAction(model, plotCompilationErrorAction){ f } }
   }
 
   def testModelCompileError(testName: String, model: Model)(f: Throwable => Unit) = {
@@ -55,7 +65,7 @@ trait AbstractTestModels extends AnyFunSuite with ModelCreator {
   object ShovelableObserver { def >>(s: String) = workspace.command(s) }
   val observer = ShovelableObserver
 
-  def testError(f: => Unit, message:String){
+  def testError(f: => Unit, message:String): Unit ={
     val e = intercept[LogoException]{f}
     assert(e.getMessage === message)
   }
@@ -67,11 +77,18 @@ trait AbstractTestModels extends AnyFunSuite with ModelCreator {
     // println(".")
     run(ws => ws.openModel(model)){ f }
   }
-  // lods the model from the given file, and runs it in a new workspace
+
+ // Set the PlotCompilationErrorAction and run the given model in a new workspace.
+  def runModelSetPlotCompilationErrorAction(model:Model, plotCompilationErrorAction: PlotCompilationErrorAction)(f: => Unit) = {
+    run(ws => {ws.setPlotCompilationErrorAction(plotCompilationErrorAction)
+    ws.openModel(model)}){ f }
+  }
+
+  // loads the model from the given file, and runs it in a new workspace
   def runModelFromFile(path: String)(f: => Unit) = run(ws => ws.open(path)){ f }
 
   // run a model
-  private def run(openModel: HeadlessWorkspace => Unit)(f: => Unit) {
+  private def run(openModel: HeadlessWorkspace => Unit)(f: => Unit): Unit = {
     if (!Version.is3D) {
       _workspace.withValue(HeadlessWorkspace.newInstance) {
         try {
@@ -84,7 +101,7 @@ trait AbstractTestModels extends AnyFunSuite with ModelCreator {
     }
   }
 
-  def checkError(commands: String) {
+  def checkError(commands: String): Unit = {
     intercept[LogoException] {
       workspace.command(commands)
     }

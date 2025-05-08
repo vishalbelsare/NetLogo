@@ -13,13 +13,14 @@ import org.nlogo.workspace.ModelsLibrary
 // in test/benchdumps, or dump the whole models library to tmp/dumps. - ST 2/11/09, 8/21/13
 
 object Dump {
-  def main(argv:Array[String]) {
+  def main(argv:Array[String]): Unit = {
     argv match {
-      case Array() => println("usage: dump all, dump bench, dump Fire, dump foo/bar/Fire.nlogo")
+      case Array() => println("usage: dump all, dump bench, dump Fire, dump foo/bar/Fire.nlogox")
       case Array("all") => dumpAll()
       case Array("bench") => dumpBenchmarks()
-      case Array(path:String) if path.endsWith(".nlogo") => print(dump(path))
+      case Array(path:String) if path.endsWith(".nlogox") => print(dump(path))
       case Array(name:String) => print(dump(benchPath(name)))
+      case _ => throw new IllegalStateException
     }
   }
   def dump(path:String) = {
@@ -33,27 +34,27 @@ object Dump {
     }
     finally { workspace.dispose() }
   }
-  def benchPath(name:String) = "models/test/benchmarks/" + name + " Benchmark.nlogo"
-  def dumpBenchmarks() {
+  def benchPath(name:String) = "models/test/benchmarks/" + name + " Benchmark.nlogox"
+  def dumpBenchmarks(): Unit = {
     for(name <- ChecksumsAndPreviews.allBenchmarks)
       writeFile(DumpsPath + name + ".txt",
                 dump(benchPath(name)))
   }
 
-  def dumpAll() {
+  def dumpAll(): Unit = {
     Runtime.getRuntime().exec("rm -r target/dumps").waitFor()
     Runtime.getRuntime().exec("mkdir -p target/dumps").waitFor()
     //
     for(path <- ModelsLibrary.getModelPaths; if include(path))
     {
-      val name = path.split("/").last.toList.dropRight(".nlogo".size).mkString
+      val name = path.split("/").last.toList.dropRight(".nlogox".size).mkString
       print('.')
       writeFile(DumpsPath + name + ".txt",dump(path))
     }
-    println
+    println()
   }
 
-  def writeFile(path:String,s:String) {
+  def writeFile(path:String,s:String): Unit = {
     val w = new java.io.FileWriter(path)
     w.write(s)
     w.close()

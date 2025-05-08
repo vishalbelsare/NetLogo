@@ -2,26 +2,28 @@
 
 package org.nlogo.sdm.gui
 
-import org.nlogo.api.CompilerServices
+import org.nlogo.api.{ AggregateManagerInterface, CompilerServices }
 import org.nlogo.core.{ AgentKind, LiteralParser, Model => CoreModel }
 import org.nlogo.editor.Colorizer
-import org.nlogo.window.{ EditDialogFactoryInterface, MenuBarFactory }
+import org.nlogo.theme.ThemeSync
+import org.nlogo.window.{ EditDialogFactory, Event, Events, MenuBarFactory }
 
 class GUIAggregateManager(
   linkParent: java.awt.Component,
   menuBarFactory: MenuBarFactory,
   compiler: CompilerServices,
   colorizer: Colorizer,
-  dialogFactory: EditDialogFactoryInterface)
-extends org.nlogo.api.AggregateManagerInterface
-with org.nlogo.window.Event.LinkChild
-with org.nlogo.window.Events.CompiledEvent.Handler
-with org.nlogo.window.Events.BeforeLoadEvent.Handler
-with org.nlogo.window.Events.LoadModelEvent.Handler {
+  dialogFactory: EditDialogFactory)
+extends AggregateManagerInterface
+with Event.LinkChild
+with Events.CompiledEvent.Handler
+with Events.BeforeLoadEvent.Handler
+with Events.LoadModelEvent.Handler
+with ThemeSync {
 
   private var editor: AggregateModelEditor = null
 
-  override def showEditor() {
+  override def showEditor(): Unit = {
     // if it's the first time, make a new aggregate model editor
     if (editor == null)
       editor = new AggregateModelEditor(
@@ -32,18 +34,18 @@ with org.nlogo.window.Events.LoadModelEvent.Handler {
 
   override def getLinkParent = linkParent
 
-  override def handle(e: org.nlogo.window.Events.BeforeLoadEvent) {
+  override def handle(e: org.nlogo.window.Events.BeforeLoadEvent): Unit = {
     if (editor != null) {
       editor.dispose()
       editor = null
     }
   }
 
-  override def handle(e: org.nlogo.window.Events.LoadModelEvent) {
+  override def handle(e: org.nlogo.window.Events.LoadModelEvent): Unit = {
     load(e.model, compiler)
   }
 
-  override def load(model: CoreModel, compiler: LiteralParser) = {
+  override def load(model: CoreModel, parser: LiteralParser) = {
     model.optionalSectionValue[AggregateDrawing]("org.nlogo.modelsection.systemdynamics.gui")
       .foreach { drawing =>
         editor = new AggregateModelEditor(
@@ -63,11 +65,18 @@ with org.nlogo.window.Events.LoadModelEvent.Handler {
 
   override def isLoaded: Boolean = editor != null
 
-  override def handle(e: org.nlogo.window.Events.CompiledEvent) {
+  override def handle(e: org.nlogo.window.Events.CompiledEvent): Unit = {
     if (editor != null)
       editor.setError(
         this,
         if(e.sourceOwner eq this) e.error else null)
+  }
+
+  override def syncTheme(): Unit = {
+    if (editor != null) {
+      editor.syncTheme()
+      editor.repaint()
+    }
   }
 
   /// from org.nlogo.nvm.SourceOwner
@@ -77,7 +86,7 @@ with org.nlogo.window.Events.LoadModelEvent.Handler {
   override def source = innerSource
   override def innerSource =
     Option(editor).map(_.toNetLogoCode).getOrElse("")
-  override def innerSource_=(s: String) { }
+  override def innerSource_=(s: String): Unit = { }
   override def headerSource = ""
 
 }

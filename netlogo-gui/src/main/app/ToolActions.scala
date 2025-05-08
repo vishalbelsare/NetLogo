@@ -9,22 +9,28 @@ import javax.swing.{ AbstractAction, JDialog }
 
 import org.nlogo.api.{ AggregateManagerInterface, LibraryManager }
 import org.nlogo.app.common.TabsInterface
-import org.nlogo.app.tools.{ LibrariesDialog, Preferences, PreferencesDialog }
+import org.nlogo.app.interfacetab.WidgetPanel
+import org.nlogo.app.tools.{ LibrariesDialog, Preferences, PreferencesDialog, ThemesDialog }
 import org.nlogo.awt.Positioning
 import org.nlogo.core.I18N
-import org.nlogo.workspace.AbstractWorkspaceScala
-import org.nlogo.window.{ ColorDialog, LinkRoot }
 import org.nlogo.shape.ShapesManagerInterface
-import org.nlogo.swing.UserAction._
+import org.nlogo.swing.{ OptionPane, UserAction }, UserAction._
+import org.nlogo.theme.ThemeSync
+import org.nlogo.window.{ CopyOnly, JFXColorPicker, LinkRoot }
+import org.nlogo.workspace.AbstractWorkspaceScala
 
-abstract class ShowDialogAction(name: String) extends AbstractAction(name) {
-  protected def createDialog(): JDialog
+abstract class ShowDialogAction(name: String) extends AbstractAction(name) with ThemeSync {
+  protected def createDialog(): JDialog with ThemeSync
 
-  lazy protected val createdDialog = createDialog
+  lazy protected val createdDialog = createDialog()
 
   override def actionPerformed(e: ActionEvent): Unit = {
     createdDialog.toFront()
     createdDialog.setVisible(true)
+  }
+
+  override def syncTheme(): Unit = {
+    createdDialog.syncTheme()
   }
 }
 
@@ -34,16 +40,30 @@ with MenuAction {
   category = ToolsCategory
   group    = ToolsSettingsGroup
 
-  override def createDialog = new PreferencesDialog(frame,
-    Preferences.Language,
-    Preferences.LoadLastOnStartup,
-    new Preferences.LineNumbers(tabs),
-    Preferences.IsLoggingEnabled,
-    new Preferences.LogDirectory(frame),
-    Preferences.LogEvents,
-    Preferences.IncludedFilesMenu,
-    Preferences.ProceduresMenuSortOrder
+  override def createDialog() = new PreferencesDialog(frame,
+    Seq(
+      Preferences.Language,
+      Preferences.LoadLastOnStartup,
+      new Preferences.ReloadOnExternalChanges(tabs),
+      Preferences.IsLoggingEnabled,
+      new Preferences.LogDirectory(frame),
+      Preferences.LogEvents,
+      Preferences.IncludedFilesMenu,
+      Preferences.ProceduresMenuSortOrder,
+      Preferences.FocusOnError,
+      Preferences.StartSeparateCodeTab,
+      Preferences.BoldWidgetNames
+    ) ++ (if (System.getProperty("os.name").contains("Linux")) Seq(Preferences.UIScale) else Nil)
   )
+}
+
+class ShowThemesDialog(frame: Frame with ThemeSync)
+  extends ShowDialogAction(I18N.gui.get("menu.tools.themes")) with MenuAction {
+
+  category = ToolsCategory
+  group = ToolsSettingsGroup
+
+  override def createDialog() = new ThemesDialog(frame)
 }
 
 class OpenLibrariesDialog( frame:              Frame
@@ -56,27 +76,21 @@ class OpenLibrariesDialog( frame:              Frame
   category = ToolsCategory
   group    = ToolsSettingsGroup
 
-  def createDialog() = new LibrariesDialog(frame, libManager, recompile, updateSource, getExtPathMappings)
+  def createDialog() = new LibrariesDialog(frame, libManager, recompile, updateSource, getExtPathMappings())
 
 }
 
-class OpenColorDialog(frame: Frame)
-extends ShowDialogAction(I18N.gui.get("menu.tools.colorSwatches"))
-with MenuAction {
+class OpenRGBAColorDialog(frame: Frame) extends ShowDialogAction(I18N.gui.get("menu.tools.rgbaColorPicker"))
+                                        with MenuAction {
   category = ToolsCategory
   group = ToolsDialogsGroup
 
-  def createDialog() = new ColorDialog(frame, false)
+  def createDialog() = new JFXColorPicker(frame, false, CopyOnly)
 
-  var hasShown = false
-
-  override def actionPerformed(e: ActionEvent) {
+  override def actionPerformed(e: ActionEvent): Unit = {
     Positioning.center(createdDialog, frame)
-    if (!hasShown) {
-      createdDialog.asInstanceOf[ColorDialog].showDialog()
-      hasShown = true
-    } else
-      super.actionPerformed(e)
+
+    super.actionPerformed(e)
   }
 }
 
@@ -86,7 +100,7 @@ with MenuAction {
   category = ToolsCategory
   group    = ToolsDialogsGroup
 
-  override def actionPerformed(e: ActionEvent) {
+  override def actionPerformed(e: ActionEvent): Unit = {
     shapeManager.init(I18N.gui.get(s"menu.tools.$key"))
   }
 }
@@ -98,7 +112,7 @@ with MenuAction {
   group       = ToolsDialogsGroup
   accelerator = KeyBindings.keystroke('D', withMenu = true, withShift = true)
 
-  override def actionPerformed(e: ActionEvent) {
+  override def actionPerformed(e: ActionEvent): Unit = {
     aggregateManager.showEditor()
   }
 }
@@ -109,10 +123,26 @@ with MenuAction {
   category = ToolsCategory
   group    = ToolsHubNetGroup
 
-  override def actionPerformed(e: ActionEvent) {
+  override def actionPerformed(e: ActionEvent): Unit = {
     workspace.getHubNetManager.foreach { mgr =>
       mgr.openClientEditor()
       linkRoot.addLinkComponent(mgr.clientEditor)
     }
+  }
+}
+
+class ConvertWidgetSizes(frame: Frame, widgetPanel: WidgetPanel)
+  extends AbstractAction(I18N.gui.get("menu.tools.convertWidgetSizes")) with MenuAction {
+
+  category = ToolsCategory
+  group    = ToolsWidgetGroup
+
+  override def actionPerformed(e: ActionEvent): Unit = {
+    val mode = new OptionPane(frame, I18N.gui.get("common.messages.warning"),
+                              I18N.gui.get("menu.tools.convertWidgetSizes.prompt"),
+                              Seq(I18N.gui.get("common.buttons.ok"), I18N.gui.get("menu.tools.convertWidgetSizes.onlyResize")),
+                              OptionPane.Icons.Warning).getSelectedIndex
+
+    widgetPanel.convertWidgetSizes(mode == 0)
   }
 }

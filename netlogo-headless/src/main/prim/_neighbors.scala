@@ -12,5 +12,6 @@ class _neighbors extends Reporter {
     (context.agent match {
       case t: Turtle => t.getPatchHere
       case p: Patch => p
+      case a => throw new IllegalStateException
     }).getNeighbors
 }

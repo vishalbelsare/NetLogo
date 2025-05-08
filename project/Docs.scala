@@ -3,8 +3,7 @@ import Keys._
 import NetLogoBuild.{ buildDate, marketingVersion, numericMarketingVersion, autogenRoot }
 import ModelsLibrary.modelsDirectory
 import Extensions.extensionRoot
-import Scaladoc.apiScaladoc
-import NetLogoPackaging.{ netLogoRoot, buildVariables }
+import NetLogoPackaging.buildVariables
 
 object Docs {
   lazy val netLogoDocs            = taskKey[NetLogoDocs]("netlogo docs object used to build documentation")
@@ -26,7 +25,6 @@ object Docs {
       "numericOnlyVersion" -> numericMarketingVersion.value,
       "year"               -> buildDate.value.takeRight(4),
       "date"               -> buildDate.value),
-    netLogoRoot := baseDirectory.value.getParentFile,
     netLogoDocs := {
       new NetLogoDocs(
         autogenRoot.value / "docs",
@@ -36,7 +34,7 @@ object Docs {
         extensionDocsGen.value)
     },
     allDocs := {
-      htmlDocs.value :+ manualPDF.value :+ apiScaladoc.value
+      htmlDocs.value :+ manualPDF.value :+ (Compile / doc).value
     },
     htmlDocs := {
       netLogoDocs.value.generateHTML(buildVariables.value, documentedExtensions.value)

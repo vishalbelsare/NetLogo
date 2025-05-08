@@ -20,11 +20,11 @@ procedure BENCHMARK:[_repeatlocal:0]{O---}:
           D2L
           LSTORE 4
           LLOAD 4
-          LDC -2147483648
+          LDC -2147483648L
           LCMP
           IFLT L2
           LLOAD 4
-          LDC 2147483647
+          LDC 2147483647L
           LCMP
           IFLE L3
          L2
@@ -33,32 +33,67 @@ procedure BENCHMARK:[_repeatlocal:0]{O---}:
           DUP
           ALOAD 1
           ALOAD 0
-          NEW java/lang/StringBuilder
-          DUP
-          LDC 75
-          INVOKESPECIAL java/lang/StringBuilder.<init> (I)V
           GETSTATIC org/nlogo/api/Dump$.MODULE$ : Lorg/nlogo/api/Dump$;
           DLOAD 2
           INVOKEVIRTUAL org/nlogo/api/Dump$.number (D)Ljava/lang/String;
-          INVOKEVIRTUAL java/lang/StringBuilder.append (Ljava/lang/String;)Ljava/lang/StringBuilder;
-          LDC " is not in the allowable range for random seeds (-2147483648 to 2147483647)"
-          INVOKEVIRTUAL java/lang/StringBuilder.append (Ljava/lang/String;)Ljava/lang/StringBuilder;
-          INVOKEVIRTUAL java/lang/StringBuilder.toString ()Ljava/lang/String;
+          INVOKEDYNAMIC makeConcatWithConstants(Ljava/lang/String;)Ljava/lang/String; [
+            // handle kind 0x6 : INVOKESTATIC
+            java/lang/invoke/StringConcatFactory.makeConcatWithConstants(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/invoke/CallSite;
+            // arguments:
+            "\u0001 is not in the allowable range for random seeds (-2147483648 to 2147483647)"
+          ]
           INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
           ATHROW
          L3
          FRAME SAME
+          LLOAD 4
+          L2I
+          ISTORE 6
           ALOAD 1
           GETFIELD org/nlogo/nvm/Context.job : Lorg/nlogo/nvm/Job;
           GETFIELD org/nlogo/nvm/Job.random : Lorg/nlogo/api/MersenneTwisterFast;
-          LLOAD 4
-          L2I
+          ILOAD 6
           I2L
           INVOKEVIRTUAL org/nlogo/api/MersenneTwisterFast.setSeed (J)V
           ALOAD 1
+          GETFIELD org/nlogo/nvm/Context.job : Lorg/nlogo/nvm/Job;
+          GETFIELD org/nlogo/nvm/Job.workspace : Lorg/nlogo/nvm/Workspace;
+          IFNULL L4
+          ALOAD 1
+          GETFIELD org/nlogo/nvm/Context.job : Lorg/nlogo/nvm/Job;
+          GETFIELD org/nlogo/nvm/Job.random : Lorg/nlogo/api/MersenneTwisterFast;
+          ALOAD 1
+          GETFIELD org/nlogo/nvm/Context.job : Lorg/nlogo/nvm/Job;
+          GETFIELD org/nlogo/nvm/Job.workspace : Lorg/nlogo/nvm/Workspace;
+          INVOKEINTERFACE org/nlogo/nvm/Workspace.world ()Lorg/nlogo/agent/World; (itf)
+          INVOKEVIRTUAL org/nlogo/agent/World.mainRNG ()Lorg/nlogo/api/MersenneTwisterFast;
+          ASTORE 7
+          DUP
+          IFNONNULL L5
+          POP
+          ALOAD 7
+          IFNULL L6
+          GOTO L4
+         L5
+         FRAME FULL [org/nlogo/prim/_asm_procedurebenchmark_randomseed_0 org/nlogo/nvm/Context D J I org/nlogo/api/MersenneTwisterFast] [org/nlogo/api/MersenneTwisterFast]
+          ALOAD 7
+          INVOKEVIRTUAL java/lang/Object.equals (Ljava/lang/Object;)Z
+          IFEQ L4
+         L6
+         FRAME SAME
+          ALOAD 1
+          GETFIELD org/nlogo/nvm/Context.job : Lorg/nlogo/nvm/Job;
+          GETFIELD org/nlogo/nvm/Job.workspace : Lorg/nlogo/nvm/Workspace;
+          INVOKEINTERFACE org/nlogo/nvm/Workspace.plotRNG ()Lorg/nlogo/api/MersenneTwisterFast; (itf)
+          ILOAD 6
+          I2L
+          INVOKEVIRTUAL org/nlogo/api/MersenneTwisterFast.setSeed (J)V
+         L4
+         FRAME CHOP 1
+          ALOAD 1
           ICONST_1
           PUTFIELD org/nlogo/nvm/Context.ip : I
-         L4
+         L7
           RETURN
 [1]_resettimer "reset-timer"
 [2]_asm_procedurebenchmark_call_1 "setup"
@@ -87,7 +122,7 @@ procedure BENCHMARK:[_repeatlocal:0]{O---}:
           // parameter final  context
           // parameter final  arg0
          L0
-          LDC 5000.0
+          LDC 5000.0D
          L1
           DSTORE 2
           ALOAD 1
@@ -357,7 +392,7 @@ procedure SETUP:[]{O---}:
           // parameter final  arg0
           TRYCATCHBLOCK L0 L1 L2 org/nlogo/api/AgentException
          L3
-          LDC 2.0
+          LDC 2.0D
          L4
           ALOAD 0
           GETFIELD org/nlogo/prim/_asm_proceduresetup_setobservervariable_4.world : Lorg/nlogo/agent/World;
@@ -531,7 +566,6 @@ procedure GO:[ACTIVE-PATCHES OVERLOADED-PATCHES]{O---}:
          L3
          FRAME SAME
           ALOAD 4
-          ASTORE 3
           GOTO L5
          L2
          FRAME CHOP 2
@@ -543,7 +577,7 @@ procedure GO:[ACTIVE-PATCHES OVERLOADED-PATCHES]{O---}:
           ASTORE 5
           ALOAD 5
           INVOKEVIRTUAL org/nlogo/agent/Agent.id ()J
-          LDC -1
+          LDC -1L
           LCMP
           IFNE L7
           NEW org/nlogo/nvm/RuntimePrimitiveException
@@ -553,7 +587,7 @@ procedure GO:[ACTIVE-PATCHES OVERLOADED-PATCHES]{O---}:
           GETSTATIC org/nlogo/core/I18N$.MODULE$ : Lorg/nlogo/core/I18N$;
           INVOKEVIRTUAL org/nlogo/core/I18N$.errors ()Lorg/nlogo/core/I18N$BundleKind;
           LDC "org.nlogo.$common.thatAgentIsDead"
-          GETSTATIC scala/Predef$.MODULE$ : Lscala/Predef$;
+          GETSTATIC scala/runtime/ScalaRunTime$.MODULE$ : Lscala/runtime/ScalaRunTime$;
           ICONST_1
           ANEWARRAY java/lang/Object
           DUP
@@ -561,8 +595,8 @@ procedure GO:[ACTIVE-PATCHES OVERLOADED-PATCHES]{O---}:
           ALOAD 5
           INVOKEVIRTUAL org/nlogo/agent/Agent.classDisplayName ()Ljava/lang/String;
           AASTORE
-          INVOKEVIRTUAL scala/Predef$.wrapRefArray ([Ljava/lang/Object;)Lscala/collection/mutable/WrappedArray;
-          INVOKEVIRTUAL org/nlogo/core/I18N$BundleKind.getN (Ljava/lang/String;Lscala/collection/Seq;)Ljava/lang/String;
+          INVOKEVIRTUAL scala/runtime/ScalaRunTime$.wrapRefArray ([Ljava/lang/Object;)Lscala/collection/immutable/ArraySeq;
+          INVOKEVIRTUAL org/nlogo/core/I18N$BundleKind.getN (Ljava/lang/String;Lscala/collection/immutable/Seq;)Ljava/lang/String;
           INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
           ATHROW
          L7
@@ -570,7 +604,6 @@ procedure GO:[ACTIVE-PATCHES OVERLOADED-PATCHES]{O---}:
           GETSTATIC org/nlogo/agent/AgentSet$.MODULE$ : Lorg/nlogo/agent/AgentSet$;
           ALOAD 5
           INVOKEVIRTUAL org/nlogo/agent/AgentSet$.fromAgent (Lorg/nlogo/agent/Agent;)Lorg/nlogo/agent/IndexedAgentSet;
-          ASTORE 3
           GOTO L5
          L6
          FRAME CHOP 3
@@ -588,7 +621,8 @@ procedure GO:[ACTIVE-PATCHES OVERLOADED-PATCHES]{O---}:
           INVOKESPECIAL org/nlogo/nvm/ArgumentTypeException.<init> (Lorg/nlogo/nvm/Context;Lorg/nlogo/nvm/Instruction;IILjava/lang/Object;)V
           ATHROW
          L5
-         FRAME APPEND [org/nlogo/agent/AgentSet]
+         FRAME SAME1 org/nlogo/agent/AgentSet
+          ASTORE 3
           ALOAD 1
           ALOAD 3
           ICONST_2
@@ -841,7 +875,7 @@ procedure GO:[ACTIVE-PATCHES OVERLOADED-PATCHES]{O---}:
               ATHROW
              L3
              FRAME SAME1 java/lang/Object
-              LDC 3.0
+              LDC 3.0D
              L4
               DSTORE 3
               ASTORE 2
@@ -859,10 +893,7 @@ procedure GO:[ACTIVE-PATCHES OVERLOADED-PATCHES]{O---}:
              L6
              FRAME APPEND [java/lang/Object D]
               ICONST_0
-             L7
-             FRAME SAME1 I
-              ISTORE 5
-              GOTO L8
+              GOTO L7
              L5
              FRAME SAME
               NEW org/nlogo/nvm/RuntimePrimitiveException
@@ -872,7 +903,7 @@ procedure GO:[ACTIVE-PATCHES OVERLOADED-PATCHES]{O---}:
               GETSTATIC org/nlogo/core/I18N$.MODULE$ : Lorg/nlogo/core/I18N$;
               INVOKEVIRTUAL org/nlogo/core/I18N$.errors ()Lorg/nlogo/core/I18N$BundleKind;
               LDC "org.nlogo.prim._greaterthan.cannotCompareParameters"
-              GETSTATIC scala/Predef$.MODULE$ : Lscala/Predef$;
+              GETSTATIC scala/runtime/ScalaRunTime$.MODULE$ : Lscala/runtime/ScalaRunTime$;
               ICONST_2
               ANEWARRAY java/lang/Object
               DUP
@@ -888,21 +919,19 @@ procedure GO:[ACTIVE-PATCHES OVERLOADED-PATCHES]{O---}:
               INVOKESTATIC scala/runtime/BoxesRunTime.boxToDouble (D)Ljava/lang/Double;
               INVOKEVIRTUAL org/nlogo/api/TypeNames$.aName (Ljava/lang/Object;)Ljava/lang/String;
               AASTORE
-              INVOKEVIRTUAL scala/Predef$.wrapRefArray ([Ljava/lang/Object;)Lscala/collection/mutable/WrappedArray;
-              INVOKEVIRTUAL org/nlogo/core/I18N$BundleKind.getN (Ljava/lang/String;Lscala/collection/Seq;)Ljava/lang/String;
+              INVOKEVIRTUAL scala/runtime/ScalaRunTime$.wrapRefArray ([Ljava/lang/Object;)Lscala/collection/immutable/ArraySeq;
+              INVOKEVIRTUAL org/nlogo/core/I18N$BundleKind.getN (Ljava/lang/String;Lscala/collection/immutable/Seq;)Ljava/lang/String;
               INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
               ATHROW
-             L8
-             FRAME APPEND [I]
-              ILOAD 5
-             L9
-              IFEQ L10
+             L7
+             FRAME SAME1 I
+              IFEQ L8
               GETSTATIC java/lang/Boolean.TRUE : Ljava/lang/Boolean;
-              GOTO L11
-             L10
+              GOTO L9
+             L8
              FRAME SAME
               GETSTATIC java/lang/Boolean.FALSE : Ljava/lang/Boolean;
-             L11
+             L9
              FRAME SAME1 java/lang/Boolean
               ARETURN
           // parameter final  context
@@ -950,7 +979,7 @@ procedure GO:[ACTIVE-PATCHES OVERLOADED-PATCHES]{O---}:
           ASTORE 4
           GETSTATIC scala/collection/mutable/ArrayBuffer$.MODULE$ : Lscala/collection/mutable/ArrayBuffer$;
           GETSTATIC scala/collection/immutable/Nil$.MODULE$ : Lscala/collection/immutable/Nil$;
-          INVOKEVIRTUAL scala/collection/mutable/ArrayBuffer$.apply (Lscala/collection/Seq;)Lscala/collection/GenTraversable;
+          INVOKEVIRTUAL scala/collection/mutable/ArrayBuffer$.apply (Lscala/collection/immutable/Seq;)Ljava/lang/Object;
           CHECKCAST scala/collection/mutable/ArrayBuffer
           ASTORE 5
           ALOAD 3
@@ -963,10 +992,10 @@ procedure GO:[ACTIVE-PATCHES OVERLOADED-PATCHES]{O---}:
          L5
          FRAME FULL [org/nlogo/prim/_asm_procedurego_setprocedurevariable_8 org/nlogo/nvm/Context org/nlogo/agent/AgentSet org/nlogo/nvm/Reporter org/nlogo/nvm/Context scala/collection/mutable/ArrayBuffer org/nlogo/agent/AgentIterator] []
           ALOAD 6
-          INVOKEINTERFACE org/nlogo/agent/AgentIterator.hasNext ()Z
+          INVOKEINTERFACE org/nlogo/agent/AgentIterator.hasNext ()Z (itf)
           IFEQ L6
           ALOAD 6
-          INVOKEINTERFACE org/nlogo/agent/AgentIterator.next ()Lorg/nlogo/agent/Agent;
+          INVOKEINTERFACE org/nlogo/agent/AgentIterator.next ()Lorg/nlogo/agent/Agent; (itf)
           ASTORE 7
           ALOAD 4
           ALOAD 7
@@ -982,7 +1011,7 @@ procedure GO:[ACTIVE-PATCHES OVERLOADED-PATCHES]{O---}:
           IFEQ L5
           ALOAD 5
           ALOAD 7
-          INVOKEVIRTUAL scala/collection/mutable/ArrayBuffer.$plus$eq (Ljava/lang/Object;)Lscala/collection/mutable/ArrayBuffer;
+          INVOKEVIRTUAL scala/collection/mutable/ArrayBuffer.$plus$eq (Ljava/lang/Object;)Lscala/collection/mutable/Growable;
           POP
           GOTO L5
          L7
@@ -994,7 +1023,7 @@ procedure GO:[ACTIVE-PATCHES OVERLOADED-PATCHES]{O---}:
           GETSTATIC org/nlogo/core/I18N$.MODULE$ : Lorg/nlogo/core/I18N$;
           INVOKEVIRTUAL org/nlogo/core/I18N$.errors ()Lorg/nlogo/core/I18N$BundleKind;
           LDC "org.nlogo.prim.$common.expectedBooleanValue"
-          GETSTATIC scala/Predef$.MODULE$ : Lscala/Predef$;
+          GETSTATIC scala/runtime/ScalaRunTime$.MODULE$ : Lscala/runtime/ScalaRunTime$;
           ICONST_3
           ANEWARRAY java/lang/Object
           DUP
@@ -1013,8 +1042,8 @@ procedure GO:[ACTIVE-PATCHES OVERLOADED-PATCHES]{O---}:
           ALOAD 8
           INVOKEVIRTUAL org/nlogo/api/Dump$.logoObject (Ljava/lang/Object;)Ljava/lang/String;
           AASTORE
-          INVOKEVIRTUAL scala/Predef$.wrapRefArray ([Ljava/lang/Object;)Lscala/collection/mutable/WrappedArray;
-          INVOKEVIRTUAL org/nlogo/core/I18N$BundleKind.getN (Ljava/lang/String;Lscala/collection/Seq;)Ljava/lang/String;
+          INVOKEVIRTUAL scala/runtime/ScalaRunTime$.wrapRefArray ([Ljava/lang/Object;)Lscala/collection/immutable/ArraySeq;
+          INVOKEVIRTUAL org/nlogo/core/I18N$BundleKind.getN (Ljava/lang/String;Lscala/collection/immutable/Seq;)Ljava/lang/String;
           INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
           ATHROW
          L6
@@ -1100,7 +1129,6 @@ procedure GO:[ACTIVE-PATCHES OVERLOADED-PATCHES]{O---}:
          L3
          FRAME SAME
           ALOAD 4
-          ASTORE 3
           GOTO L5
          L2
          FRAME CHOP 2
@@ -1112,7 +1140,7 @@ procedure GO:[ACTIVE-PATCHES OVERLOADED-PATCHES]{O---}:
           ASTORE 5
           ALOAD 5
           INVOKEVIRTUAL org/nlogo/agent/Agent.id ()J
-          LDC -1
+          LDC -1L
           LCMP
           IFNE L7
           NEW org/nlogo/nvm/RuntimePrimitiveException
@@ -1122,7 +1150,7 @@ procedure GO:[ACTIVE-PATCHES OVERLOADED-PATCHES]{O---}:
           GETSTATIC org/nlogo/core/I18N$.MODULE$ : Lorg/nlogo/core/I18N$;
           INVOKEVIRTUAL org/nlogo/core/I18N$.errors ()Lorg/nlogo/core/I18N$BundleKind;
           LDC "org.nlogo.$common.thatAgentIsDead"
-          GETSTATIC scala/Predef$.MODULE$ : Lscala/Predef$;
+          GETSTATIC scala/runtime/ScalaRunTime$.MODULE$ : Lscala/runtime/ScalaRunTime$;
           ICONST_1
           ANEWARRAY java/lang/Object
           DUP
@@ -1130,8 +1158,8 @@ procedure GO:[ACTIVE-PATCHES OVERLOADED-PATCHES]{O---}:
           ALOAD 5
           INVOKEVIRTUAL org/nlogo/agent/Agent.classDisplayName ()Ljava/lang/String;
           AASTORE
-          INVOKEVIRTUAL scala/Predef$.wrapRefArray ([Ljava/lang/Object;)Lscala/collection/mutable/WrappedArray;
-          INVOKEVIRTUAL org/nlogo/core/I18N$BundleKind.getN (Ljava/lang/String;Lscala/collection/Seq;)Ljava/lang/String;
+          INVOKEVIRTUAL scala/runtime/ScalaRunTime$.wrapRefArray ([Ljava/lang/Object;)Lscala/collection/immutable/ArraySeq;
+          INVOKEVIRTUAL org/nlogo/core/I18N$BundleKind.getN (Ljava/lang/String;Lscala/collection/immutable/Seq;)Ljava/lang/String;
           INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
           ATHROW
          L7
@@ -1139,7 +1167,6 @@ procedure GO:[ACTIVE-PATCHES OVERLOADED-PATCHES]{O---}:
           GETSTATIC org/nlogo/agent/AgentSet$.MODULE$ : Lorg/nlogo/agent/AgentSet$;
           ALOAD 5
           INVOKEVIRTUAL org/nlogo/agent/AgentSet$.fromAgent (Lorg/nlogo/agent/Agent;)Lorg/nlogo/agent/IndexedAgentSet;
-          ASTORE 3
           GOTO L5
          L6
          FRAME CHOP 3
@@ -1157,7 +1184,8 @@ procedure GO:[ACTIVE-PATCHES OVERLOADED-PATCHES]{O---}:
           INVOKESPECIAL org/nlogo/nvm/ArgumentTypeException.<init> (Lorg/nlogo/nvm/Context;Lorg/nlogo/nvm/Instruction;IILjava/lang/Object;)V
           ATHROW
          L5
-         FRAME APPEND [org/nlogo/agent/AgentSet]
+         FRAME SAME1 org/nlogo/agent/AgentSet
+          ASTORE 3
           ALOAD 1
           ALOAD 3
           BIPUSH 9
@@ -1221,7 +1249,7 @@ procedure GO:[ACTIVE-PATCHES OVERLOADED-PATCHES]{O---}:
           ATHROW
          L9
          FRAME SAME1 D
-          LDC 4.0
+          LDC 4.0D
          L10
           DSTORE 4
           DSTORE 2
@@ -1301,7 +1329,7 @@ procedure GO:[ACTIVE-PATCHES OVERLOADED-PATCHES]{O---}:
           ATHROW
          L7
          FRAME SAME1 D
-          LDC 4.0
+          LDC 4.0D
          L8
           DSTORE 4
           DSTORE 2
@@ -1370,34 +1398,30 @@ procedure GO:[ACTIVE-PATCHES OVERLOADED-PATCHES]{O---}:
          L0
           ALOAD 1
           GETFIELD org/nlogo/nvm/Context.agent : Lorg/nlogo/agent/Agent;
-          ASTORE 3
-          ALOAD 3
+          ASTORE 2
+          ALOAD 2
           INSTANCEOF org/nlogo/agent/Turtle
           IFEQ L1
-          ALOAD 3
+          ALOAD 2
           CHECKCAST org/nlogo/agent/Turtle
           INVOKEVIRTUAL org/nlogo/agent/Turtle.getPatchHere ()Lorg/nlogo/agent/Patch;
-          ASTORE 2
           GOTO L2
          L1
-         FRAME APPEND [T org/nlogo/agent/Agent]
-          ALOAD 3
+         FRAME APPEND [org/nlogo/agent/Agent]
+          ALOAD 2
           INSTANCEOF org/nlogo/agent/Patch
           IFEQ L3
-          ALOAD 3
+          ALOAD 2
           CHECKCAST org/nlogo/agent/Patch
-          ASTORE 2
           GOTO L2
          L3
          FRAME SAME
-          NEW scala/MatchError
+          NEW java/lang/IllegalStateException
           DUP
-          ALOAD 3
-          INVOKESPECIAL scala/MatchError.<init> (Ljava/lang/Object;)V
+          INVOKESPECIAL java/lang/IllegalStateException.<init> ()V
           ATHROW
          L2
-         FRAME FULL [org/nlogo/prim/_asm_procedurego_ask_14 org/nlogo/nvm/Context org/nlogo/agent/Patch org/nlogo/agent/Agent] []
-          ALOAD 2
+         FRAME SAME1 org/nlogo/agent/Patch
           INVOKEVIRTUAL org/nlogo/agent/Patch.getNeighbors4 ()Lorg/nlogo/agent/IndexedAgentSet;
          L4
           ASTORE 2
@@ -1421,7 +1445,7 @@ procedure GO:[ACTIVE-PATCHES OVERLOADED-PATCHES]{O---}:
           INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
           ATHROW
          L6
-         FRAME FULL [org/nlogo/prim/_asm_procedurego_ask_14 org/nlogo/nvm/Context org/nlogo/agent/IndexedAgentSet org/nlogo/agent/Agent] []
+         FRAME FULL [org/nlogo/prim/_asm_procedurego_ask_14 org/nlogo/nvm/Context org/nlogo/agent/IndexedAgentSet] []
           ALOAD 2
           ALOAD 0
           GETFIELD org/nlogo/prim/_asm_procedurego_ask_14.world : Lorg/nlogo/agent/World;
@@ -1667,34 +1691,30 @@ procedure GO:[ACTIVE-PATCHES OVERLOADED-PATCHES]{O---}:
                L0
                 ALOAD 1
                 GETFIELD org/nlogo/nvm/Context.agent : Lorg/nlogo/agent/Agent;
-                ASTORE 3
-                ALOAD 3
+                ASTORE 2
+                ALOAD 2
                 INSTANCEOF org/nlogo/agent/Turtle
                 IFEQ L1
-                ALOAD 3
+                ALOAD 2
                 CHECKCAST org/nlogo/agent/Turtle
                 INVOKEVIRTUAL org/nlogo/agent/Turtle.getPatchHere ()Lorg/nlogo/agent/Patch;
-                ASTORE 2
                 GOTO L2
                L1
-               FRAME APPEND [T org/nlogo/agent/Agent]
-                ALOAD 3
+               FRAME APPEND [org/nlogo/agent/Agent]
+                ALOAD 2
                 INSTANCEOF org/nlogo/agent/Patch
                 IFEQ L3
-                ALOAD 3
+                ALOAD 2
                 CHECKCAST org/nlogo/agent/Patch
-                ASTORE 2
                 GOTO L2
                L3
                FRAME SAME
-                NEW scala/MatchError
+                NEW java/lang/IllegalStateException
                 DUP
-                ALOAD 3
-                INVOKESPECIAL scala/MatchError.<init> (Ljava/lang/Object;)V
+                INVOKESPECIAL java/lang/IllegalStateException.<init> ()V
                 ATHROW
                L2
-               FRAME FULL [org/nlogo/prim/_asm_procedurego_neighbors4_21 org/nlogo/nvm/Context org/nlogo/agent/Patch org/nlogo/agent/Agent] []
-                ALOAD 2
+               FRAME SAME1 org/nlogo/agent/Patch
                 INVOKEVIRTUAL org/nlogo/agent/Patch.getNeighbors4 ()Lorg/nlogo/agent/IndexedAgentSet;
                L4
                 ARETURN
@@ -1827,7 +1847,7 @@ procedure COLORIZE:[]{-TP-}:
           ATHROW
          L3
          FRAME SAME1 java/lang/Object
-          LDC 3.0
+          LDC 3.0D
          L4
           DSTORE 3
           ASTORE 2
@@ -1869,7 +1889,7 @@ procedure COLORIZE:[]{-TP-}:
           INVOKESTATIC java/lang/Double.valueOf (D)Ljava/lang/Double;
           INVOKESTATIC org/nlogo/api/TypeNames.aName (Ljava/lang/Object;)Ljava/lang/String;
           AASTORE
-          INVOKEINTERFACE org/nlogo/core/I18NJava.getN (Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;
+          INVOKEINTERFACE org/nlogo/core/I18NJava.getN (Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String; (itf)
           INVOKESPECIAL org/nlogo/nvm/RuntimePrimitiveException.<init> (Lorg/nlogo/api/Context;Lorg/nlogo/nvm/Instruction;Ljava/lang/String;)V
           ATHROW
          L8

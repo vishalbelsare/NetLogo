@@ -6,7 +6,7 @@ import org.nlogo.core.WorldDimensions
 import org.nlogo.core.{ View => CoreView }
 
 class WorldLoader {
-  def load(view: CoreView, worldInterface: WorldLoaderInterface) {
+  def load(view: CoreView, worldInterface: WorldLoaderInterface): Unit = {
     val d = view.dimensions
 
     // set the visiblity of the ticks counter first because it changes the minimum size of the
@@ -49,7 +49,7 @@ class WorldLoader {
     val widgetWidth = world.calculateWidth(d.width, d.patchSize)
     val minWidth = world.getMinimumWidth
     if(widgetWidth < minWidth)
-      world.computePatchSize(minWidth - world.insetWidth, d.width)
+      world.computePatchSize(minWidth - world.insetWidth(), d.width)
     else
       d.patchSize
   }
@@ -57,9 +57,9 @@ class WorldLoader {
 
 class WorldLoader3D extends WorldLoader {
   override def getWidth(world: WorldLoaderInterface, d: WorldDimensions, v: CoreView) =
-    v.right - v.left
+    v.width
   override def getHeight(world: WorldLoaderInterface, d: WorldDimensions, adjustedPatchSize: Double, v: CoreView) =
-    v.bottom - v.top
+    v.height
   override def adjustPatchSize(world: WorldLoaderInterface, d: WorldDimensions) =
     d.patchSize
 }

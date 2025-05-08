@@ -2,45 +2,24 @@
 
 package org.nlogo.window
 
-import java.awt.{ Component, Dimension, Font, Point, Rectangle }
-import javax.swing.{ JPopupMenu, BorderFactory }
+import java.awt.{ Dimension, Point, Rectangle }
+import javax.swing.border.LineBorder
 
 import org.nlogo.api.{ Approximate, Version }
-import org.nlogo.awt.{ Fonts => NlogoFonts }
-import org.nlogo.core.{ View => CoreView }
+import org.nlogo.core.{Widget=>CoreWidget}
+import org.nlogo.swing.PopupMenu
+import org.nlogo.theme.InterfaceColors
 import org.nlogo.window.Events.ResizeViewEvent
 import org.nlogo.window.MouseMode._
-
-
-object ViewWidget {
-  private val InsideBorderHeight = 1
-
-  // The 245 here was determined empirically by measuring the width
-  // on Mac OS X and then adding some slop.  Yes, this an incredible
-  // kludge, but I figure it's not worth it to try to do it the right
-  // way, since all of this view widget sizing code is targeted to be
-  // thrown out and redone anyway - ST 1/20/11
-  private val MaxViewWidthFudgeValue = 245
-}
 
 class ViewWidget(workspace: GUIWorkspace)
     extends Widget
     with ViewWidgetInterface {
 
-  import ViewWidget._
-
-  type WidgetModel = CoreView
-
   val view = new View(workspace)
   val tickCounter = new TickCounterLabel(workspace.world)
   val displaySwitch = new DisplaySwitch(workspace)
 
-  NlogoFonts.adjustDefaultFont(tickCounter)
-
-  setBackground(InterfaceColors.GRAPHICS_BACKGROUND)
-  setBorder(BorderFactory.createCompoundBorder(
-        widgetBorder,
-        BorderFactory.createMatteBorder(1, 1, 2, 2, InterfaceColors.GRAPHICS_BACKGROUND)))
   setLayout(null)
   add(view)
   val settings: WorldViewSettings =
@@ -52,7 +31,7 @@ class ViewWidget(workspace: GUIWorkspace)
   override def classDisplayName: String = "World & View"
 
   final def getExtraHeight: Int =
-    getInsets.top + getInsets.bottom + InsideBorderHeight
+    getInsets.top + getInsets.bottom
 
   def getAdditionalHeight: Int =
     getExtraHeight
@@ -67,9 +46,7 @@ class ViewWidget(workspace: GUIWorkspace)
     // view.setBounds will force the Renderer to a particular size, overriding the
     // calculation the Render makes internally if need be -- CLB
     view.visualPatchSize(patchSize)
-    view.setBounds(getInsets.left,
-      getInsets.top + InsideBorderHeight,
-      availableWidth, graphicsHeight)
+    view.setBounds(getInsets.left, getInsets.top, availableWidth, graphicsHeight)
   }
 
   override def getEditable: AnyRef =
@@ -92,10 +69,8 @@ class ViewWidget(workspace: GUIWorkspace)
 
   // just returning zeros prevents the "smart" preferred-size
   // code in EditView from getting confused - ST 6/6/02
-  override def getPreferredSize(font: Font): Dimension =
+  override def getPreferredSize: Dimension =
     new Dimension(0, 0)
-
-  override def needsPreferredWidthFudgeFactor: Boolean = false
 
   override def getMinimumSize: Dimension = {
     val gSize = view.getMinimumSize
@@ -143,20 +118,6 @@ class ViewWidget(workspace: GUIWorkspace)
     setBounds(bounds.x, bounds.y, bounds.width, bounds.height)
   }
 
-  override def getBoundsString: String = {
-    // If we're in a zoomed container, save the unzoomed size
-    val r =
-      if (findWidgetContainer == null)
-        getBounds()
-      else
-        findWidgetContainer.getUnzoomedBounds(this)
-
-    val width = StrictMath.max(MaxViewWidthFudgeValue, r.width)
-    // and, ugh, this is copy-and-pasted from Widget.java. more
-    // kludginess - ST 1/20/11
-    Seq(r.x, r.y, r.x + width, r.y + r.height).mkString("\n")
-  }
-
   override def constrainDrag(newBounds: Rectangle,
     originalBounds: Rectangle,
     mouseMode: MouseMode): Rectangle = {
@@ -178,7 +139,7 @@ class ViewWidget(workspace: GUIWorkspace)
     workspace.world.patchSize(newPatchSize)
     view.setSize(worldWidth, worldHeight, newPatchSize)
 
-    view.renderer.trailDrawer.rescaleDrawing
+    view.renderer.trailDrawer.rescaleDrawing()
 
     val newWidth = ((newPatchSize * worldWidth) + insetWidth).toInt
     val newHeight = ((newPatchSize * worldHeight) + getExtraHeight).toInt
@@ -212,6 +173,12 @@ class ViewWidget(workspace: GUIWorkspace)
     new Rectangle(newX, newY, newWidth, newHeight)
   }
 
+  override def syncTheme(): Unit = {
+    setBackgroundColor(InterfaceColors.viewBackground())
+    setBorder(new LineBorder(InterfaceColors.viewBorder(), 2))
+    tickCounter.syncTheme()
+  }
+
   /// font handling for turtle and patch labels
 
   private[window] def applyNewFontSize(newFontSize: Int): Unit = {
@@ -219,10 +186,6 @@ class ViewWidget(workspace: GUIWorkspace)
     val zoomDiff = font.getSize - view.fontSize
     view.applyNewFontSize(newFontSize, zoomDiff)
   }
-
-  /// tell the zooming code it's OK to grab our subcomponents and zoom them too
-
-  override def zoomSubcomponents: Boolean = true
 
   /// ViewWidgetInterface
 
@@ -233,8 +196,9 @@ class ViewWidget(workspace: GUIWorkspace)
   override def hasContextMenu: Boolean =
     true;
 
-  override def populateContextMenu(menu: JPopupMenu, p: Point, source: Component): Point =
-    view.populateContextMenu(menu, p, source)
+  override def populateContextMenu(menu: PopupMenu, p: Point): Unit = {
+    view.populateContextMenu(menu, p)
+  }
 
   /// display switch
 
@@ -245,10 +209,10 @@ class ViewWidget(workspace: GUIWorkspace)
 
   /// load & save
 
-  override def model: WidgetModel =
+  override def model: CoreWidget =
     settings.model
 
-  override def load(view: WidgetModel): AnyRef =
+  override def load(view: CoreWidget): Unit =
     settings.load(view)
 
   override def copyable: Boolean = false

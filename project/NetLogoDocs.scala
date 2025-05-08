@@ -29,6 +29,7 @@ class NetLogoDocs(
     "extension-manager"   -> "Extension Manager Guide",
     "shapes"              -> "Shapes Editor Guide",
     "behaviorspace"       -> "BehaviorSpace Guide",
+    "behaviorspace-spanish" -> "BehaviorSpace Guide en Español",
     "systemdynamics"      -> "System Dynamics Guide",
     "hubnet"              -> "HubNet Guide",
     "hubnet-authoring"    -> "HubNet Authoring Guide",
@@ -68,7 +69,7 @@ class NetLogoDocs(
   }
 
   private def infoTabHTML: String = {
-    InfoTabGenerator(modelsDirectory / "Code Examples" / "Info Tab Example.nlogo")
+    InfoTabGenerator(modelsDirectory / "Code Examples" / "Info Tab Example.nlogox")
   }
 
   def generatePDF(buildVariables: Map[String, Object], documentedExtensions: Seq[(String, String)]): File = {

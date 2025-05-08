@@ -2,19 +2,19 @@
 
 package org.nlogo.workspace
 
-import org.nlogo.api.{ MersenneTwisterFast, PlotInterface }
+import org.nlogo.api.PlotInterface
 import org.nlogo.plot.PlotManager
 import org.nlogo.nvm.Context
 
 trait Plotting { this: AbstractWorkspace =>
 
-  val plotRNG = new MersenneTwisterFast()
+  val plotRNG = this.world.mainRNG.clone
 
   val realPlotManager = new PlotManager(this, plotRNG)
   val plotManager     = realPlotManager
 
   // methods used when importing plots
-  def currentPlot(plot: String) {
+  def currentPlot(plot: String): Unit = {
     plotManager.currentPlot = plotManager.maybeGetPlot(plot)
   }
 
@@ -26,11 +26,11 @@ trait Plotting { this: AbstractWorkspace =>
   // runtime.  So once we know the Context, we store it in a bit of mutable state
   // in Evaluator. - ST 3/2/10
 
-  def updatePlots(c: Context) {
+  def updatePlots(c: Context): Unit = {
     evaluator.withContext(c){ plotManager.updatePlots() }
   }
 
-  def setupPlots(c: Context) {
+  def setupPlots(c: Context): Unit = {
     evaluator.withContext(c){ plotManager.setupPlots() }
   }
 

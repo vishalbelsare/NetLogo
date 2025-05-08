@@ -2,7 +2,8 @@
 package org.nlogo.shape
 
 import java.awt.Color
-import java.util.Observable
+
+import java.beans.{ PropertyChangeListener, PropertyChangeSupport }
 
 import org.nlogo.{ core, api },
   core.Shape,
@@ -41,11 +42,18 @@ object VectorShape {
 }
 
 @SerialVersionUID(0L)
-class VectorShape extends Observable with BaseVectorShape with Cloneable with java.io.Serializable with DrawableShape {
+class VectorShape
+  extends BaseVectorShape
+  with Cloneable
+  with java.io.Serializable
+  with DrawableShape {
+
   var name: String = ""
 
   var editableColorIndex: Int = 0
   var rotatable: Boolean = true
+
+  val propertyChangeSupport = new PropertyChangeSupport(this)
 
   private var _fgRecolorable: VectorShape.Recolorable.Recolorable =
     VectorShape.Recolorable.UNKNOWN
@@ -64,7 +72,7 @@ class VectorShape extends Observable with BaseVectorShape with Cloneable with ja
   override def clone: VectorShape =
     try {
       val newShape = super.clone.asInstanceOf[VectorShape]
-      newShape.elementList = ArrayBuffer(elementList.map(_.clone.asInstanceOf[Element]): _*)
+      newShape.elementList = elementList.map(_.clone.asInstanceOf[Element])
       newShape
     } catch {
       case ex: CloneNotSupportedException => throw new IllegalStateException(ex)
@@ -73,10 +81,13 @@ class VectorShape extends Observable with BaseVectorShape with Cloneable with ja
   def setOutline() =
     elementList.foreach(_.filled = false)
 
-  def getElements: java.util.List[Element] = {
-    import scala.collection.JavaConverters._
-    elementList.toList.asJava
+  def getElementsJ: java.util.List[Element] = {
+    import scala.jdk.CollectionConverters.SeqHasAsJava
+    elementList.asJava
   }
+
+  def getElements: Seq[Element] =
+    elementList.toSeq
 
   def setRotatable(rotatable: Boolean) =
     this.rotatable = rotatable
@@ -118,18 +129,28 @@ class VectorShape extends Observable with BaseVectorShape with Cloneable with ja
     val modifiedElements = newEls
     if (modifiedElements != elementList) {
       elementList = modifiedElements
-      setChanged()
       notifyObservers()
     }
   }
 
   def changed(): Unit = {
-    setChanged()
     notifyObservers()
   }
 
+  def addPropertyChangeListener(listener: PropertyChangeListener): Unit = {
+    propertyChangeSupport.addPropertyChangeListener(listener)
+  }
+
+  def removePropertyChangeListener(listener: PropertyChangeListener): Unit = {
+    propertyChangeSupport.removePropertyChangeListener(listener)
+  }
+
+  def notifyObservers(): Unit = {
+    propertyChangeSupport.firePropertyChange("shapeChanged", null, null)
+  }
+
   def remove(element: Element) =
-    modifyingElements { elementList - element }
+    elementList -= element
 
   def removeLast() =
     modifyingElements { elementList.dropRight(1) }
@@ -188,11 +209,7 @@ class VectorShape extends Observable with BaseVectorShape with Cloneable with ja
     s"Shape $name:\n${elementList.map(_.toString)}"
 
   override def toString: String =
-    (Seq(
-      name,
-      rotatable,
-      editableColorIndex) ++
-      elementList.filter(_.shouldSave).map(_.toString)).mkString("\n")
+    (Seq[Any](name, rotatable, editableColorIndex) ++ elementList.filter(_.shouldSave).map(_.toString)).mkString("\n")
 
   def addElement(element: Element) =
     if (element != null)

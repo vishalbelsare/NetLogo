@@ -2,9 +2,10 @@
 
 package org.nlogo.shape
 
-import org.nlogo.api.GraphicsInterface
 import java.awt.Color
 import java.io.IOException
+
+import org.nlogo.api.GraphicsInterface
 
 trait ShapesManagerInterface {
   def reset(): Unit
@@ -17,7 +18,7 @@ trait LinkShapesManagerInterface extends ShapesManagerInterface
 
 trait DrawableShape {
   def isRotatable: Boolean
-  def paint(g: GraphicsInterface, color: Color, x: Int, y: Int, cellSize: Double, angle: Int)
+  def paint(g: GraphicsInterface, color: Color, x: Int, y: Int, cellSize: Double, angle: Int): Unit
   def getEditableColorIndex: Int
 }
 

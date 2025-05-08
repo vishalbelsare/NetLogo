@@ -2,21 +2,24 @@
 
 package org.nlogo.lab.gui
 
-import org.nlogo.api.{Editable, Property}
+import java.awt.Window
+
+import org.nlogo.api.{ LabDefaultValues, LabRunOptions }
 import org.nlogo.awt.UserCancelException
-import org.nlogo.window.EditDialogFactoryInterface
-import Supervisor.RunOptions
+import org.nlogo.core.I18N
+import org.nlogo.window.{ DummyErrorHandler, Editable, EditDialogFactory, EditPanel }
 
 import java.io.File
 import java.util.prefs.Preferences
 
-class RunOptionsDialog(parent: java.awt.Dialog,
-                       dialogFactory: EditDialogFactoryInterface,
-                       filePrefix: String)
-{
+class RunOptionsDialog(parent: Window, dialogFactory: EditDialogFactory, filePrefix: String) {
   val userHome = System.getProperty("user.home")
   val spreadsheetFile = s"$filePrefix-spreadsheet.csv"
   val tableFile = s"$filePrefix-table.csv"
+  val statsFile = s"$filePrefix-stats.csv"
+  val listsFile = s"$filePrefix-lists.csv"
+  val totalProcessors = Runtime.getRuntime.availableProcessors
+  val defaultProcessors = LabDefaultValues.getDefaultThreads
 
   object Prefs {
     private val prefs = Preferences.userNodeForPackage(RunOptionsDialog.this.getClass)
@@ -53,48 +56,92 @@ class RunOptionsDialog(parent: java.awt.Dialog,
         append(replaceTrue(t), tableFile)
       }
     }
+    def stats = {
+      val t = prefs.get("stats", "")
+      if (emptyVals.contains(t)) { "" } else {
+        append(replaceTrue(t), statsFile)
+      }
+    }
+    def lists = {
+      val l = prefs.get("lists", "")
+      if (emptyVals.contains(l)) { "" } else {
+        append(replaceTrue(l), listsFile)
+      }
+    }
     def updateView = prefs.getBoolean("updateView", true)
     def updatePlotsAndMonitors = prefs.getBoolean("updatePlotsAndMonitors", true)
-    def updateFrom(runOptions: RunOptions): Unit = {
+    def updateThreadCount = prefs.getInt("threadCount", defaultProcessors)
+    def updateFrom(runOptions: LabRunOptions): Unit = {
       prefs.put("spreadsheet", parentDirectory(runOptions.spreadsheet))
       prefs.put("table", parentDirectory(runOptions.table))
+      prefs.put("stats", parentDirectory(runOptions.stats))
+      prefs.put("lists", parentDirectory(runOptions.lists))
       prefs.putBoolean("updateView", runOptions.updateView)
       prefs.putBoolean("updatePlotsAndMonitors", runOptions.updatePlotsAndMonitors)
+      prefs.putInt("threadCount", runOptions.threadCount)
     }
   }
   def get = {
     val editable = new EditableRunOptions
-    if(dialogFactory.canceled(parent, editable))
+    if (dialogFactory.canceled(parent, editable))
       throw new UserCancelException
     val runOptions = editable.get
     Prefs.updateFrom(runOptions)
     runOptions
   }
-  class EditableRunOptions extends Editable {
-    var spreadsheet = Prefs.spreadsheet
-    var table = Prefs.table
-    var updateView = Prefs.updateView
-    var updatePlotsAndMonitors = Prefs.updatePlotsAndMonitors
-    var threadCount = Runtime.getRuntime.availableProcessors
-    val classDisplayName = "Run options"
-    val propertySet = {
-      import scala.collection.JavaConverters._
-      List(
-        Property("spreadsheet", Property.FilePath(spreadsheetFile), "Spreadsheet output"),
-        Property("table", Property.FilePath(tableFile), "Table output"),
-        Property("updateView", Property.Boolean, "Update view"),
-        Property("updatePlotsAndMonitors", Property.Boolean, "Update plots and monitors"),
-        Property("threadCount", Property.Integer, "Simultaneous runs in parallel",
-                 "<html>If more than one, some runs happen invisibly in the background." +
-                 "<br>Defaults to one per processor core.</html>")).asJava
+  class EditableRunOptions extends Editable with DummyErrorHandler {
+    private implicit val i18nPrefix: org.nlogo.core.I18N.Prefix = I18N.Prefix("tools.behaviorSpace.runoptions")
+    private var _spreadsheet = Prefs.spreadsheet
+    private var _table = Prefs.table
+    private var _stats = Prefs.stats
+    private var _lists = Prefs.lists
+    private var _updateView = Prefs.updateView
+    private var _updatePlotsAndMonitors = Prefs.updatePlotsAndMonitors
+    private var _threadCount = Prefs.updateThreadCount
+    val classDisplayName = I18N.gui("title")
+
+    def spreadsheet: String = _spreadsheet
+    def setSpreadsheet(s: String): Unit = {
+      _spreadsheet = s
     }
-    def get = RunOptions(threadCount, table, spreadsheet, updateView, updatePlotsAndMonitors)
+
+    def table: String = _table
+    def setTable(s: String): Unit = {
+      _table = s
+    }
+
+    def stats: String = _stats
+    def setStats(s: String): Unit = {
+      _stats = s
+    }
+
+    def lists: String = _lists
+    def setLists(s: String): Unit = {
+      _lists = s
+    }
+
+    def updateView: Boolean = _updateView
+    def setUpdateView(b: Boolean): Unit = {
+      _updateView = b
+    }
+
+    def updatePlotsAndMonitors: Boolean = _updatePlotsAndMonitors
+    def setUpdatePlotsAndMonitors(b: Boolean): Unit = {
+      _updatePlotsAndMonitors = b
+    }
+
+    def threadCount: Int = _threadCount
+    def setThreadCount(i: Int): Unit = {
+      _threadCount = i
+    }
+
+    override def editPanel: EditPanel = new RunOptionsEditPanel(this, spreadsheetFile, tableFile, statsFile, listsFile,
+                                                                defaultProcessors.toString, totalProcessors.toString)
+
+    def get = LabRunOptions(threadCount, table, spreadsheet, stats, lists, updateView, updatePlotsAndMonitors, false)
     // boilerplate for Editable
     def helpLink = None
-    def error(key:Object) = null
-    def error(key:Object, e: Exception){}
-    def anyErrors = false
     val sourceOffset = 0
-    def editFinished = true
+    def editFinished() = true
   }
 }

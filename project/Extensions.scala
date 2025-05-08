@@ -1,10 +1,10 @@
 import java.io.File
+import scala.sys.process._
 import sbt._
 import Keys._
 
 import Def.Initialize
 import sbt.complete.{ Parser, DefaultParsers }, Parser.success, DefaultParsers._
-import SbtSubdirectory.runSubdirectoryCommand
 
 import scala.sys.process.Process
 
@@ -47,25 +47,25 @@ object Extensions {
 
   lazy val settings = Seq(
     extensionNetLogoJar := {
-      (packageBin in Test).value
-      (packageBin in Compile).value
+      (Test / packageBin).value
+      (Compile / packageBin).value
     },
     forExtension := {
       val (extensionDir, command) = extensionAndCommandParser.parsed
-
-      runSubdirectoryCommand(extensionDir, state.value, extensionNetLogoJar.value, Seq(command))
+      streams.value.log.info(s"running ${command} on ${extensionDir.getName}")
+      sbtExec(extensionDir, command, extensionNetLogoJar.value.getAbsolutePath)
     },
     forAllExtensions := {
       val command = initSbtCommandParser.parsed
       val dirs = extensionDirs(extensionRoot.value)
-
+      streams.value.log.info(s"running ${command} on each extension")
       dirs.foreach { dir =>
-        runSubdirectoryCommand(dir, state.value, extensionNetLogoJar.value, Seq(command))
+        sbtExec(dir, command, extensionNetLogoJar.value.getAbsolutePath)
       }
     },
     extension  := {
       val extensionDir = extensionParser.parsed
-      streams.value.log.info("building extension: " + extensionDir.getName)
+      streams.value.log.info(s"building extension: ${extensionDir.getName}")
       buildExtension(extensionDir, extensionNetLogoJar.value, state.value)(Set()).toSeq
     },
     extensions := {
@@ -95,8 +95,22 @@ object Extensions {
   }
 
   private def buildExtension(dir: File, netLogoJar: File, state: State): Set[File] => Set[File] = {
-    runSubdirectoryCommand(dir, state, netLogoJar, Seq("package"))
+    sbtExec(dir, "package", netLogoJar.getAbsolutePath)
 
     { files => Set(dir / (dir.getName + ".jar")) }
+  }
+
+  private def sbtExec(dir: File, command: String, netlogoJarPath: String): Unit = {
+    val formatCommand = Option(System.getProperty("sbt.log.noformat")).map( (o) =>
+      s"-Dsbt.log.noformat=$o"
+    ).toSeq
+    val sbtName =
+      if (System.getProperty("os.name").startsWith("Windows"))
+        "sbt.bat"
+      else
+        "sbt"
+    val sbtCommand = Seq(sbtName, s"-Dnetlogo.jar.file=${netlogoJarPath}") ++ formatCommand ++ Seq(command)
+    val result = Process(sbtCommand, dir).!
+    assert(result == 0, s"failed to ${command} ${dir.getName}, exitCode = ${result}")
   }
 }
